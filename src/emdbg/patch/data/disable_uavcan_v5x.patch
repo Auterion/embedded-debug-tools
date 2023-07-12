@@ -1,0 +1,16 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/boards/px4/fmu-v5x/default.px4board b/boards/px4/fmu-v5x/default.px4board
+index 066fb52e1e..4b81d213ff 100644
+--- a/boards/px4/fmu-v5x/default.px4board
++++ b/boards/px4/fmu-v5x/default.px4board
+@@ -44,7 +44,7 @@ CONFIG_DRIVERS_SAFETY_BUTTON=y
+ CONFIG_DRIVERS_SMART_BATTERY_BATMON=y
+ CONFIG_COMMON_TELEMETRY=y
+ CONFIG_DRIVERS_TONE_ALARM=y
+-CONFIG_DRIVERS_UAVCAN=y
++CONFIG_DRIVERS_UAVCAN=n
+ CONFIG_MODULES_AIRSPEED_SELECTOR=y
+ CONFIG_MODULES_ATTITUDE_ESTIMATOR_Q=y
+ CONFIG_MODULES_BATTERY_STATUS=y

@@ -1,0 +1,65 @@
+[build-system]
+requires = [ "setuptools>=41", "wheel", "setuptools-git-versioning<2", ]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "emdbg"
+authors = [
+    {name = "Auterion", email = "success@auterion.com"},
+]
+description = "Embedded Debug Tools"
+readme = "README.md"
+requires-python = ">=3.8"
+keywords = ["embedded", "debug", "gdb", "stm32", "px4"]
+license = {text = "BSD-3-Clause"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: Unix",
+    "Programming Language :: Python :: 3.8",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: Software Development :: Testing",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Operating System",
+    "Topic :: System :: Operating System Kernels",
+]
+dependencies = [
+    "pyserial",
+    "graphviz",
+    "pygdbmi",
+    "cmsis-svd",
+    "arm-gdb",
+    "pydwf",
+    "yoctopuce",
+    "rpyc",
+]
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/auterion/embedded-debug-tools"
+
+[project.optional-dependencies]
+all = ["pdoc"]
+# Make our specific hardware drivers optional too?
+# digilent = ["pydwf"]
+# yocto = ["yoctopuce"]
+# rpyc = ["rpyc"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+emdbg = ["*.md"]
+"emdbg.patch.data" = ["*"]
+"emdbg.bench.data" = ["*"]
+
+[tool.setuptools]
+# GDB expects plain text config files!
+zip-safe = false
+
+[tool.setuptools-git-versioning]
+enabled = true
+version_file = "VERSION"

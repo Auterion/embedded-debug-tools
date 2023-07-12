@@ -1,0 +1,196 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
+index e9f69dfe1a..af427937e4 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
+@@ -33,6 +33,7 @@
+
+ #include "sched/sched.h"
+ #include "semaphore/semaphore.h"
++#include <nuttx/itm/itm.h>
+
+ /****************************************************************************
+  * Public Functions
+@@ -69,6 +70,7 @@
+
+ int nxsem_post(FAR sem_t *sem)
+ {
++  EMDBG_LOG_SEMAPHORE_POST(sem);
+   FAR struct tcb_s *stcb = NULL;
+   irqstate_t flags;
+   int ret = -EINVAL;
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
+index eec67723d7..fea433e2f5 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
+@@ -34,6 +34,7 @@
+
+ #include "sched/sched.h"
+ #include "semaphore/semaphore.h"
++#include <nuttx/itm/itm.h>
+
+ /****************************************************************************
+  * Public Functions
+@@ -69,6 +70,7 @@
+
+ int nxsem_wait(FAR sem_t *sem)
+ {
++  EMDBG_LOG_SEMAPHORE_WAIT(sem);
+   FAR struct tcb_s *rtcb = this_task();
+   irqstate_t flags;
+   int ret = -EINVAL;
+diff --git a/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c b/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
+index 1b2abd47a3..7551b92366 100644
+--- a/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
++++ b/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
+@@ -27,6 +27,7 @@
+ #include <stdbool.h>
+ #include <queue.h>
+ #include <assert.h>
++#include <nuttx/itm/itm.h>
+
+ #include "irq/irq.h"
+ #include "sched/sched.h"
+@@ -108,6 +109,7 @@ bool nxsched_add_readytorun(FAR struct tcb_s *btcb)
+       ret = false;
+     }
+
++  if (!ret) emdbg_itm16_block(EMDBG_TASK_RUNNABLE, btcb->pid);
+   return ret;
+ }
+ #endif /* !CONFIG_SMP */
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/task/task_prctl.c b/platforms/nuttx/NuttX/nuttx/sched/task/task_prctl.c
+index 017ee5b55b..bcd193ecc0 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/task/task_prctl.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/task/task_prctl.c
+@@ -31,6 +31,7 @@
+ #include <debug.h>
+
+ #include <nuttx/sched.h>
++#include <nuttx/itm/itm.h>
+
+ #include "sched/sched.h"
+ #include "task/task.h"
+@@ -128,6 +129,7 @@ int prctl(int option, ...)
+
+               strncpy(tcb->name, name, CONFIG_TASK_NAME_SIZE);
+               tcb->name[CONFIG_TASK_NAME_SIZE] = '\0';
++              EMDBG_LOG_TASK_START(tcb);
+             }
+           else
+             {
+diff --git a/platforms/nuttx/src/px4/common/cpuload.cpp b/platforms/nuttx/src/px4/common/cpuload.cpp
+index 62c5c6205d..2c22732b32 100644
+--- a/platforms/nuttx/src/px4/common/cpuload.cpp
++++ b/platforms/nuttx/src/px4/common/cpuload.cpp
+@@ -48,6 +48,7 @@
+ #if defined(__PX4_NUTTX) && defined(CONFIG_SCHED_INSTRUMENTATION)
+ __BEGIN_DECLS
+ # include <nuttx/sched_note.h>
++# include <nuttx/itm/itm.h>
+ 
+ __EXPORT struct system_load_s system_load;
+ 
+@@ -110,6 +111,7 @@ void cpuload_initialize_once()
+ 
+ void sched_note_start(FAR struct tcb_s *tcb)
+ {
++  EMDBG_LOG_TASK_START(tcb);
+   // find first free slot
+   if (system_load.initialized) {
+      for (auto &task : system_load.tasks) {
+@@ -128,6 +130,7 @@ void sched_note_start(FAR struct tcb_s *tcb)
+ 
+ void sched_note_stop(FAR struct tcb_s *tcb)
+ {
++  emdbg_itm16_block(EMDBG_TASK_STOP, tcb->pid);
+   if (system_load.initialized) {
+      for (auto &task : system_load.tasks) {
+         if (task.tcb && task.tcb->pid == tcb->pid) {
+@@ -143,8 +146,11 @@ void sched_note_stop(FAR struct tcb_s *tcb)
+   }
+ }
+ 
++static uint8_t emdbg_prev_state = 0;
+ void sched_note_suspend(FAR struct tcb_s *tcb)
+ {
++  emdbg_prev_state = tcb->task_state;
++  emdbg_itm16_block(EMDBG_TASK_SUSPEND, tcb->pid);
+   if (system_load.initialized) {
+      if (tcb->pid == 0) {
+         system_load.tasks[0].total_runtime += hrt_elapsed_time(&system_load.tasks[0].curr_start_time);
+@@ -170,6 +176,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
+ 
+ void sched_note_resume(FAR struct tcb_s *tcb)
+ {
++  EMDBG_LOG_TASK_RESUME(tcb, emdbg_prev_state);
+   if (system_load.initialized) {
+      if (tcb->pid == 0) {
+         hrt_store_absolute_time(&system_load.tasks[0].curr_start_time);
+@@ -191,5 +198,49 @@ void sched_note_resume(FAR struct tcb_s *tcb)
+      }
+   }
+ }
++
++#ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
++void sched_note_premption(FAR struct tcb_s *tcb, bool locked)
++{
++  const uint8_t channel = locked ? EMDBG_PREEMPTION_LOCK : EMDBG_PREEMPTION_UNLOCK;
++  emdbg_itm8(channel, tcb->lockcount);
++}
++#endif
++
++#ifdef CONFIG_SCHED_INSTRUMENTATION_CSECTION
++void sched_note_csection(FAR struct tcb_s *tcb, bool enter)
++{
++  const uint8_t channel = enter ? EMDBG_CSECTION_ENTER : EMDBG_CSECTION_LEAVE;
++  emdbg_itm8(channel, tcb->irqcount);
++}
++#endif
++
++#ifdef CONFIG_SCHED_INSTRUMENTATION_SPINLOCKS
++static inline void note_spincommon(FAR volatile void *spinlock, int type)
++{
++  emdbg_itm16(type, (uint32_t)spinlock >> 3);
++}
++
++void sched_note_spinlock(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
++{
++  note_spincommon(spinlock, EMDBG_SPINLOCK_LOCK);
++}
++
++void sched_note_spinlocked(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
++{
++  note_spincommon(spinlock, EMDBG_SPINLOCK_LOCKED);
++}
++
++void sched_note_spinunlock(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
++{
++  note_spincommon(spinlock, EMDBG_SPINLOCK_UNLOCK);
++}
++
++void sched_note_spinabort(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
++{
++  note_spincommon(spinlock, EMDBG_SPINLOCK_ABORT);
++}
++#endif
++
+ __END_DECLS
+ #endif // PX4_NUTTX && CONFIG_SCHED_INSTRUMENTATION
+
+diff --git a/boards/px4/fmu-v5x/nuttx-config/nsh/defconfig b/boards/px4/fmu-v5x/nuttx-config/nsh/defconfig
+index 070350442f..5cc7c4c98e 100644
+--- a/boards/px4/fmu-v5x/nuttx-config/nsh/defconfig
++++ b/boards/px4/fmu-v5x/nuttx-config/nsh/defconfig
+@@ -135,6 +135,9 @@ CONFIG_SCHED_HPWORKPRIORITY=249
+ CONFIG_SCHED_HPWORKSTACKSIZE=1280
+ CONFIG_SCHED_INSTRUMENTATION=y
+ CONFIG_SCHED_INSTRUMENTATION_EXTERNAL=y
++CONFIG_SCHED_INSTRUMENTATION_PREEMPTION=y
++CONFIG_SCHED_INSTRUMENTATION_CSECTION=y
++CONFIG_SCHED_INSTRUMENTATION_SPINLOCKS=y
+ CONFIG_SCHED_LPWORK=y
+ CONFIG_SCHED_LPWORKPRIORITY=50
+ CONFIG_SCHED_LPWORKSTACKSIZE=1632

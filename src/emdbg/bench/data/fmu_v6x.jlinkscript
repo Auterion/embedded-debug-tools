@@ -1,0 +1,102 @@
+
+__constant U32 GPIOE_BASE = 0x58021000;
+__constant U32 GPIOE_MODER = GPIOE_BASE + 0x00;
+__constant U32 GPIOE_OTYPER = GPIOE_BASE + 0x04;
+__constant U32 GPIOE_SPEEDR = GPIOE_BASE + 0x08;
+__constant U32 GPIOE_PUPDR = GPIOE_BASE + 0x0C;
+__constant U32 GPIOE_LCKR = GPIOE_BASE + 0x1C;
+__constant U32 GPIOE_AFRL = GPIOE_BASE + 0x20;
+
+__constant U32 DBGMCU_BASE = 0xE00E1000;
+__constant U32 DBGMCU_CR = DBGMCU_BASE + 0x004;
+
+__constant U32 ITM_BASE = 0xE0000000;
+
+__constant U32 TPIU_BASE = 0xE0040000;
+__constant U32 TPIU_CURPSIZE = TPIU_BASE + 0x04;
+__constant U32 TPIU_LAR = TPIU_BASE + 0xFB0;
+
+__constant U32 ETM_BASE = 0xE0041000;
+__constant U32 ETM_LAR = ETM_BASE + 0xFB0;
+
+__constant U32 CS_KEY = 0xc5acce55;
+__constant U32 MASK0 = 0x00000000;
+__constant U32 MASK1 = 0x0000007C;
+__constant U32 MASK2 = 0x00003FF0;
+__constant U32 MASK2_01 = 0x00001550;
+__constant U32 MASK2_10 = 0x00002AA0;
+__constant U32 MASK4 = 0x0FFFFF00;
+
+
+U32 TRACE_CONFIGURED = 0;
+
+int OnTraceStart(void)
+{
+    U32 reg;
+
+    // PE2 = TRACECLK
+    // PE3 = TRACED0
+    // PE4 = TRACED1
+    // PE5 = TRACED2 x only 2-bit mode supported
+    // PE6 = TRACED3 x cannot use due to nARMED
+
+    JLINK_SYS_Report("Start: Initializing trace pins");
+
+    // Set Alternate Function 0
+    reg = JLINK_MEM_ReadU32(GPIOE_AFRL);
+    reg = (reg & ~MASK4) | MASK0;
+    JLINK_MEM_WriteU32(GPIOE_AFRL, reg);
+
+    // Set Output Type to PushPull
+    reg = JLINK_MEM_ReadU32(GPIOE_OTYPER);
+    reg &= ~MASK1;
+    JLINK_MEM_WriteU32(GPIOE_OTYPER, reg);
+
+    // Set Speed to Very High
+    reg = JLINK_MEM_ReadU32(GPIOE_SPEEDR);
+    reg = (reg & ~MASK2) | MASK2;
+    JLINK_MEM_WriteU32(GPIOE_SPEEDR, reg);
+
+    // No Pullups, No Pulldowns
+    reg = JLINK_MEM_ReadU32(GPIOE_PUPDR);
+    reg &= ~MASK2;
+    JLINK_MEM_WriteU32(GPIOE_PUPDR, reg);
+
+    // Set mode to Alternate Function 0b10
+    reg = JLINK_MEM_ReadU32(GPIOE_MODER);
+    reg = (reg & ~MASK2) | MASK2_10;
+    JLINK_MEM_WriteU32(GPIOE_MODER, reg);
+
+    // Lock down the pin configuration
+    reg = JLINK_MEM_ReadU32(GPIOE_LCKR);
+    reg |= MASK1;
+    JLINK_MEM_WriteU32(GPIOE_LCKR, reg | 0x00010000);
+    JLINK_MEM_WriteU32(GPIOE_LCKR, reg);
+    JLINK_MEM_WriteU32(GPIOE_LCKR, reg | 0x00010000);
+    JLINK_MEM_ReadU32(GPIOE_LCKR);
+    JLINK_MEM_ReadU32(GPIOE_LCKR);
+
+    JLINK_SYS_Report("End: Initializing trace pins");
+
+    // Enable the Trace Clock
+    reg = JLINK_MEM_ReadU32(DBGMCU_CR);
+    reg |= 0x100000; // TRACECLKEN
+    JLINK_MEM_WriteU32(DBGMCU_CR, reg);
+
+    // set *($ITMBASE+0xfb0) = CS_KEY
+    JLINK_MEM_WriteU32(ETM_LAR, CS_KEY);
+
+    JLINK_MEM_WriteU32(TPIU_LAR, CS_KEY);
+    JLINK_MEM_WriteU32(TPIU_CURPSIZE, (1 << 3));
+    // Set pin protocol to Sync Trace Port (TPIU_SPPR)
+    // set *($TPIUBASE+0xF0)=0
+
+    TRACE_CONFIGURED = 1;
+    return 0;
+}
+
+int ConfigTargetSettings(void) {
+  JLINK_ExecCommand("CORESIGHT_SetTPIUBaseAddr = 0xE0040000 ForceUnlock = 1"); // TPIU address is missing in ROM table
+  JLINK_SYS_Report("Set TPIU Base Address");
+  return 0;
+}

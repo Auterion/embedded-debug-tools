@@ -1,0 +1,15 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/platforms/nuttx/NuttX/nuttx/drivers/Makefile b/platforms/nuttx/NuttX/nuttx/drivers/Makefile
+index 88c5339aa1..e29a3cebfe 100644
+--- a/platforms/nuttx/NuttX/nuttx/drivers/Makefile
++++ b/platforms/nuttx/NuttX/nuttx/drivers/Makefile
+@@ -62,6 +62,7 @@ include contactless/Make.defs
+ include 1wire/Make.defs
+ include rf/Make.defs
+ include rc/Make.defs
++include itm/Make.defs
+ 
+ ifeq ($(CONFIG_SPECIFIC_DRIVERS),y)
+ include platform/Make.defs

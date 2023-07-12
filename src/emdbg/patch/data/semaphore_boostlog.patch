@@ -1,0 +1,97 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/Make.defs b/platforms/nuttx/NuttX/nuttx/sched/semaphore/Make.defs
+index 68049e3408..c3d2470ae3 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/Make.defs
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/Make.defs
+@@ -26,6 +26,7 @@ CSRCS += sem_recover.c sem_reset.c sem_waitirq.c
+ 
+ ifeq ($(CONFIG_PRIORITY_INHERITANCE),y)
+ CSRCS += sem_initialize.c sem_holder.c sem_setprotocol.c
++CSRCS += sem_boostlog.c
+ endif
+ 
+ ifeq ($(CONFIG_SPINLOCK),y)
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_holder.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_holder.c
+index 328b8fa82b..7edad90f17 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_holder.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_holder.c
+@@ -31,7 +31,7 @@
+ 
+ #include "sched/sched.h"
+ #include "semaphore/semaphore.h"
+-
++#include <semaphore_boostlog.h>
+ #ifdef CONFIG_PRIORITY_INHERITANCE
+ 
+ /****************************************************************************
+@@ -369,7 +369,7 @@ static int nxsem_boostholderprio(FAR struct semholder_s *pholder,
+            * disabled.  The holder thread may be marked "pending" and the
+            * switch may occur during up_block_task() processing.
+            */
+-
++          NX_SEMBOOST_LOG_PUSH_UP(rtcb);
+           nxsched_set_priority(htcb, rtcb->sched_priority);
+         }
+       else
+@@ -515,7 +515,7 @@ static int nxsem_restoreholderprio(FAR struct tcb_s *htcb,
+             htcb->npend_reprio == 0);
+ 
+           /* Reset the holder's priority back to the base priority. */
+-
++          NX_SEMBOOST_LOG_PUSH_DOWN(htcb->base_priority);
+           nxsched_reprioritize(htcb, htcb->base_priority);
+         }
+ 
+@@ -557,7 +557,7 @@ static int nxsem_restoreholderprio(FAR struct tcb_s *htcb,
+           /* And apply that priority to the thread (while retaining the
+            * base_priority)
+            */
+-
++          NX_SEMBOOST_LOG_PUSH_DOWN(rpriority);
+           nxsched_set_priority(htcb, rpriority);
+         }
+       else
+diff --git a/src/modules/logger/logger.cpp b/src/modules/logger/logger.cpp
+index d2a6b906d7..88e215162c 100644
+--- a/src/modules/logger/logger.cpp
++++ b/src/modules/logger/logger.cpp
+@@ -129,6 +129,29 @@ int logger_main(int argc, char *argv[])
+       return Logger::main(argc, argv);
+ }
+ 
++#include <semaphore_boostlog.h>
++static void sem_boostlog()
++{
++      nxsem_boostlog_item_t item;
++      static int nxsem_boostlog_dropped = 0;
++      int dropped;
++      if ((dropped = nxsem_boostlog_pop(&item)) >= 0)
++      {
++             if (item.reason[0]) {
++                    PX4_INFO("L%u %10lluus> %p: %25.24s %3d _/ %3d %.24s", item.line,
++                                   item.hrt, item.sem, item.name, item.prio_from,
++                                   item.prio_to, item.reason);
++             } else {
++                    PX4_INFO("L%u %10lluus> %p: %25.24s %3d \\_ %3d", item.line,
++                                   item.hrt, item.sem, item.name, item.prio_from, item.prio_to);
++             }
++             if (nxsem_boostlog_dropped != dropped) {
++                    PX4_WARN("Semaphore log dropped %d messages!", dropped);
++                    nxsem_boostlog_dropped = dropped;
++             }
++      }
++}
++
+ namespace px4
+ {
+ namespace logger
+@@ -690,6 +712,7 @@ void Logger::run()
+       bool was_started = false;
+ 
+       while (!should_exit()) {
++             sem_boostlog();
+              // Start/stop logging (depending on logging mode, by default when arming/disarming)
+              const bool logging_started = start_stop_logging();
+ 

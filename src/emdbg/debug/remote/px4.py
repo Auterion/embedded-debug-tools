@@ -1,0 +1,315 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+import gdb, argparse, shlex, re
+from collections import defaultdict
+# The import is relative only to the emdbg/debug folder, so that we do not pull
+# in any other dependencies
+import px4
+
+
+# Wrap functionality into user commands
+class PX4_Tasks(gdb.Command):
+    """
+    Print a table of all NuttX tasks and their current state.
+    """
+    def __init__(self):
+        super().__init__("px4_tasks", gdb.COMMAND_USER)
+        self.parser = argparse.ArgumentParser(self.__doc__)
+        self.parser.add_argument("-f", "--files", default=False, action="store_true",
+                                 help="Print the names of the open files.")
+
+    def invoke(self, argument, from_tty):
+        args = self.parser.parse_args(shlex.split(argument))
+        print(px4.all_tasks_as_table(gdb, with_file_names=args.files))
+
+
+class PX4_Registers(gdb.Command):
+    """
+    Print a table of all Cortex-M registers.
+    Optional argument is number of columns.
+    """
+    def __init__(self):
+        super().__init__("px4_registers", gdb.COMMAND_USER)
+
+    def invoke(self, argument, from_tty):
+        print(px4.all_registers_as_table(gdb, int(argument or 3)))
+
+
+class PX4_Interrupts(gdb.Command):
+    """
+    Print a table of all registered NuttX interrupts.
+    EPA = Enabled/Pending/Active, P = (Shifted) Priority
+    Optional argument is number of columns.
+    """
+    def __init__(self):
+        super().__init__("px4_interrupts", gdb.COMMAND_USER)
+
+    def invoke(self, argument, from_tty):
+        print(px4.vector_table_as_table(gdb, int(argument or 1)))
+
+
+class PX4_Gpios(gdb.Command):
+    """
+    Print a table of all GPIOs, their configuration and their FMU specific names.
+    You can sort the table with the `-s COLUMN` option and filter it by pin name
+
+    """
+    def __init__(self):
+        super().__init__("px4_gpios", gdb.COMMAND_USER)
+        self.parser = argparse.ArgumentParser(self.__doc__)
+        self.parser.add_argument("-f", "--filter", help="Regex filter for FMU names.")
+        self.parser.add_argument("-ff", "--function-filter", help="Regex filter for FMU functions.")
+        self.parser.add_argument("-pf", "--pin-filter", help="Regex filter for GPIO pin names.")
+        self.parser.add_argument("-s", "--sort", help="Column name to sort the table by.",
+                                 choices=["pin", "config", "i", "o", "af", "name", "function"])
+        self.parser.add_argument("-c", "--columns", type=int, default=2,
+                                 help="Number of columns to print.")
+
+    def invoke(self, argument, from_tty):
+        args = self.parser.parse_args(shlex.split(argument))
+        pinout = None
+        if "px4_fmu-v5x" in px4._TARGET:
+            pinout = px4.pinout_fmu_v5x
+        columns = args.columns
+        if args.pin_filter or args.filter or args.function_filter:
+            columns = 1
+        def pin_filter(row):
+            if args.pin_filter is not None and not re.search(args.pin_filter, row[0]):
+                return False
+            if len(row) > 5:
+                if args.filter is not None and not re.search(args.filter, row[5]):
+                    return False
+                if args.function_filter is not None and not re.search(args.function_filter, row[6]):
+                    return False
+            return True
+        print(px4.all_gpios_as_table(gdb, pinout, pin_filter, args.sort, columns))
+
+
+class PX4_Backtrace(gdb.Command):
+    """
+    Print a backtrace of the current frame.
+    This works like `backtrace`, except it doesn't fail internal GDB assertions.
+    """
+    def __init__(self):
+        super().__init__("px4_backtrace", gdb.COMMAND_USER)
+
+    def invoke(self, argument, from_tty):
+        print(px4.backtrace(gdb))
+
+
+class PX4_Switch_Task(gdb.Command):
+    """
+    Switch to a task pointer to inspect the task.
+    """
+    def __init__(self):
+        super().__init__("px4_switch_task", gdb.COMMAND_USER)
+
+    def invoke(self, argument, from_tty):
+        pointer = int(argument, 0) if argument else 0
+        px4.task_switch(gdb, pointer)
+
+
+class PX4_Relative_Breakpoint(gdb.Command):
+    """
+    Finds the absolute location of a relative line number offset and then sets
+    a breakpoint on that location. Backslashes in the regex pattern are preserved.
+
+    Location format: `file:function:+offset` or `file:function:regex`.
+    """
+    def __init__(self):
+        super().__init__("px4_rbreak", gdb.COMMAND_USER)
+
+    def invoke(self, argument, from_tty):
+        location = px4.utils.gdb_relative_location(gdb, argument)
+        gdb.execute(f"break {location}")
+
+
+class PX4_Coredump(gdb.Command):
+    """
+    Dump the volatile memories and registers.
+    Optional argument is the filename.
+    """
+    def __init__(self):
+        super().__init__("px4_coredump", gdb.COMMAND_USER)
+        self.parser = argparse.ArgumentParser(self.__doc__)
+        self.parser.add_argument("--memory", action="append",
+                                 help="Memory range in `start:size` format.")
+        self.parser.add_argument("--file",
+                                 help="Coredump filename, defaults to `coredump_{datetime}.txt`.")
+
+    def invoke(self, argument, from_tty):
+        args = self.parser.parse_args(shlex.split(argument))
+        if args.memory:
+            # px4_coredump --memory 0x20000000:0x80000 --memory 0x40010424:4
+            memories = [[int(h, 0) for h in m.split(":")] for m in args.memory]
+        else:
+            # FIXME: hardcoded values for FMU-v5x
+            memories = [
+                (0x20000000, 0x00080000), # SRAM1-3
+                (0x40010424, 4), # HRT uptime
+            ]
+        px4.coredump(gdb, memories, args.file)
+
+
+class PX4_Watch_Peripheral(gdb.Command):
+    """
+    Visualize the differences in peripheral registers on every GDB stop event.
+    """
+    def __init__(self, filename):
+        super().__init__("px4_pwatch", gdb.COMMAND_USER)
+        self.parser = argparse.ArgumentParser(self.__doc__)
+        self.parser.add_argument("name", nargs="*",
+                                 help="One or more peripheral or peripheral register names: PER or PER.REG .")
+        self.parser.add_argument("--add", "-a", action="store_true", default=False,
+                                 help="Add these peripherals.")
+        self.parser.add_argument("--remove", "-r", action="store_true", default=False,
+                                 help="Remove these peripherals.")
+        self.parser.add_argument("--reset", "-R", action="store_true", default=False,
+                                 help="Reset watcher to peripheral reset values.")
+        self.parser.add_argument("--quiet", "-q", action="store_true", default=False,
+                                 help="Stop automatically reporting.")
+        self.parser.add_argument("--loud", "-l", action="store_true", default=False,
+                                 help="Automatically report on GDB stop event.")
+        self.parser.add_argument("--all", "-x", action="store_true", default=False,
+                                 help="Show all logged changes.")
+        self.parser.add_argument("--watch-write", "-ww", action="store_true", default=False,
+                                 help="Add a write watchpoint on registers.")
+        self.parser.add_argument("--watch-read", "-wr", action="store_true", default=False,
+                                 help="Add a read watchpoint on registers.")
+        self.do_report = True
+        self.last_report = {}
+        self.all_report = {}
+        self.watchpoints = {}
+        self.svd = px4.PeripheralWatcher(gdb, filename)
+        gdb.events.stop.connect(self.on_stop)
+
+    def invoke(self, argument, from_tty):
+        args = self.parser.parse_args(shlex.split(argument))
+        if args.add:
+            for name in args.name:
+                report = self.svd.watch(name)
+                if args.loud: print(report)
+                arange = self.svd.address(name).values()
+                amin, amax = min(a[0] for a in arange), max(a[1] for a in arange)
+                match (args.watch_read, args.watch_write):
+                    case (False, False): command = None
+                    case (True,  False): command = "rwatch"
+                    case (False, True):  command = "watch"
+                    case (True,  True):  command = "awatch"
+                if command:
+                    ceil2 = 1 << (amax - amin - 1).bit_length()
+                    command = f"{command} *(uint8_t[{ceil2}]*){hex(amin)}"
+                    print(command)
+                    output = gdb.execute(command, to_string=True)
+                    print(output)
+                    if match := re.match(r"Hardware watchpoint (\d+):", output):
+                        self.watchpoints[name] = int(match.group(1))
+        elif args.remove:
+            for name in args.name:
+                self.svd.unwatch(name)
+                if name in self.watchpoints:
+                    gdb.execute(f"delete {self.watchpoints.pop(name)}")
+            if not args.name:
+                self.svd.unwatch()
+                for name in self.watchpoints:
+                    gdb.execute(f"delete {self.watchpoints.pop(name)}")
+        elif args.reset:
+            for name in args.name:
+                self.svd.reset(name)
+            if not args.name:
+                self.svd.reset()
+        elif args.quiet:
+            self.do_report = False
+        elif args.loud:
+            self.do_report = True
+        else:
+            for name in (args.name or [None]):
+                print(self.report(name, args.all))
+
+    def report(self, name=None, show_all=False):
+        report_map = self.all_report if show_all else self.last_report
+        output = []
+        if name is not None:
+            for register in sorted(self.svd._find(name), key=lambda r: r[1].address_offset):
+                if report := report_map.get(register, ""):
+                    output.append(report)
+        else:
+            peripherals = defaultdict(list)
+            for register in report_map:
+                peripherals[register[0]].append(register)
+            for peripheral in sorted(peripherals, key=lambda p: p.base_address):
+                if report := self.report(peripherals[peripheral], show_all):
+                    output.append(f"Differences for {peripheral.name}:")
+                    output.append(report)
+        return "\n".join(output)
+
+    def on_stop(self, event):
+        self.last_report = {}
+        for reg in self.svd._watched:
+            if report := self.svd.report(reg):
+                self.last_report[reg] = report
+                self.all_report[reg] = report
+        if self.do_report:
+            print(self.report())
+        self.svd.update()
+
+
+class PX4_Show_Peripheral(gdb.Command):
+    """
+    Show the value and descriptions of one peripherals and optional register.
+    Note: This will read register with side-effects!
+    """
+    def __init__(self, filename):
+        super().__init__("px4_pshow", gdb.COMMAND_USER)
+        gdb.execute(f"arm loadfile st {filename}")
+
+    def invoke(self, argument, from_tty):
+        gdb.execute(f"arm inspect /hab st {argument}")
+
+# Instantiate all user commands
+PX4_Tasks()
+PX4_Registers()
+PX4_Interrupts()
+PX4_Gpios()
+PX4_Switch_Task()
+PX4_Relative_Breakpoint()
+PX4_Backtrace()
+PX4_Coredump()
+if px4._SVD_FILE:
+    PX4_Watch_Peripheral(px4._SVD_FILE)
+    PX4_Show_Peripheral(px4._SVD_FILE)
+
+
+# Functions for use in GDB scripts
+class PX4_Relative_Location(gdb.Function):
+    """
+    Finds the absolute location of a relative line number offset.
+    Note that backslashes in the regex must be double escaped!!!
+    """
+    def __init__(self):
+        super().__init__("px4_rloc")
+
+    def invoke(self, location):
+        return px4.utils.gdb_relative_location(gdb, location.string())
+
+
+class PX4_IsValid(gdb.Function):
+    """Is a variable valid? = not <optimized out> and not <unavailable>."""
+    def __init__(self):
+        super().__init__("px4_valid")
+
+    def invoke(self, var):
+        if var.is_optimized_out:
+            return 0
+        descr = str(var)
+        if descr in ["<optimized out>", "<unavailable>"]:
+            return 0
+        else:
+            return 1
+
+
+# Instantiate all user functions
+PX4_Relative_Location()
+PX4_IsValid()
+
