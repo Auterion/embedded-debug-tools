@@ -52,7 +52,7 @@ all = ["pdoc"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-emdbg = ["*.md"]
+emdbg = ["*.md", "*/*.md", "*/*/*.md", "*/*/*/*.md"]
 "emdbg.patch.data" = ["*"]
 "emdbg.bench.data" = ["*"]
 

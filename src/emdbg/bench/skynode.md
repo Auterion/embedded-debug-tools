@@ -14,5 +14,6 @@ To quickly debug something interactively on the test bench, you can launch GDB
 directly:
 
 ```sh
-python3 -m emdbg.bench.skynode --px4-dir path/to/PX4-Autopilot --target px4_fmu-v5x -ui tui
+python3 -m emdbg.bench.skynode --px4-dir path/to/PX4-Autopilot \
+	--target px4_fmu-v5x -ui tui --openocd
 ```
