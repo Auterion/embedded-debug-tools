@@ -13,7 +13,7 @@ requires-python = ">=3.8"
 keywords = ["embedded", "debug", "gdb", "stm32", "px4"]
 license = {text = "BSD-3-Clause"}
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
@@ -39,7 +39,8 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
-"Homepage" = "https://github.com/auterion/embedded-debug-tools"
+"GitHub" = "https://github.com/auterion/embedded-debug-tools"
+"Changelog" = "https://github.com/auterion/embedded-debug-tools/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 all = ["pdoc"]

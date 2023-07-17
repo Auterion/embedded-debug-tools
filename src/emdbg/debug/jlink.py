@@ -5,6 +5,7 @@
 .. include:: jlink.md
 """
 
+from __future__ import annotations
 import os
 import time
 import signal

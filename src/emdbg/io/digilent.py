@@ -1,10 +1,11 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 from pydwf import DwfLibrary
 from pydwf.utilities import openDwfDevice
 from contextlib import contextmanager
-from functools import cache
+from functools import lru_cache
 import enum
 import logging
 
@@ -164,7 +165,7 @@ class Digilent:
         """
         self.dwf = device
 
-    @cache
+    @lru_cache(100)
     def gpio(self, position: int) -> DigilentPin:
         """
         Creates a pin abstraction.

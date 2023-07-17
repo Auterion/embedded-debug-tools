@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 from serial.tools import list_ports
 import logging
 LOGGER = logging.getLogger("serial")

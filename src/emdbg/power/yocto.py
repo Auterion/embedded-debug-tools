@@ -137,10 +137,9 @@ if __name__ == "__main__":
     emdbg.logger.configure(args.verbosity)
 
     with relay(args.channel, args.inverted, args.location) as pwr:
-        match args.command:
-            case "on":
-                pwr.on(args.time)
-            case "off":
-                pwr.off(args.time)
-            case "cycle":
-                pwr.cycle(args.time, args.time)
+        if args.command == "on":
+            pwr.on(args.time)
+        elif args.command == "off":
+            pwr.off(args.time)
+        elif args.command == "cycle":
+            pwr.cycle(args.time, args.time)

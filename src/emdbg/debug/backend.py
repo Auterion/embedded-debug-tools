@@ -2,6 +2,7 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 from pathlib import Path
 from contextlib import contextmanager
 

@@ -1,7 +1,8 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
-from functools import cached_property, cache
+from __future__ import annotations
+from functools import cached_property
 from . import utils
 from .system_load import SystemLoad
 from .device import Device

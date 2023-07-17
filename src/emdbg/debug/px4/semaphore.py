@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 from functools import cached_property
 from dataclasses import dataclass
 from . import utils

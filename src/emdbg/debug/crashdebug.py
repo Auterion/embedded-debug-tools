@@ -6,6 +6,7 @@
 .. include:: crashdebug.md
 """
 
+from __future__ import annotations
 import os, platform
 from pathlib import Path
 from .backend import ProbeBackend

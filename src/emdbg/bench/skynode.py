@@ -5,6 +5,7 @@
 .. include:: skynode.md
 """
 
+from __future__ import annotations
 import time
 from pathlib import Path
 from .fmu import debug as fmu_debug, Fmu

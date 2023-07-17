@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 import re
 from .priority import _BoostOperation
 
@@ -98,15 +99,15 @@ class FileSystemBacktrace(Backtrace):
         IRQ = r"^stm32_sdmmc_interrupt$",
         INIT = r"^stm32_sdio_initialize$",
     )
-    COLORS = {"^fat_.*$": _fill("LightYellow"),
-              "^mmc?sd_.*$": _fill("LightCyan"),
-              "^stm32_.*$": _fill("DarkSeaGreen"),
-              "px4::logger::": _fill("Gold"),
-              "Navigator": _fill("GreenYellow"),
-              "can": _fill("LightSalmon"),
-              "^nsh_.*": _fill("LightSkyBlue"),
-              "^(param|bson)_.*": _fill("Bisque")} | \
-             {pattern: _bfill("Silver") for pattern in EDGES.values()}
+    COLORS = {**{"^fat_.*$": _fill("LightYellow"),
+                 "^mmc?sd_.*$": _fill("LightCyan"),
+                 "^stm32_.*$": _fill("DarkSeaGreen"),
+                 "px4::logger::": _fill("Gold"),
+                 "Navigator": _fill("GreenYellow"),
+                 "can": _fill("LightSalmon"),
+                 "^nsh_.*": _fill("LightSkyBlue"),
+                 "^(param|bson)_.*": _fill("Bisque")},
+              **{pattern: _bfill("Silver") for pattern in EDGES.values()}}
 
 
 class SpiBacktrace(Backtrace):
@@ -116,15 +117,15 @@ class SpiBacktrace(Backtrace):
         PARAM = r"^param_main$",
         NSH = r"^nsh_initialize$",
     )
-    COLORS = {pattern: _bfill("Silver") for pattern in EDGES.values()} | \
-             {"^(ramtron|bch|bchlib)_.*$": _fill("LightYellow"),
-              "^spi_.*$": _fill("LightCyan"),
-              "^stm32_.*$": _fill("DarkSeaGreen"),
-              "ICM20602": _fill("Gold"),
-              "BMI088": _fill("GreenYellow"),
-              "ICM42688": _fill("LightSalmon"),
-              "^nsh_.*": _fill("LightSkyBlue"),
-              "^(param|bson)_.*": _fill("Bisque")}
+    COLORS = {**{pattern: _bfill("Silver") for pattern in EDGES.values()},
+              **{"^(ramtron|bch|bchlib)_.*$": _fill("LightYellow"),
+                 "^spi_.*$": _fill("LightCyan"),
+                 "^stm32_.*$": _fill("DarkSeaGreen"),
+                 "ICM20602": _fill("Gold"),
+                 "BMI088": _fill("GreenYellow"),
+                 "ICM42688": _fill("LightSalmon"),
+                 "^nsh_.*": _fill("LightSkyBlue"),
+                 "^(param|bson)_.*": _fill("Bisque")}}
 
 
 class I2cBacktrace(Backtrace):
@@ -134,13 +135,13 @@ class I2cBacktrace(Backtrace):
         IRQ = r"^stm32_i2c_isr$",
         INIT = r"^stm32_i2c_setclock$",
     )
-    COLORS = {"^stm32_.*$": _fill("DarkSeaGreen"),
-              "BMM150": _fill("Yellow"),
-              "IST8310": _fill("Cyan"),
-              "BMP388": _fill("Gold"),
-              "RGBLED": _fill("LightSkyBlue"),
-              "MCP23009": _fill("LightSalmon")} | \
-             {pattern: _bfill("Silver") for pattern in EDGES.values()}
+    COLORS = {**{"^stm32_.*$": _fill("DarkSeaGreen"),
+                 "BMM150": _fill("Yellow"),
+                 "IST8310": _fill("Cyan"),
+                 "BMP388": _fill("Gold"),
+                 "RGBLED": _fill("LightSkyBlue"),
+                 "MCP23009": _fill("LightSalmon")},
+              **{pattern: _bfill("Silver") for pattern in EDGES.values()}}
 
 
 class CanBacktrace(Backtrace):
@@ -150,9 +151,9 @@ class CanBacktrace(Backtrace):
         INIT = r"CanIface::init$",
         FRAME = r"TransferListener::handleFrame$",
     )
-    COLORS = {pattern: _bfill("Silver") for pattern in EDGES.values()} | \
-             {"^(ramtron|bch|bchlib)_.*$": _fill("LightYellow"),
-              "Publisher": _fill("DarkSeaGreen")}
+    COLORS = {**{pattern: _bfill("Silver") for pattern in EDGES.values()},
+              **{"^(ramtron|bch|bchlib)_.*$": _fill("LightYellow"),
+                 "Publisher": _fill("DarkSeaGreen")}}
 
 
 class UartBacktrace(Backtrace):
@@ -168,15 +169,15 @@ class UartBacktrace(Backtrace):
         IRQ = r"^irq_dispatch$",
         INIT = r"^arm_earlyserialinit$",
     )
-    COLORS = {"^I2CSPI": _fill("LightYellow"),
-              "^(up|uart)_.*$": _fill("LightCyan"),
-              "^stm32_.*$": _fill("DarkSeaGreen"),
-              "px4::logger": _fill("Gold"),
-              "[mM]avlink": _fill("GreenYellow"),
-              "can": _fill("LightSalmon"),
-              "^nsh_.*": _fill("LightSkyBlue"),
-              "^(param|bson)_.*": _fill("Bisque")} | \
-             {pattern: _bfill("Silver") for pattern in EDGES.values()}
+    COLORS = {**{"^I2CSPI": _fill("LightYellow"),
+                 "^(up|uart)_.*$": _fill("LightCyan"),
+                 "^stm32_.*$": _fill("DarkSeaGreen"),
+                 "px4::logger": _fill("Gold"),
+                 "[mM]avlink": _fill("GreenYellow"),
+                 "can": _fill("LightSalmon"),
+                 "^nsh_.*": _fill("LightSkyBlue"),
+                 "^(param|bson)_.*": _fill("Bisque")},
+              **{pattern: _bfill("Silver") for pattern in EDGES.values()}}
 
 
 class SemaphoreBacktrace(Backtrace):

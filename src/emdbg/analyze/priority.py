@@ -23,6 +23,7 @@ python3 -m emdbg.analyze.callgraph log_semaphore_boosts.txt --svg --type Semapho
 ```
 """
 
+from __future__ import annotations
 import re
 from pathlib import Path
 import statistics

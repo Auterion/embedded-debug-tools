@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+from __future__ import annotations
 from contextlib import contextmanager
 import time
 import os
@@ -45,17 +46,14 @@ class Gdb(Interface):
             responses = self.mi.io_manager.get_gdb_response(timeout_sec=0, raise_error_on_timeout=False)
             for response in responses:
                 # print(response)
-                match (response["type"], response["message"]):
-                    # Previous command has done executing
-                    case "result", "done" | "running":
-                        self._command_is_done = True
-                    # Console is logging out messages
-                    case "console", _:
-                        if payload := response["payload"].encode("latin-1").decode('unicode_escape'):
-                            payload = payload.replace("\\e", "\033")
-                            self._payloads.append(payload)
-                            if "#" not in payload or VERBOSITY >= 3:
-                                LOGGER.debug(payload)
+                if response["type"] == "result" and response["message"] in ["done", "running"]:
+                    self._command_is_done = True
+                elif response["type"] == "console":
+                    if payload := response["payload"].encode("latin-1").decode('unicode_escape'):
+                        payload = payload.replace("\\e", "\033")
+                        self._payloads.append(payload)
+                        if "#" not in payload or VERBOSITY >= 3:
+                            LOGGER.debug(payload)
             time.sleep(0.01)
 
     def read(self, clear=True):

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 # Adapted from https://github.com/Gallopsled/pwntools
 
+from __future__ import annotations
 from threading import Event
 from contextlib import contextmanager
 import time

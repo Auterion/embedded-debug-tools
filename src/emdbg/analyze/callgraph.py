@@ -5,6 +5,7 @@
 .. include:: callgraph.md
 """
 
+from __future__ import annotations
 import re, os
 import itertools
 import logging

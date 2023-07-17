@@ -5,6 +5,7 @@
 .. include:: fmu.md
 """
 
+from __future__ import annotations
 import time
 from pathlib import Path
 from contextlib import contextmanager, nullcontext
@@ -15,11 +16,11 @@ class Fmu:
     """
     FMU test bench with optional nsh, power, and logic analyzer attachements.
     """
-    DBGMCU_CONFIG = [
+    _DBGMCU_CONFIG = [
         "set *0xE0042008 = 0xffffffff",
         "set *0xE004200C = 0xffffffff"
     ]
-    MCU_MEMORIES = [
+    _MCU_MEMORIES = [
         (0x20000000, 0x00080000), # SRAM1-3
         (0x40010424, 4), # HRT uptime
     ]
@@ -29,19 +30,20 @@ class Fmu:
                  nsh: "emdbg.serial.protocol.Nsh" = None,
                  power: "emdbg.power.base.Base" = None,
                  io: "emdbg.io.digilent.Digilent" = None):
-        self.elf = elf
-        self.gdb = gdb
+        self.elf: Path = elf
+        """The ELF file under debug"""
+        self.gdb: "emdbg.debug.remote.gdb.Interface" = gdb
         """The remote GDB access interface object"""
-        self.nsh = nsh
+        self.nsh: "emdbg.serial.protocol.Nsh" = nsh
         """The NSH protocol controller"""
-        self.power = power
+        self.power: "emdbg.power.base.Base" = power
         """The power relay controlling the FMU"""
-        self.io = io
+        self.io: "emdbg.io.digilent.Digilent" = io
         """The Digilent Scope"""
 
     def _init(self):
         self.gdb.interrupt_and_wait()
-        for cmd in self.DBGMCU_CONFIG:
+        for cmd in self._DBGMCU_CONFIG:
             self.gdb.execute(cmd)
         self.restart_system_load_monitor()
 
@@ -60,7 +62,7 @@ class Fmu:
             else:
                 emdbg.debug.px4.restart_system_load_monitor(self.gdb)
 
-    def coredump(self, filename: str = None):
+    def coredump(self, filename: Path = None):
         """
         Dumps the FMU core for later analysis with CrashDebug (see
         `emdbg.debug.crashdebug`).
@@ -70,11 +72,11 @@ class Fmu:
         with self.gdb.interrupt_continue():
             if False:
                 # Connection is remote, therefore we must use slower RPyC interface
-                emdbg.debug.px4.coredump(self.gdb, self.MCU_MEMORIES, filename)
+                emdbg.debug.px4.coredump(self.gdb, self._MCU_MEMORIES, filename)
             else:
                 # Executing directly on the GDB process is *significantly* faster!
                 if filename: filename = f"--file '{filename}'"
-                memories = [f"--memory {m[0]}:{m[1]}" for m in self.MCU_MEMORIES]
+                memories = [f"--memory {m[0]}:{m[1]}" for m in self._MCU_MEMORIES]
                 self.gdb.execute(f"px4_coredump {' '.join(memories)} {filename or ''}")
 
     def upload(self, source: Path = None):
@@ -135,8 +137,8 @@ class Fmu:
                 func(seconds)
 
 
-def px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
-               ui: str = None, speed: int = 16000, backend: str = None):
+def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
+                ui: str = None, speed: int = 16000, backend: str = None) -> tuple:
     if "fmu-v5x" in target:
         device = "STM32F765II"
         svd = "STM32F7x5.svd"
@@ -168,7 +170,7 @@ def px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
             f"source {data_dir}/orbuculum.gdb",
             f"python px4._TARGET='{target.lower()}'"]
     if ui is not None:
-        cmds += Fmu.DBGMCU_CONFIG + ["python px4.restart_system_load_monitor(gdb)"]
+        cmds += Fmu._DBGMCU_CONFIG + ["python px4.restart_system_load_monitor(gdb)"]
     cmds += (commands or [])
 
     return backend, elf, svd, cmds
@@ -206,12 +208,12 @@ def debug(px4_directory: Path, target: Path, serial: str = None,
                       GDB/MI interface. See `emdbg.debug.remote`.
     :param keep_power_on: Do not shut off the Fmu after the context has closed.
     :param upload: Automatically upload the firmware after powering on the FMU.
-    :param backend: "openocd", "jlink", or "IP:PORT" for a GDB server on another machine.
+    :param backend: `openocd`, `jlink`, or `IP:PORT` for a GDB server on another machine.
 
     :return: A configured test bench with the latest firmware.
     """
-    backend, elf, svd, cmds = px4_config(px4_directory, target, commands, ui,
-                                         backend=backend or "openocd")
+    backend, elf, svd, cmds = _px4_config(px4_directory, target, commands, ui,
+                                          backend=backend or "openocd")
 
     with (nullcontext() if power is None else power) as pwr:
         try:
