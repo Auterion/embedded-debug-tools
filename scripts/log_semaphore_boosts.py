@@ -67,7 +67,7 @@ if __name__ == "__main__":
 
         # Start MAVSDK Stress tester
         try:
-            sproc = subprocess.Popen("(cd build/stresstest && ./arm_disarm_stresstest udp://:14550)",
+            sproc = subprocess.Popen("(cd ext/arm_disarm_stresstest/build && ./arm_disarm_stresstest udp://:14550)",
                                      start_new_session=True, cwd=rootdir, shell=True)
             def check_subprocess(_):
                 if (rc := sproc.poll()) is not None and rc != 0:
