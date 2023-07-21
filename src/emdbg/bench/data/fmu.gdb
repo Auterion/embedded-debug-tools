@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 define hook-load
-    monitor reset
+    monitor reset halt
 end
 define hookpost-load
     monitor reset halt

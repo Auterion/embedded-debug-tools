@@ -8,31 +8,16 @@ from collections import defaultdict
 from contextlib import redirect_stdout
 
 from . import utils
-from .base import Base
+from .device import Device
 
 
-class PeripheralWatcher(Base, metaclass=utils._Singleton):
-    """
-    Visualize the changes of a peripheral register map.
-    Example:
+class PeripheralWatcher(Device):
+    """Visualize the changes of a peripheral register map."""
 
-    ```py
-    pwatch = PeripheralWatcher(gdb, "path/to/STM32F7x5.svd")
-    print(pwatch.watch("I2C1"))
-    # Continue GDB for one second
-    gdb.continue_nowait()
-    time.sleep(1)
-    gdb.interrupt_wait()
-    # print the difference report
-    print(pwatch.report())
-    # update the cached values now
-    pwatch.update()
-    ```
-    """
-
-    def __init__(self, gdb, filename: Path):
+    def __init__(self, gdb, filename: Path = None):
         from cmsis_svd.parser import SVDParser
         super().__init__(gdb)
+        if filename is None: filename = self._SVD_FILE
         self.device = SVDParser.for_xml_file(filename).get_device()
         self._watched = {}
 

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 import time
+from functools import cached_property
 from pathlib import Path
 from contextlib import contextmanager, nullcontext
 import emdbg
@@ -16,16 +17,18 @@ class Fmu:
     """
     FMU test bench with optional nsh, power, and logic analyzer attachements.
     """
-    _DBGMCU_CONFIG = [
-        "set *0xE0042008 = 0xffffffff",
-        "set *0xE004200C = 0xffffffff"
-    ]
-    _MCU_MEMORIES = [
-        (0x20000000, 0x00080000), # SRAM1-3
-        (0x40010424, 4), # HRT uptime
-    ]
+    def _DBGMCU_CONFIG(target):
+        if "fmu-v5x" in target:
+            return ["set *0xE0042008 = 0xffffffff",
+                    "set *0xE004200C = 0xffffffff"]
+        if "fmu-v6x" in target:
+            return ["set *0xE00E1034 = 0xffffffff",
+                    "set *0xE00E103C = 0xffffffff",
+                    "set *0xE00E104C = 0xffffffff",
+                    "set *0xE00E1054 = 0xffffffff"]
+        return []
 
-    def __init__(self, elf: Path,
+    def __init__(self, target: str, elf: Path,
                  gdb: "emdbg.debug.remote.gdb.Interface",
                  nsh: "emdbg.serial.protocol.Nsh" = None,
                  power: "emdbg.power.base.Base" = None,
@@ -40,10 +43,11 @@ class Fmu:
         """The power relay controlling the FMU"""
         self.io: "emdbg.io.digilent.Digilent" = io
         """The Digilent Scope"""
+        self._target = target
 
     def _init(self):
         self.gdb.interrupt_and_wait()
-        for cmd in self._DBGMCU_CONFIG:
+        for cmd in self._DBGMCU_CONFIG(self._target):
             self.gdb.execute(cmd)
         self.restart_system_load_monitor()
 
@@ -72,12 +76,11 @@ class Fmu:
         with self.gdb.interrupt_continue():
             if False:
                 # Connection is remote, therefore we must use slower RPyC interface
-                emdbg.debug.px4.coredump(self.gdb, self._MCU_MEMORIES, filename)
+                emdbg.debug.px4.coredump(self.gdb, filename=filename)
             else:
                 # Executing directly on the GDB process is *significantly* faster!
                 if filename: filename = f"--file '{filename}'"
-                memories = [f"--memory {m[0]}:{m[1]}" for m in self._MCU_MEMORIES]
-                self.gdb.execute(f"px4_coredump {' '.join(memories)} {filename or ''}")
+                self.gdb.execute(f"px4_coredump {filename or ''}")
 
     def upload(self, source: Path = None):
         """
@@ -141,11 +144,9 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
                 ui: str = None, speed: int = 16000, backend: str = None) -> tuple:
     if "fmu-v5x" in target:
         device = "STM32F765II"
-        svd = "STM32F7x5.svd"
         config = "fmu_v5x.cfg"
     elif "fmu-v6x" in target:
         device = "STM32H753II"
-        svd = "STM32H753x.svd"
         config = "fmu_v6x.cfg"
     else:
         raise ValueError(f"Unknown device for '{target}'!")
@@ -164,21 +165,20 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     px4_dir = Path(px4_directory).absolute().resolve()
     # script_dir = px4_dir / f"platforms/nuttx/Debug"
 
-    svd = data_dir / svd
     elf = px4_dir / f"build/{target}_default/{target}_default.elf"
     cmds = [f"dir {px4_dir}", f"source {data_dir}/fmu.gdb",
             f"source {data_dir}/orbuculum.gdb",
             f"python px4._TARGET='{target.lower()}'"]
     if ui is not None:
-        cmds += Fmu._DBGMCU_CONFIG + ["python px4.restart_system_load_monitor(gdb)"]
+        cmds += Fmu._DBGMCU_CONFIG(target) + ["python px4.restart_system_load_monitor(gdb)"]
     cmds += (commands or [])
 
-    return backend, elf, svd, cmds
+    return backend, elf, cmds
 
 
 # -----------------------------------------------------------------------------
 @contextmanager
-def debug(px4_directory: Path, target: Path, serial: str = None,
+def debug(px4_directory: Path, target: str, serial: str = None,
           digilent: str = None, power: "emdbg.power.base.Base" = None,
           ui: str = None, commands: list[str] = None, with_rpyc: bool = False,
           keep_power_on: bool = True, upload: bool = True, backend: str = None,
@@ -212,15 +212,15 @@ def debug(px4_directory: Path, target: Path, serial: str = None,
 
     :return: A configured test bench with the latest firmware.
     """
-    backend, elf, svd, cmds = _px4_config(px4_directory, target, commands, ui,
-                                          backend=backend or "openocd")
+    backend, elf, cmds = _px4_config(px4_directory, target, commands, ui,
+                                     backend=backend or "openocd")
 
     with (nullcontext() if power is None else power) as pwr:
         try:
             if ui is not None:
                 # Manual mode that only connects the debugger (blocking)
                 if power: pwr.on()
-                yield emdbg.debug.gdb.call(backend, elf, commands=cmds, ui=ui, svd=svd)
+                yield emdbg.debug.gdb.call(backend, elf, commands=cmds, ui=ui)
             else:
                 # Turn off, then connect the serial
                 if power: pwr.off()
@@ -230,9 +230,9 @@ def debug(px4_directory: Path, target: Path, serial: str = None,
                     # Then power on and connect GDB to get the full boot log
                     if power: pwr.on()
                     gdb_call = emdbg.debug.gdb.call_rpyc if with_rpyc else emdbg.debug.gdb.call_mi
-                    debugger = gdb_call(backend, elf, commands=cmds, svd=svd)
+                    debugger = gdb_call(backend, elf, commands=cmds)
                     with debugger as gdb:
-                        bench = _FmuClass(elf, gdb, nsh, pwr, io)
+                        bench = _FmuClass(target, elf, gdb, nsh, pwr, io)
                         if upload: bench.upload()
                         yield bench
                         bench._deinit()

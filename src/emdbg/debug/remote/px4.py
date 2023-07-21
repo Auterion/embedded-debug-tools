@@ -1,14 +1,33 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
-import gdb, argparse, shlex, re
+import gdb, argparse, shlex, re, traceback, functools
 from collections import defaultdict
 # The import is relative only to the emdbg/debug folder, so that we do not pull
 # in any other dependencies
 import px4
 
+def report_exception(f):
+    @functools.wraps(f)
+    def inner(*args, **kwargs):
+        try: return f(*args, **kwargs)
+        except: print(traceback.format_exc())
+    return inner
+
 
 # Wrap functionality into user commands
+class PX4_Discover(gdb.Command):
+    """
+    Find out what device we are connected to.
+    """
+    def __init__(self):
+        super().__init__("px4_discover", gdb.COMMAND_USER)
+
+    @report_exception
+    def invoke(self, argument, from_tty):
+        print(px4.discover_device(gdb))
+
+
 class PX4_Tasks(gdb.Command):
     """
     Print a table of all NuttX tasks and their current state.
@@ -19,6 +38,7 @@ class PX4_Tasks(gdb.Command):
         self.parser.add_argument("-f", "--files", default=False, action="store_true",
                                  help="Print the names of the open files.")
 
+    @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
         print(px4.all_tasks_as_table(gdb, with_file_names=args.files))
@@ -32,6 +52,7 @@ class PX4_Registers(gdb.Command):
     def __init__(self):
         super().__init__("px4_registers", gdb.COMMAND_USER)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         print(px4.all_registers_as_table(gdb, int(argument or 3)))
 
@@ -45,6 +66,7 @@ class PX4_Interrupts(gdb.Command):
     def __init__(self):
         super().__init__("px4_interrupts", gdb.COMMAND_USER)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         print(px4.vector_table_as_table(gdb, int(argument or 1)))
 
@@ -66,11 +88,10 @@ class PX4_Gpios(gdb.Command):
         self.parser.add_argument("-c", "--columns", type=int, default=2,
                                  help="Number of columns to print.")
 
+    @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
-        pinout = None
-        if "px4_fmu-v5x" in px4._TARGET:
-            pinout = px4.pinout_fmu_v5x
+        pinout = px4.pinout(gdb, "fmu")
         columns = args.columns
         if args.pin_filter or args.filter or args.function_filter:
             columns = 1
@@ -94,6 +115,7 @@ class PX4_Backtrace(gdb.Command):
     def __init__(self):
         super().__init__("px4_backtrace", gdb.COMMAND_USER)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         print(px4.backtrace(gdb))
 
@@ -105,6 +127,7 @@ class PX4_Switch_Task(gdb.Command):
     def __init__(self):
         super().__init__("px4_switch_task", gdb.COMMAND_USER)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         pointer = int(argument, 0) if argument else 0
         px4.task_switch(gdb, pointer)
@@ -120,6 +143,7 @@ class PX4_Relative_Breakpoint(gdb.Command):
     def __init__(self):
         super().__init__("px4_rbreak", gdb.COMMAND_USER)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         location = px4.utils.gdb_relative_location(gdb, argument)
         gdb.execute(f"break {location}")
@@ -138,17 +162,12 @@ class PX4_Coredump(gdb.Command):
         self.parser.add_argument("--file",
                                  help="Coredump filename, defaults to `coredump_{datetime}.txt`.")
 
+    @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
+        memories = None
         if args.memory:
-            # px4_coredump --memory 0x20000000:0x80000 --memory 0x40010424:4
             memories = [[int(h, 0) for h in m.split(":")] for m in args.memory]
-        else:
-            # FIXME: hardcoded values for FMU-v5x
-            memories = [
-                (0x20000000, 0x00080000), # SRAM1-3
-                (0x40010424, 4), # HRT uptime
-            ]
         px4.coredump(gdb, memories, args.file)
 
 
@@ -184,6 +203,7 @@ class PX4_Watch_Peripheral(gdb.Command):
         self.svd = px4.PeripheralWatcher(gdb, filename)
         gdb.events.stop.connect(self.on_stop)
 
+    @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
         if args.add:
@@ -227,6 +247,7 @@ class PX4_Watch_Peripheral(gdb.Command):
             for name in (args.name or [None]):
                 print(self.report(name, args.all))
 
+    @report_exception
     def report(self, name=None, show_all=False):
         report_map = self.all_report if show_all else self.last_report
         output = []
@@ -244,6 +265,7 @@ class PX4_Watch_Peripheral(gdb.Command):
                     output.append(report)
         return "\n".join(output)
 
+    @report_exception
     def on_stop(self, event):
         self.last_report = {}
         for reg in self.svd._watched:
@@ -262,12 +284,16 @@ class PX4_Show_Peripheral(gdb.Command):
     """
     def __init__(self, filename):
         super().__init__("px4_pshow", gdb.COMMAND_USER)
+        if filename is None:
+            filename = px4.device.Device(gdb)._SVD_FILE
         gdb.execute(f"arm loadfile st {filename}")
 
+    @report_exception
     def invoke(self, argument, from_tty):
         gdb.execute(f"arm inspect /hab st {argument}")
 
 # Instantiate all user commands
+PX4_Discover()
 PX4_Tasks()
 PX4_Registers()
 PX4_Interrupts()
@@ -276,9 +302,8 @@ PX4_Switch_Task()
 PX4_Relative_Breakpoint()
 PX4_Backtrace()
 PX4_Coredump()
-if px4._SVD_FILE:
-    PX4_Watch_Peripheral(px4._SVD_FILE)
-    PX4_Show_Peripheral(px4._SVD_FILE)
+PX4_Watch_Peripheral(px4._SVD_FILE)
+PX4_Show_Peripheral(px4._SVD_FILE)
 
 
 # Functions for use in GDB scripts
@@ -290,6 +315,7 @@ class PX4_Relative_Location(gdb.Function):
     def __init__(self):
         super().__init__("px4_rloc")
 
+    @report_exception
     def invoke(self, location):
         return px4.utils.gdb_relative_location(gdb, location.string())
 
@@ -313,3 +339,28 @@ class PX4_IsValid(gdb.Function):
 PX4_Relative_Location()
 PX4_IsValid()
 
+
+# Internal development helpers
+class PX4_Reload(gdb.Command):
+    """
+    Reloads the px4 module internally. This can have unwanted side-effects!
+    """
+    def __init__(self):
+        super().__init__("px4_reload", gdb.COMMAND_USER)
+
+    @report_exception
+    def invoke(self, argument, from_tty):
+        px4.utils._Singleton._instances = {}
+        import importlib
+        # importlib.reload(px4)
+        importlib.reload(px4.base)
+        importlib.reload(px4.device)
+        importlib.reload(px4.data)
+        importlib.reload(px4.semaphore)
+        importlib.reload(px4.svd)
+        importlib.reload(px4.system_load)
+        importlib.reload(px4.task)
+        importlib.reload(px4.utils)
+        gdb.execute(f"source /Users/niklaut/dev/Better-Tooling/embedded-debug-tools/src/emdbg/debug/remote/px4.py")
+
+PX4_Reload()

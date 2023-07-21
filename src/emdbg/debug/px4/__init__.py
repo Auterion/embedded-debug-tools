@@ -23,13 +23,16 @@ as a function argument so that it can be replaced by
 
 
 from .task import all_tasks, all_tasks_as_table, task_switch
+from .semaphore import Semaphore
 from .device import all_registers, all_registers_as_table, all_gpios_as_table
 from .device import vector_table, vector_table_as_table, Device, coredump
+from .device import discover as discover_device
 from .svd import PeripheralWatcher
 
 from .system_load import restart_system_load_monitor
 from .utils import gdb_backtrace as backtrace
-from .pinout import fmu_v5x as pinout_fmu_v5x
+from .data import pinout
+
 
 _TARGET = None
 _SVD_FILE = None
