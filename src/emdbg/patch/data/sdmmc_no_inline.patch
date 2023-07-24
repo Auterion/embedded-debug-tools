@@ -1,0 +1,87 @@
+diff --git a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_sdmmc.c b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_sdmmc.c
+index 0350c174a4..3158b37ce7 100644
+--- a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_sdmmc.c
++++ b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_sdmmc.c
+@@ -461,9 +461,9 @@ struct stm32_sampleregs_s
+ 
+ /* Low-level helpers ********************************************************/
+ 
+-static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
++void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+               int offset);
+-static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset);
++uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset);
+ static int  stm32_takesem(struct stm32_dev_s *priv);
+ #define     stm32_givesem(priv) (nxsem_post(&priv->waitsem))
+ static inline void stm32_setclkcr(struct stm32_dev_s *priv, uint32_t clkcr);
+@@ -726,7 +726,7 @@ static struct stm32_sampleregs_s g_sampleregs[DEBUG_NSAMPLES];
+  * Name: sdmmc_putreg32
+  ****************************************************************************/
+ 
+-static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
++__attribute__((noinline)) void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+                                   int offset)
+ {
+   putreg32(value, priv->base + offset);
+@@ -736,7 +736,7 @@ static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+  * Name: sdmmc_gettreg32
+  ****************************************************************************/
+ 
+-static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
++__attribute__((noinline)) uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
+ {
+   return getreg32(priv->base + offset);
+ }
+@@ -745,7 +745,7 @@ static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
+  * Name: sdmmc_modifyreg32
+  ****************************************************************************/
+ 
+-static inline void sdmmc_modifyreg32(struct stm32_dev_s *priv, int offset,
++__attribute__((noinline)) void sdmmc_modifyreg32(struct stm32_dev_s *priv, int offset,
+                                       uint32_t clearbits, uint32_t setbits)
+ {
+   irqstate_t flags;
+diff --git a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32h7/stm32_sdmmc.c b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32h7/stm32_sdmmc.c
+index 8441884f31..a39ed434c0 100644
+--- a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32h7/stm32_sdmmc.c
++++ b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32h7/stm32_sdmmc.c
+@@ -410,9 +410,9 @@ struct stm32_sampleregs_s
+ 
+ /* Low-level helpers ********************************************************/
+ 
+-static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
++void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+                                   int offset);
+-static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset);
++uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset);
+ static int  stm32_takesem(struct stm32_dev_s *priv);
+ #define     stm32_givesem(priv) (nxsem_post(&priv->waitsem))
+ static inline void stm32_setclkcr(struct stm32_dev_s *priv, uint32_t clkcr);
+@@ -659,7 +659,7 @@ static struct stm32_sampleregs_s g_sampleregs[DEBUG_NSAMPLES];
+  * Name: sdmmc_putreg32
+  ****************************************************************************/
+ 
+-static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
++__attribute__((noinline)) void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+                                   int offset)
+ {
+   putreg32(value, priv->base + offset);
+@@ -669,7 +669,7 @@ static inline void sdmmc_putreg32(struct stm32_dev_s *priv, uint32_t value,
+  * Name: sdmmc_gettreg32
+  ****************************************************************************/
+ 
+-static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
++__attribute__((noinline)) uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
+ {
+   return getreg32(priv->base + offset);
+ }
+@@ -678,7 +678,8 @@ static inline uint32_t sdmmc_getreg32(struct stm32_dev_s *priv, int offset)
+  * Name: sdmmc_modifyreg32
+  ****************************************************************************/
+ 
+-static inline void sdmmc_modifyreg32(struct stm32_dev_s *priv, int offset,
++
++__attribute__((noinline)) void sdmmc_modifyreg32(struct stm32_dev_s *priv, int offset,
+                                      uint32_t clearbits, uint32_t setbits)
+ {
+   irqstate_t flags;

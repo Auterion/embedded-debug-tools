@@ -99,7 +99,7 @@ class Device(Base):
     @cached_property
     def _SVD_FILE(self):
         return {
-            0x0451: Path(__file__).parents[2] / "bench/data/STM32Fx5.svd",
+            0x0451: Path(__file__).parents[2] / "bench/data/STM32F7x5.svd",
             0x0450: Path(__file__).parents[2] / "bench/data/STM32H753x.svd"
         }.get(self.devid)
 
@@ -229,18 +229,20 @@ class Device(Base):
                 result.append(g)
         return result
 
-    def coredump(self, memories: list[tuple[int, int]] = None) -> str:
+    def coredump(self, memories: list[tuple[int, int]] = None) -> tuple[str, int]:
         """
         Reads the memories and registers and returns them as a formatted string
         that is compatible with CrashDebug (see `emdbg.debug.crashdebug`).
 
         :param memories: list of memory ranges (start, size) to dump
-        :return: coredump formatted as string
+        :return: coredump formatted as string and coredump size
         """
         if memories is None:
             memories = self._MEMORIES
         lines = []
+        total_size = 0
         for addr, size in memories:
+            total_size += size
             data = self.read_memory(addr, size).cast("I")
             for ii, values in enumerate(utils.chunks(data, 4, 0)):
                 values = (hex(v & 0xffffffff) for v in values)
@@ -254,7 +256,7 @@ class Device(Base):
             else:
                 lines.append(f"{name:<28} {hex(value & 0xffffffff):<28} {int(value)}")
 
-        return "\n".join(lines)
+        return "\n".join(lines), total_size
 
     @cached_property
     def cpuid(self) -> int:
@@ -360,10 +362,10 @@ def coredump(gdb, memories: list[tuple[int, int]] = None, filename: Path = None)
         filename = utils.add_datetime("coredump.txt")
     print("Starting coredump...", flush=True)
     start = time.perf_counter()
-    output = Device(gdb).coredump(memories)
+    output, size = Device(gdb).coredump(memories)
     Path(filename).write_text(output)
     end = time.perf_counter()
-    print(f"Coredump completed in {(end - start):.1f}s")
+    print(f"Dumped {size//1000}kB in {(end - start):.1f}s ({int(size/((end - start)*1000))}kB/s)")
 
 
 def all_gpios_as_table(gdb, pinout: dict[str, tuple[str, str]] = None,

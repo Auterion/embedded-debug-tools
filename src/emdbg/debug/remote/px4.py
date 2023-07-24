@@ -26,6 +26,8 @@ class PX4_Discover(gdb.Command):
     @report_exception
     def invoke(self, argument, from_tty):
         print(px4.discover_device(gdb))
+        gdb.execute("arm scb")
+        gdb.execute("arm fpu")
 
 
 class PX4_Tasks(gdb.Command):
@@ -122,15 +124,15 @@ class PX4_Backtrace(gdb.Command):
 
 class PX4_Switch_Task(gdb.Command):
     """
-    Switch to a task pointer to inspect the task.
+    Switch to a task PID to inspect the task.
     """
     def __init__(self):
         super().__init__("px4_switch_task", gdb.COMMAND_USER)
 
     @report_exception
     def invoke(self, argument, from_tty):
-        pointer = int(argument, 0) if argument else 0
-        px4.task_switch(gdb, pointer)
+        pid = int(argument, 0) if argument else -1
+        px4.task_switch(gdb, pid)
 
 
 class PX4_Relative_Breakpoint(gdb.Command):
@@ -228,11 +230,11 @@ class PX4_Watch_Peripheral(gdb.Command):
         elif args.remove:
             for name in args.name:
                 self.svd.unwatch(name)
-                if name in self.watchpoints:
+                if name in list(self.watchpoints.keys()):
                     gdb.execute(f"delete {self.watchpoints.pop(name)}")
             if not args.name:
                 self.svd.unwatch()
-                for name in self.watchpoints:
+                for name in list(self.watchpoints.keys()):
                     gdb.execute(f"delete {self.watchpoints.pop(name)}")
         elif args.reset:
             for name in args.name:

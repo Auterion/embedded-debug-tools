@@ -10,7 +10,7 @@ import logging
 LOGGER = logging.getLogger(__name__)
 
 
-class SystemLoad(Base, metaclass=utils._Singleton):
+class SystemLoad(Base):
     """
     PX4 system load monitor using the `cpuload.cpp` module inside PX4.
     Do not use this class directly, instead access the cpu load information via
@@ -75,10 +75,21 @@ class SystemLoad(Base, metaclass=utils._Singleton):
         return (sl["start"], interval, sample)
 
 
+_SYSTEM_LOAD = None
+def system_load(gdb):
+    """
+    :return: The SystemLoad singleton object.
+    """
+    global _SYSTEM_LOAD
+    if _SYSTEM_LOAD is None:
+        _SYSTEM_LOAD = SystemLoad(gdb)
+    return _SYSTEM_LOAD
+
+
 def restart_system_load_monitor(gdb):
     """
     Starts the system load monitor if not started, else resets the sample
     interval to right now.
     """
-    SystemLoad(gdb).sample
-    SystemLoad(gdb).restart()
+    system_load(gdb).sample
+    system_load(gdb).restart()

@@ -4,7 +4,7 @@
 from __future__ import annotations
 from functools import cached_property
 from . import utils
-from .system_load import SystemLoad
+from .system_load import system_load
 from .device import Device
 from .base import Base
 from dataclasses import dataclass
@@ -88,7 +88,7 @@ class Task(Base):
     def __init__(self, gdb, tcb_ptr: "gdb.Value"):
         super().__init__(gdb)
         self._tcb = tcb_ptr
-        self._system_load = SystemLoad(self._gdb)
+        self._system_load = system_load(self._gdb)
         self.pid = self._tcb["pid"]
         self.init_priority = int(self._tcb["init_priority"])
         self.stack_limit = int(self._tcb["adj_stack_size"])

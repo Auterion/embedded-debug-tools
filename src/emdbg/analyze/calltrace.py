@@ -54,24 +54,39 @@ if __name__ == "__main__":
             type=int,
             help="Sample time in seconds.")
         parser.add_argument(
-            "--trace",
+            "--ex",
             required=True,
             action="append",
-            help="The break- or watchpoints to trace.")
+            help="The commands to execute.")
+        values = {
+            "FileSystem": emdbg.analyze.FileSystemBacktrace,
+            "SPI": emdbg.analyze.SpiBacktrace,
+            "I2C": emdbg.analyze.I2cBacktrace,
+            "CAN": emdbg.analyze.CanBacktrace,
+            "UART": emdbg.analyze.UartBacktrace,
+            "Semaphore": emdbg.analyze.SemaphoreBacktrace,
+            "Generic": emdbg.analyze.Backtrace,
+        }
+        parser.add_argument(
+            "--type",
+            choices=values.keys(),
+            default="Generic",
+            help="The backtrace class to use.")
         args = parser.parse_args()
         emdbg.logger.configure(args.verbosity)
         backend = args.remote
         if args.openocd: backend = "openocd"
         if args.jlink: backend = "jlink"
 
-        print(f"Logging for: {', '.join(args.trace)}")
+        print(f"Logging for: {', '.join(args.ex)}")
 
-        calltrace = "".join(filter(lambda c: re.match(r"[\w\d]", c), '_'.join(args.trace)))
+        calltrace = "".join(filter(lambda c: re.match(r"[\w\d]", c), '_'.join(args.ex)))
         calltrace = Path(f"{args.log_prefix}_{calltrace}.txt")
         with emdbg.bench.fmu(args.px4_dir, args.target, backend=backend, upload=False) as bench:
-            for trace in args.trace:
-                bench.gdb.execute(trace)
-                bench.gdb.execute("px4_commands_backtrace")
+            for ex in args.ex:
+                bench.gdb.execute(ex)
+                if any(ex.startswith(b) for b in ["break ", "watch ", "awatch ", "rwatch "]):
+                    bench.gdb.execute("px4_commands_backtrace")
             bench.gdb.execute(f"px4_log_start {calltrace}")
             bench.gdb.continue_nowait()
 
@@ -80,5 +95,5 @@ if __name__ == "__main__":
             # halt the debugger and stop logging
             bench.gdb.interrupt_and_wait()
             bench.gdb.execute("px4_log_stop")
-            emdbg.analyze.callgraph_from_backtrace(calltrace, emdbg.analyze.Backtrace,
+            emdbg.analyze.callgraph_from_backtrace(calltrace, values.get(args.type),
                                                    output_graphviz=calltrace.with_suffix(".svg"))

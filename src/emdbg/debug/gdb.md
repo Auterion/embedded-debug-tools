@@ -104,6 +104,23 @@ You can call the modules directly:
 
 For convenience, several user commands wrap our Python plugins:
 
+### px4_discover
+
+Shows information about the connected device.
+
+```
+(gdb) px4_discover
+(gdb) px4_discover
+Device(armv7e-m, 0x411fc271, 0x450, 0x2003 -> STM32H742, STM32H743/753, STM32H750 at revision Y)
+SCB registers:
+CPUID                            = 411fc271
+    Variant                        ..1..... - Revision: r1pX
+    Architecture                   ...f.... - ARMv7-M
+    PartNo                         ....c27. - Cortex-M7
+    Revision                       .......1 - Patch: rXp1
+```
+
+
 ### px4_tasks
 
 ```

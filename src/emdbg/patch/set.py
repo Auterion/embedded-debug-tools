@@ -63,3 +63,15 @@ def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
         PatchOperation(px4_root, _data("nuttx_tracing_itm.patch")),
     ]
     return PatchManager("Add tracing support to NuttX via ITM", operations)
+
+
+def nuttx_sdmmc_reg_access(px4_root: Path) -> PatchManager:
+    """
+    Un-inlines the `sdmmc_putreg32`, `sdmmc_getreg32`, and `sdmmc_modifyreg32`
+    functions, so that breakpoints can be set on them.
+    """
+    px4_root = Path(px4_root)
+    operations = [
+        PatchOperation(px4_root, _data("sdmmc_no_inline.patch")),
+    ]
+    return PatchManager("Un-inline SDMMC register access", operations)

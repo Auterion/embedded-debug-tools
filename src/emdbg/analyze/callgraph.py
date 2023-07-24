@@ -44,11 +44,17 @@ def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
 
     nodes = set()
     edges = set()
+
+    def itertools_pairwise(iterable):
+        a, b = itertools.tee(iterable)
+        next(b, None)
+        return zip(a, b)
+
     for btype, bts in backtraces.items():
         for bt in bts:
             for frame in bt.frames:
                 nodes.add(frame.function)
-            for f1, f2 in itertools.pairwise(bt.frames):
+            for f1, f2 in itertools_pairwise(bt.frames):
                 edges.add( (f2.function, f1.function, str((btype or "").lower())) )
 
     sources = set(nodes)
