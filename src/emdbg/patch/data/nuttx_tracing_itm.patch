@@ -194,3 +194,40 @@ index 070350442f..5cc7c4c98e 100644
  CONFIG_SCHED_LPWORK=y
  CONFIG_SCHED_LPWORKPRIORITY=50
  CONFIG_SCHED_LPWORKSTACKSIZE=1632
+diff --git a/boards/px4/fmu-v6x/nuttx-config/nsh/defconfig b/boards/px4/fmu-v6x/nuttx-config/nsh/defconfig
+index cfbe9979d2..e091d8b57d 100644
+--- a/boards/px4/fmu-v6x/nuttx-config/nsh/defconfig
++++ b/boards/px4/fmu-v6x/nuttx-config/nsh/defconfig
+@@ -166,6 +166,9 @@ CONFIG_SCHED_HPWORKPRIORITY=249
+ CONFIG_SCHED_HPWORKSTACKSIZE=1280
+ CONFIG_SCHED_INSTRUMENTATION=y
+ CONFIG_SCHED_INSTRUMENTATION_EXTERNAL=y
++CONFIG_SCHED_INSTRUMENTATION_PREEMPTION=y
++CONFIG_SCHED_INSTRUMENTATION_CSECTION=y
++CONFIG_SCHED_INSTRUMENTATION_SPINLOCKS=y
+ CONFIG_SCHED_LPWORK=y
+ CONFIG_SCHED_LPWORKPRIORITY=50
+ CONFIG_SCHED_LPWORKSTACKSIZE=1632
+diff --git a/platforms/common/px4_work_queue/WorkQueue.cpp b/platforms/common/px4_work_queue/WorkQueue.cpp
+index fa32017912..1b2aa522b1 100644
+--- a/platforms/common/px4_work_queue/WorkQueue.cpp
++++ b/platforms/common/px4_work_queue/WorkQueue.cpp
+@@ -39,6 +39,7 @@
+ #include <px4_platform_common/tasks.h>
+ #include <px4_platform_common/time.h>
+ #include <drivers/drv_hrt.h>
++#include <nuttx/itm/itm.h>
+
+ namespace px4
+ {
+@@ -183,8 +184,10 @@ void WorkQueue::Run()
+                        WorkItem *work = _q.pop();
+
+                        work_unlock(); // unlock work queue to run (item may requeue itself)
++                       EMDBG_WORKQUEUE_START(work);
+                        work->RunPreamble();
+                        work->Run();
++                       EMDBG_WORKQUEUE_STOP(work);
+                        // Note: after Run() we cannot access work anymore, as it might have been deleted
+                        work_lock(); // re-lock
+                }

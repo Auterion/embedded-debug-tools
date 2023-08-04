@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 define hook-load
-    monitor reset halt
+    monitor reset
 end
 define hookpost-load
-    monitor reset halt
+    monitor reset
 end
 define hook-quit
     px4_switch_task -1
@@ -162,35 +162,7 @@ define px4_calltrace_semaphore_boosts
     end
 end
 
-
-define px4_trace_swo
-    monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
-    monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
-    monitor itm.tpiu enable
-    monitor tpiu init
-    monitor itm ports off
-    # Enable scheduler reporting
-    monitor itm port 0 on
-    monitor itm port 1 on
-    # Task suspensions are implicit before a task resume
-    # monitor itm port 2 on
-    monitor itm port 3 on
-    monitor itm port 4 on
-    # Enable semaphore reporting
-    # monitor itm port 5 on
-    # monitor itm port 6 on
-    # Enable preemption lock reporting
-    # monitor itm port 7 on
-    # monitor itm port 8 on
-    # Enable critical section lock reporting
-    # monitor itm port 9 on
-    # monitor itm port 10 on
-    # Enable spinlock reporting
-    # monitor itm port 11 on
-    # monitor itm port 12 on
-    # monitor itm port 13 on
-    # monitor itm port 14 on
-
+define px4_trace_swo_gdb
     # send out sync packets every CYCCNT[28] ~268M cycles
     dwtSyncTap 3
     # enable the CYCCNT
@@ -218,11 +190,60 @@ define px4_trace_swo
     ITMTXEna 1
     # Sync packets are transmitted
     ITMSYNCEna 1
+    # Enable the ports
+    ITMTER 0 0xC001801B
     # Enable the ITM
     ITMEna 1
+end
+
+
+define px4_trace_swo_v5x_openocd
+    monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
+    monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
+    monitor itm.tpiu enable
+    monitor tpiu init
+    monitor itm ports off
+
+    px4_trace_swo_gdb
 
     # Enable the SWO output
     enableSTM32SWO 4
 end
 
 
+define px4_trace_swo_v5x_jlink
+    monitor SWO EnableTarget 216000000 27000000 1 0
+    px4_trace_swo_gdb
+end
+
+define px4_trace_swo_v6x_jlink
+    monitor SWO EnableTarget 120000000 30000000 1 0
+    px4_trace_swo_gdb
+end
+
+
+define px4_trace_swo_v6x_gdb
+    # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
+    set *0xE00E1004 |= 0x00700000;
+    # Unlock SWTF_LAR
+    set *0xE00E4FB0 = 0xC5ACCE55;
+    # Unlock SWO_LAR
+    set *0xE00E3FB0 = 0xC5ACCE55;
+
+    # SWO current output divisor register
+    # SWO_CODR = (CPU/4 / SWO) - 1
+    set *0xE00E3010 = ((120 / 20) - 1);
+    # SWO selected pin protocol register SWO_SPPR
+    set *0xE00E30F0 = 0x00000002;
+    # Enable ITM input of SWO trace funnel SWFT_CTRL
+    set *0xE00E4000 |= 0x00000001;
+
+    # RCC_AHB4ENR enable GPIOB clock
+    set *0x580244E0 |= 0x00000002;
+    # Configure GPIOB pin 3 Speed
+    set *0x58020408 |= 0x00000080;
+    # Force AF0 for GPIOB pin 3
+    set *0x58020420 &= 0xFFFF0FFF;
+    # Configure GPIOB pin 3 as AF
+    set *0x58020400 = (*0x58020400 & 0xffffff3f) | 0x00000080;
+end

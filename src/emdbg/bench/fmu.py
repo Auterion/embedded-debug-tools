@@ -165,12 +165,12 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     px4_dir = Path(px4_directory).absolute().resolve()
     # script_dir = px4_dir / f"platforms/nuttx/Debug"
 
-    elf = px4_dir / f"build/{target}_default/{target}_default.elf"
+    elf = px4_dir / f"build/{target}/{target}.elf"
     cmds = [f"dir {px4_dir}", f"source {data_dir}/fmu.gdb",
             f"source {data_dir}/orbuculum.gdb",
             f"python px4._TARGET='{target.lower()}'"]
     if ui is not None:
-        cmds += Fmu._DBGMCU_CONFIG(target) + ["python px4.restart_system_load_monitor(gdb)"]
+        cmds += Fmu._DBGMCU_CONFIG(target)
     cmds += (commands or [])
 
     return backend, elf, cmds

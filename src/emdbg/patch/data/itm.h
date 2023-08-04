@@ -32,6 +32,10 @@ enum
     EMDBG_SPINLOCK_LOCKED = 12,
     EMDBG_SPINLOCK_UNLOCK = 13,
     EMDBG_SPINLOCK_ABORT = 14,
+
+    // Workqueue custom
+    EMDBG_WORKQUEUE_START = 15,
+    EMDBG_WORKQUEUE_STOP = 16,
 };
 
 #define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
@@ -53,6 +57,17 @@ enum
 
 #define EMDBG_LOG_TASK_RESUME(tcb, prev_state) \
     emdbg_itm32_block(EMDBG_TASK_RESUME, (prev_state << 24) | (tcb->sched_priority << 16) | tcb->pid)
+
+
+#define EMDBG_WORKQUEUE_START(item) \
+    { \
+        emdbg_itm32_block(EMDBG_WORKQUEUE_START, (uint32_t)(item->ItemName())); \
+    }
+
+#define EMDBG_WORKQUEUE_STOP(item) \
+    { \
+        emdbg_itm8_block(EMDBG_WORKQUEUE_STOP, item->_run_count); \
+    }
 
 typedef struct
 {
@@ -117,6 +132,8 @@ void emdbg_itm32_block(uint8_t channel, uint32_t value)
         EMDBG_ITM->PORT[channel].u32 = value;
     }
 }
+
+#undef EMDBG_ITM
 
 #ifdef __cplusplus
 }
