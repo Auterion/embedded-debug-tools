@@ -2,10 +2,10 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 define hook-load
-    monitor reset
+    px4_reset
 end
 define hookpost-load
-    monitor reset
+    px4_reset
 end
 define hook-quit
     px4_switch_task -1
@@ -195,32 +195,6 @@ define px4_trace_swo_gdb
     # Enable the ITM
     ITMEna 1
 end
-
-
-define px4_trace_swo_v5x_openocd
-    monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
-    monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
-    monitor itm.tpiu enable
-    monitor tpiu init
-    monitor itm ports off
-
-    px4_trace_swo_gdb
-
-    # Enable the SWO output
-    enableSTM32SWO 4
-end
-
-
-define px4_trace_swo_v5x_jlink
-    monitor SWO EnableTarget 216000000 27000000 1 0
-    px4_trace_swo_gdb
-end
-
-define px4_trace_swo_v6x_jlink
-    monitor SWO EnableTarget 120000000 30000000 1 0
-    px4_trace_swo_gdb
-end
-
 
 define px4_trace_swo_v6x_gdb
     # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN

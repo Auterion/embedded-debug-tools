@@ -154,11 +154,11 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     data_dir = Path(__file__).parent.resolve() / "data"
 
     if backend == "openocd":
-        backend = emdbg.debug.OpenOcdBackend(config=[data_dir / config])
+        backend_obj = emdbg.debug.OpenOcdBackend(config=[data_dir / config])
     elif backend == "jlink":
-        backend = emdbg.debug.JLinkBackend(device, speed)
+        backend_obj = emdbg.debug.JLinkBackend(device, speed)
     elif ":" in backend:
-        backend = emdbg.debug.ProbeBackend(backend)
+        backend_obj = emdbg.debug.ProbeBackend(backend)
     else:
         raise ValueError(f"Unknown backend '{backend}'. Use 'openocd', 'jlink' or 'IP:PORT'!")
 
@@ -166,14 +166,18 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     # script_dir = px4_dir / f"platforms/nuttx/Debug"
 
     elf = px4_dir / f"build/{target}/{target}.elf"
-    cmds = [f"dir {px4_dir}", f"source {data_dir}/fmu.gdb",
+    backend_gdb = data_dir / f"fmu_{backend}.gdb"
+    cmds = [f"dir {px4_dir}",
+            f"source {data_dir}/fmu.gdb",
             f"source {data_dir}/orbuculum.gdb",
             f"python px4._TARGET='{target.lower()}'"]
+    if backend_gdb.exists():
+        cmds += [f"source {backend_gdb}"]
     if ui is not None:
         cmds += Fmu._DBGMCU_CONFIG(target)
     cmds += (commands or [])
 
-    return backend, elf, cmds
+    return backend_obj, elf, cmds
 
 
 # -----------------------------------------------------------------------------

@@ -80,11 +80,11 @@ class Device(Base):
     def _MEMORIES(self):
         mems = {
             0x0451: [
-                (0x0000_0000, 0x04000), # ITCM
+                # (0x0000_0000, 0x04000), # ITCM
                 (0x2000_0000, 0x80000), # DTCM, SRAM1, SRAM2
             ],
             0x0450: [
-                (0x0000_0000, 0x10000), # ITCM
+                # (0x0000_0000, 0x10000), # ITCM
                 (0x2000_0000, 0x20000), # DTCM
                 (0x2400_0000, 0x80000), # AXI_SRAM
                 (0x3000_0000, 0x48000), # SRAM1, SRAM2, SRAM3

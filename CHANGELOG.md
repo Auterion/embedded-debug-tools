@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+
+- Choose correct GDB config files for JLink and OpenOCD backend.
+
 ## 1.0.3
 
 - Fix Python 3.8 compatiblity.
