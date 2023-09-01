@@ -27,6 +27,6 @@ python3 -m emdbg.patch --px4-dir path/to/PX4-Autopilot semaphore_boostlog --appl
 To remove a patch set:
 
 ```sh
-python3 -m emdbg.patch --px4-dir path/to/PX4-Autopilot  semaphore_boostlog --restore
+python3 -m emdbg.patch --px4-dir path/to/PX4-Autopilot semaphore_boostlog --restore
 ```
 

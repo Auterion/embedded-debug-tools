@@ -1,12 +1,28 @@
 # Changelog
 
-## 1.0.4
+## 1.1.0
 
+- Add ORBetto tool to convert ITM/DWT traces to perfetto.dev format.
+- Add support for FMUv6x.
+- Detect STM32F7 vs STM32H7 at runtime via DEVID.
+- Use SVD files to generate coredump also from peripherals.
 - Choose correct GDB config files for JLink and OpenOCD backend.
+- More Python 3.8 compatibility fixes.
+- Patches:
+    - Add patch for un-inlining SDMMC register access in NuttX.
+    - Add patch for instrumenting NuttX heap access.
+- GDB plugins:
+    - Show backtrace of GDB plugin exceptions.
+    - Add `px4_discover` command to show device identity.
+    - Add `px4_reload` command to dynamically reload the GDB plugins without
+      quitting and restarting the GDB session.
+    - Fix `px4_interrupt` command displaying an offset for the EPA P flags.
+    - Add `px4_reset` command to reset the device independent of backend.
 
 ## 1.0.3
 
 - Fix Python 3.8 compatiblity.
+- Add this changelog.
 
 ## 1.0.2
 

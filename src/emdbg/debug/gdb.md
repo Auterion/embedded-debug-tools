@@ -110,7 +110,6 @@ Shows information about the connected device.
 
 ```
 (gdb) px4_discover
-(gdb) px4_discover
 Device(armv7e-m, 0x411fc271, 0x450, 0x2003 -> STM32H742, STM32H743/753, STM32H750 at revision Y)
 SCB registers:
 CPUID                            = 411fc271
@@ -119,6 +118,10 @@ CPUID                            = 411fc271
     PartNo                         ....c27. - Cortex-M7
     Revision                       .......1 - Patch: rXp1
 ```
+
+### px4_reset
+
+Resets and halts the device using the correct command for the backend.
 
 
 ### px4_tasks
@@ -452,8 +455,8 @@ px4_coredump [--memory start:size] [--file coredump_{datetime}.txt]
 
 Dumps the memories into a coredump file suffixed with the current date and time.
 The coredump file can be passed to the [CrashDebug](crashdebug.md) debug
-backend. By default, the SRAM memories and a few selected peripherals of the
-FMUv5x are read.
+backend. By default, the SRAM memories and all peripherals listed in the SVD
+file of the target are copied.
 
 ```
 (gdb) px4_coredump

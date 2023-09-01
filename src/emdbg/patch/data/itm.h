@@ -36,6 +36,11 @@ enum
     // Workqueue custom
     EMDBG_WORKQUEUE_START = 15,
     EMDBG_WORKQUEUE_STOP = 16,
+    // Heap custom
+    EMDBG_HEAP_REGIONS = 17,
+    EMDBG_HEAP_MALLOC_ATTEMPT = 18,
+    EMDBG_HEAP_MALLOC_RESULT = 19,
+    EMDBG_HEAP_FREE = 20,
 };
 
 #define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
@@ -60,14 +65,31 @@ enum
 
 
 #define EMDBG_WORKQUEUE_START(item) \
-    { \
-        emdbg_itm32_block(EMDBG_WORKQUEUE_START, (uint32_t)(item->ItemName())); \
-    }
+    { emdbg_itm32_block(EMDBG_WORKQUEUE_START, (uint32_t)(item->ItemName())); }
 
 #define EMDBG_WORKQUEUE_STOP(item) \
-    { \
-        emdbg_itm8_block(EMDBG_WORKQUEUE_STOP, item->_run_count); \
-    }
+    { emdbg_itm8_block(EMDBG_WORKQUEUE_STOP, item->_run_count); }
+
+
+#define EMDBG_HEAP_ADDREGION(start, size) \
+    { emdbg_itm32_block(EMDBG_HEAP_REGIONS, (uint32_t)start | 0x80000000); \
+      emdbg_itm_block(EMDBG_HEAP_REGIONS, (uint32_t)size);
+
+#define EMDBG_HEAP_MALLOC(size) \
+    emdbg_itm_block(EMDBG_HEAP_MALLOC_ATTEMPT, (uint32_t)size)
+
+#define EMDBG_HEAP_MALLOC_RESULT(ptr) \
+    emdbg_itm_block(EMDBG_HEAP_MALLOC_RESULT, (uint32_t)ptr)
+
+#define EMDBG_HEAP_FREE(ptr) \
+    emdbg_itm32_block(EMDBG_HEAP_FREE, (uint32_t)ptr)
+
+#define EMDBG_HEAP_REALLOC(oldptr, size, newptr) \
+    { EMDBG_HEAP_FREE(oldptr); EMDBG_HEAP_MALLOC(size); EMDBG_HEAP_MALLOC_RESULT(newptr); }
+
+#define EMDBG_HEAP_MEMALIGN(oldptr, size, newptr) \
+    EMDBG_HEAP_REALLOC(oldptr, size, newptr)
+
 
 typedef struct
 {
@@ -86,6 +108,7 @@ typedef struct
 static inline void emdbg_itm8(uint8_t channel, uint8_t value);
 static inline void emdbg_itm16(uint8_t channel, uint16_t value);
 static inline void emdbg_itm32(uint8_t channel, uint32_t value);
+static inline void emdbg_itm(uint8_t channel, uint32_t value);
 
 void emdbg_itm8(uint8_t channel, uint8_t value)
 {
@@ -105,9 +128,17 @@ void emdbg_itm32(uint8_t channel, uint32_t value)
         EMDBG_ITM->PORT[channel].u32 = value;
 }
 
+void emdbg_itm(uint8_t channel, uint32_t value)
+{
+    if (value & 0xffff0000ul) emdbg_itm32(channel, value);
+    else if (value & 0xff00u) emdbg_itm16(channel, value);
+    else emdbg_itm8(channel, value);
+}
+
 static inline void emdbg_itm8_block(uint8_t channel, uint8_t value);
 static inline void emdbg_itm16_block(uint8_t channel, uint16_t value);
 static inline void emdbg_itm32_block(uint8_t channel, uint32_t value);
+static inline void emdbg_itm_block(uint8_t channel, uint32_t value);
 
 void emdbg_itm8_block(uint8_t channel, uint8_t value)
 {
@@ -131,6 +162,13 @@ void emdbg_itm32_block(uint8_t channel, uint32_t value)
         while (!EMDBG_ITM->PORT[channel].u32) ;
         EMDBG_ITM->PORT[channel].u32 = value;
     }
+}
+
+void emdbg_itm_block(uint8_t channel, uint32_t value)
+{
+    if (value & 0xffff0000ul) emdbg_itm32_block(channel, value);
+    else if (value & 0xff00u) emdbg_itm16_block(channel, value);
+    else emdbg_itm8_block(channel, value);
 }
 
 #undef EMDBG_ITM

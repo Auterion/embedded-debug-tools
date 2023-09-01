@@ -395,7 +395,8 @@ static std::unordered_map<int32_t, const char*> irq_names_stm32h753 =
     {16+149, "WAKEUP_PIN"},         // Interrupt for all 6 wake-up pins
 };
 // FIXME: detect this automatically
-static auto &irq_names = irq_names_stm32h753;
+static auto &irq_names = irq_names_stm32f765;
+// static auto &irq_names = irq_names_stm32h753;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
@@ -403,8 +404,6 @@ static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
 static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_state = -1)
 {
-    const uint32_t pid = (tid >= PID_STOP) ? PID_STOP : PID_TSK;
-
     if (begin)
     {
         auto *event = ftrace->add_event();
@@ -465,7 +464,49 @@ static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_stat
 
         prev_tid = tid;
     }
+}
 
+static std::unordered_map<uint32_t, uint32_t> heap_regions;
+static std::unordered_map<uint32_t, std::pair<uint32_t, uint32_t>> heap_allocations;
+static uint32_t heap_size_total{0};
+static uint32_t heap_size_remaining{0};
+static uint32_t heap_packet_index{0};
+static void _writeHeapTotal(uint64_t ns, int32_t size)
+{
+    heap_size_total += size;
+    heap_size_remaining -= size;
+    auto *event = ftrace->add_event();
+    event->set_timestamp(ns);
+    event->set_pid(0);
+    auto *print = event->mutable_print();
+    char buffer[100];
+    snprintf(buffer, 100, "C|0|Total Heap Usage in Bytes|%u", heap_size_total);
+    print->set_buf(buffer);
+}
+static void _writeMalloc(uint64_t ns, uint32_t address, uint32_t alignsize, uint32_t size)
+{
+    _writeHeapTotal(ns, alignsize);
+    auto *event = ftrace->add_event();
+    event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+    event->set_pid(prev_tid);
+    auto *print = event->mutable_print();
+    // print->set_ip(address);
+    char buffer[100];
+    snprintf(buffer, 100, "I|0|malloc(%u) -> [0x%08x, %u]", size, address, alignsize);
+    print->set_buf(buffer);
+
+}
+static void _writeFree(uint64_t ns, uint32_t address, uint32_t alignsize, uint32_t size)
+{
+    _writeHeapTotal(ns, -alignsize);
+    auto *event = ftrace->add_event();
+    event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+    event->set_pid(prev_tid);
+    auto *print = event->mutable_print();
+    // print->set_ip(address | 0x1'0000'0000);
+    char buffer[100];
+    snprintf(buffer, 100, "I|0|free(0x%08x) <- %u (%u)", address, size, alignsize);
+    print->set_buf(buffer);
 }
 
 // ====================================================================================================
@@ -607,23 +648,44 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             // const uint8_t count = m->value;
         }
     }
-    else if (m->srcAddr == 30) // put
+    else if (m->srcAddr == 17) // heap region
     {
-        const uint16_t errors = m->value;
-        const uint8_t priority = m->value >> 16;
-        const uint8_t dev_id = m->value >> 24;
-
+        static uint32_t start = 0;
+        if (m->value & 0x80000000) {
+            start = m->value & ~0x80000000;
+        }
+        else if (start)
+        {
+            const uint32_t end = start + m->value;
+            heap_regions.insert({start, end});
+            printf("Heap region added: [%08x, %08x] (%ukiB)\n", start, end, (end - start) / 1024);
+            heap_size_remaining += end - start;
+            start = 0;
+        }
     }
-    else if (m->srcAddr == 31) // fail
+    else if (m->srcAddr == 18 || m->srcAddr == 19) // malloc attempt and result
     {
-        const uint8_t to = m->value;
-        const uint8_t from = m->value >> 8;
-
-        // auto *track_packet = perfetto_trace->add_packet();
-        // track_packet->set_trusted_packet_sequence_id(42);
-        // track_packet->set_timestamp(ns);
-        // auto *track_event = track_packet->mutable_track_event();
-        // auto *debug_annotation = track_event->add_debug_annotation();
+        static uint32_t size = 0;
+        static uint32_t alignsize = 0;
+        if (m->srcAddr == 18) {
+            size = m->value;
+            alignsize = ((size + 16) + 0xf) & ~0xf;
+        }
+        else {
+            if (m->value) heap_allocations.insert({m->value, {size, alignsize}});
+            else printf("malloc(%uB) failed!\n", size);
+            _writeMalloc(ns, m->value, alignsize, size);
+        }
+    }
+    else if (m->srcAddr == 20) // free
+    {
+        if (heap_allocations.contains(m->value))
+        {
+            const auto [size, alignsize] = heap_allocations[m->value];
+            heap_allocations.erase(m->value);
+            _writeFree(ns, m->value, alignsize, size);
+        }
+        else printf("Unknown size for free(0x%08x)!\n", m->value);
     }
 }
 // ====================================================================================================
@@ -1222,7 +1284,6 @@ static void _feedStream( struct Stream *stream )
 
         fflush( stdout );
     }
-
     {
         auto *interned_data = ftrace_packet->mutable_interned_data();
         for (auto&& [func, name] : workqueue_names)

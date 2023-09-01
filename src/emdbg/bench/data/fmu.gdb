@@ -190,8 +190,10 @@ define px4_trace_swo_gdb
     ITMTXEna 1
     # Sync packets are transmitted
     ITMSYNCEna 1
-    # Enable the ports
-    ITMTER 0 0xC001801B
+    # Enable tasks, workqueues, heap
+    ITMTER 0 0x001F801B
+    # Enable tasks and workqueues
+    # ITMTER 0 0x0001801B
     # Enable the ITM
     ITMEna 1
 end

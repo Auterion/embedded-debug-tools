@@ -55,7 +55,7 @@ def itm_logging(px4_root: Path) -> PatchManager:
 
 def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
     """
-    Adds scheduler instrumentation to NuttX via ITM ports 0-17.
+    Adds scheduler and heap instrumentation to NuttX via ITM.
     Requires the `itm_logging` patch.
     """
     px4_root = Path(px4_root)

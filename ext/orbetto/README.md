@@ -12,6 +12,7 @@ The functionality currently instrumented with cycle accuracy:
 - Task waking (waiting to run).
 - IRQ entry/exit.
 - Workqueue start/stop with name.
+- Heap malloc/free with address and size.
 
 Perfetto is a FTrace visualizer that works really well for this use case:
 
@@ -19,8 +20,9 @@ Perfetto is a FTrace visualizer that works really well for this use case:
 
 ![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto3.png)
 
-[Here is an example trace with workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_wq.perf)
-and [another without workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perf)
+[Here is an example trace of only the scheduler](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perf),
+[here is one with the scheduler and workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_wq.perf),
+and [another one with heap tracking](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_heap.perf)
 that you can download and drag into the [the Perfetto UI](https://ui.perfetto.dev)
 to test it yourself.
 
@@ -69,9 +71,7 @@ to use a J-Link for tracing the FMUv6x.
 
 ### FMUv5x
 
-To capture the trace output, we use the STLinkv3-MINIE probe with up to 24Mbps
-SWO logging capability, configured and controlled via GDB.
-However, the FMUv5x SWO can only be clocked ~20MHz to prevent data corruption.
+To capture the trace output, we can use the STLinkv3-MINIE or a JLink.
 
 Launch GDB inside your PX4-Autopilot source code directory:
 
@@ -83,8 +83,7 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v5x --openocd
 Reset your target and start the capture:
 
 ```
-(gdb) monitor reset halt
-(gdb) px4_trace_swo_v5x_openocd
+(gdb) px4_trace_swo_v5x
 (gdb) continue
 ```
 
@@ -101,8 +100,7 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v6x --jlink
 Reset your target and start the capture:
 
 ```
-(gdb) monitor reset
-(gdb) px4_trace_swo_v6x_jlink
+(gdb) px4_trace_swo_v6x
 (gdb) continue
 ```
 
@@ -128,7 +126,10 @@ To convert the `trace.swo` binary file to the Perfetto format, call the
 
 ```sh
 # cd embedded-debug-tools/ext/orbetto
+# FMUv5x runs at 216MHz
 build/orbetto -T s -C 216000 -E -f path/to/trace.swo -e path/to/fmu.elf
+# FMUv6x runs at 480MHz
+build/orbetto -T s -C 480000 -E -f path/to/trace.swo -e path/to/fmu.elf
 ```
 
 You should now have a `orbetto.perf` file that you can drag into

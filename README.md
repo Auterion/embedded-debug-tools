@@ -34,15 +34,16 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
     - [User commands for PX4 and NuttX](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/gdb.md#user-commands).
         - Task information.
         - Task switching to inspect call stack.
-        - Coredumping.
+        - Coredumping of memories and peripherals.
         - GPIO state visualization.
         - Backtrace generation.
         - Register state visualization using SVD files.
         - Register access watching and difference visualization.
 - [Real-time instrumentation using ITM/DWT](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto).
-    - Up to 2MB/s SWO capture via STLinkv3.
+    - Up to 2MB/s SWO capture via STLinkv3, 3MB/s via JLink.
     - Visualization of task switching and interrupts via [perfetto](https://perfetto.dev).
     - Latency measurement of scheduler and task priorities.
+    - Heap usage tracking via malloc, free, realloc, alignmem.
     - Nanosecond resolution with very little runtime overhead.
 - Patch Manager for out-of-tree modifications.
 - Power Switch.
@@ -58,6 +59,15 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
 
 A number of GDB and NSH scripting examples for test automation can be found in
 the `scripts` folder.
+
+
+## Presentations
+
+### Debugging Microcontrollers
+
+Presented at Chaos Communication Camp by Niklas Hauser on 2023-08-18.
+
+[![](https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg)](https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers)
 
 
 ## Installation
