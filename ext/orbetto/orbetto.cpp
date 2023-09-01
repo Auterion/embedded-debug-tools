@@ -475,13 +475,24 @@ static void _writeHeapTotal(uint64_t ns, int32_t size)
 {
     heap_size_total += size;
     heap_size_remaining -= size;
-    auto *event = ftrace->add_event();
-    event->set_timestamp(ns);
-    event->set_pid(0);
-    auto *print = event->mutable_print();
-    char buffer[100];
-    snprintf(buffer, 100, "C|0|Total Heap Usage in Bytes|%u", heap_size_total);
-    print->set_buf(buffer);
+    {
+        auto *event = ftrace->add_event();
+        event->set_timestamp(ns);
+        event->set_pid(0);
+        auto *print = event->mutable_print();
+        char buffer[100];
+        snprintf(buffer, 100, "C|0|Heap Usage|%u", heap_size_total);
+        print->set_buf(buffer);
+    }
+    {
+        auto *event = ftrace->add_event();
+        event->set_timestamp(ns);
+        event->set_pid(0);
+        auto *print = event->mutable_print();
+        char buffer[100];
+        snprintf(buffer, 100, "C|0|Heap Available|%u", heap_size_remaining);
+        print->set_buf(buffer);
+    }
 }
 static void _writeMalloc(uint64_t ns, uint32_t address, uint32_t alignsize, uint32_t size)
 {
@@ -661,6 +672,15 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             printf("Heap region added: [%08x, %08x] (%ukiB)\n", start, end, (end - start) / 1024);
             heap_size_remaining += end - start;
             start = 0;
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "C|0|Heap Available|%u", heap_size_remaining);
+                print->set_buf(buffer);
+            }
         }
     }
     else if (m->srcAddr == 18 || m->srcAddr == 19) // malloc attempt and result

@@ -20,6 +20,8 @@ Perfetto is a FTrace visualizer that works really well for this use case:
 
 ![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto3.png)
 
+![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto4.png)
+
 [Here is an example trace of only the scheduler](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perf),
 [here is one with the scheduler and workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_wq.perf),
 and [another one with heap tracking](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_heap.perf)

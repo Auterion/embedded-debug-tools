@@ -7,3 +7,4 @@ dist/
 /ext/orbetto/subprojects/perfetto/perfetto_src
 /ext/orbetto/subprojects/orbuculum
 /ext/orbetto/*.perf
+/ext/orbetto/*.debug
