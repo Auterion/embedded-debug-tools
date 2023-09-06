@@ -3,6 +3,7 @@
 ## 1.1.1
 
 - Better visualization of the number of backtraces in callgraphs.
+- Load NuttX RTOS plugin from PX4 into JLink if available.
 
 ## 1.1.0
 

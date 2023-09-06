@@ -151,19 +151,19 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     else:
         raise ValueError(f"Unknown device for '{target}'!")
 
+    px4_dir = Path(px4_directory).absolute().resolve()
     data_dir = Path(__file__).parent.resolve() / "data"
 
     if backend == "openocd":
         backend_obj = emdbg.debug.OpenOcdBackend(config=[data_dir / config])
     elif backend == "jlink":
-        backend_obj = emdbg.debug.JLinkBackend(device, speed)
+        rtos_so = px4_dir / f"platforms/nuttx/NuttX/nuttx/tools/jlink-nuttx.so"
+        if not rtos_so.exists(): rtos_so = None
+        backend_obj = emdbg.debug.JLinkBackend(device, speed, rtos_so)
     elif ":" in backend:
         backend_obj = emdbg.debug.ProbeBackend(backend)
     else:
         raise ValueError(f"Unknown backend '{backend}'. Use 'openocd', 'jlink' or 'IP:PORT'!")
-
-    px4_dir = Path(px4_directory).absolute().resolve()
-    # script_dir = px4_dir / f"platforms/nuttx/Debug"
 
     elf = px4_dir / f"build/{target}/{target}.elf"
     backend_gdb = data_dir / f"fmu_{backend}.gdb"

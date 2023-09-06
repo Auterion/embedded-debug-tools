@@ -29,18 +29,21 @@ class JLinkBackend(ProbeBackend):
 
     See `call()` for additional information.
     """
-    def __init__(self, device: str, speed: int):
+    def __init__(self, device: str, speed: int, rtos: Path = None):
         """
         :param device: part name of the microcontroller to debug.
         :param speed: SWD connection baudrate in kHz.
+        :param rtos: Path to RTOS plugin for thread-aware debugging.
         """
         super().__init__(":2331")
         self.device = device
         self.speed = speed
+        self.rtos = rtos
         self.process = None
 
     def start(self):
-        self.process = call(self.device, self.speed, blocking=False, silent=True)
+        self.process = call(self.device, self.speed, self.rtos,
+                            blocking=False, silent=True)
         LOGGER.info(f"Starting {self.process.pid}...")
 
     def stop(self):
@@ -52,7 +55,7 @@ class JLinkBackend(ProbeBackend):
 
 
 # -----------------------------------------------------------------------------
-def call(device: str, speed: int, blocking: bool = True,
+def call(device: str, speed: int, rtos: Path = None, blocking: bool = True,
          silent: bool = False) -> "int | subprocess.Popen":
     """
     Starts the `JLinkGDBServer` and connects to the microcontroller without
@@ -65,6 +68,7 @@ def call(device: str, speed: int, blocking: bool = True,
 
     :param device: part name of the microcontroller to debug.
     :param speed: SWD connection baudrate in kHz.
+    :param rtos: Path to RTOS plugin for thread-aware debugging.
     :param blocking: Run in current process as a blocking call.
                      Set to `False` to run in a new subprocess.
     :param silent: Disable any reporting from `JLinkGDBServer`.
@@ -74,8 +78,8 @@ def call(device: str, speed: int, blocking: bool = True,
     binary = os.environ.get("PX4_JLINK_GDB_SERVER", "JLinkGDBServer")
 
     command_jlink = f"{binary} -device {device} -speed {speed} -if swd -noreset -nogui"
-    if silent:
-        command_jlink += " -silent"
+    if rtos: command_jlink += f" -rtos {Path(rtos).absolute()}"
+    if silent: command_jlink += " -silent"
 
     LOGGER.debug(command_jlink)
 
