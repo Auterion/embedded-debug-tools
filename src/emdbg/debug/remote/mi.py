@@ -36,6 +36,7 @@ class Gdb(Interface):
 
         self._run_thread = True
         self._command_is_done = False
+        self._stopped = False
         self._payloads = []
         self._continue_timeout = -1
         self._response_thread = threading.Thread(target=self._handle_responses)
@@ -49,23 +50,34 @@ class Gdb(Interface):
                 if response["type"] == "result" and response["message"] in ["done", "running"]:
                     self._command_is_done = True
                 elif response["type"] == "console":
-                    if payload := response["payload"].encode("latin-1").decode('unicode_escape'):
+                    if payload := response["payload"].encode("latin-1", "ignore").decode("unicode_escape"):
                         payload = payload.replace("\\e", "\033")
                         self._payloads.append(payload)
                         if "#" not in payload or VERBOSITY >= 3:
                             LOGGER.debug(payload)
+                elif response["type"] == "notify" and response["message"] == "stopped":
+                    self._stopped = True
+                    self.interrupted = True
             time.sleep(0.01)
 
-    def read(self, clear=True):
+    def read(self, clear: bool = True) -> list[str]:
         p = self._payloads
         if clear: self._payloads = []
-        return p
+        return "".join(p)
 
-    def _write(self, cmd):
+    def continue_wait(self, timeout: float = 1) -> bool:
+        self._stopped = False
+        self.continue_nowait()
+        while(not self._stopped and timeout > 0):
+            time.sleep(0.1)
+            timeout -= 0.1
+        return self._stopped
+
+    def _write(self, cmd: str):
         LOGGER.debug(f"(gdb) {cmd}")
         self.mi.write(cmd, timeout_sec=0, raise_error_on_timeout=False, read_response=False)
 
-    def execute(self, cmd, timeout=1, to_string=False) -> str | None:
+    def execute(self, cmd: str, timeout: float = 1, to_string: bool = False) -> str | None:
         self._command_is_done = False
         self._payloads = []
         self._write(cmd)
@@ -73,7 +85,7 @@ class Gdb(Interface):
             time.sleep(0.1)
             timeout -= 0.1
         if to_string:
-            return "\n".join(self._payloads)
+            return self.read()
 
     def quit(self):
         self._run_thread = False

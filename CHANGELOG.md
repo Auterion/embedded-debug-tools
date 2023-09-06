@@ -5,6 +5,7 @@
 - Better visualization of the number of backtraces in callgraphs.
 - Load NuttX RTOS plugin from PX4 into JLink if available.
 - More opportunistic backtrace information printing.
+- Add blocking continue with timeout for GDB/MI wrapper.
 
 ## 1.1.0
 
