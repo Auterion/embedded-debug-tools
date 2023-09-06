@@ -243,7 +243,8 @@ class Device(Base):
         total_size = 0
         for addr, size in memories:
             total_size += size
-            data = self.read_memory(addr, size).cast("I")
+            try: data = self.read_memory(addr, size).cast("I")
+            except: print(f"Failed to read [{addr:#x}, {addr+size:#x}]")
             for ii, values in enumerate(utils.chunks(data, 4, 0)):
                 values = (hex(v & 0xffffffff) for v in values)
                 lines.append(f"{hex(addr + ii * 16)}: {' '.join(values)}")

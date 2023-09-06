@@ -6,6 +6,7 @@
 - Load NuttX RTOS plugin from PX4 into JLink if available.
 - More opportunistic backtrace information printing.
 - Add blocking continue with timeout for GDB/MI wrapper.
+- Prevent an exception if taking a coredump.
 
 ## 1.1.0
 
