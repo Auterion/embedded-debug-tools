@@ -73,13 +73,19 @@ def gdb_backtrace(gdb) -> str:
     index = 0
     output = []
     while(frame and frame.is_valid()):
+        pc = frame.pc()
+        line = "??"
+        file = "??"
+        if sal := frame.find_sal():
+            line = sal.line
+            if sal.symtab:
+                file = sal.symtab.fullname()
         if func := frame.function():
-            pc = frame.pc()
-            line = frame.find_sal().line
-            file = frame.find_sal().symtab.fullname()
-            func = frame.function().print_name
+            func = func.print_name
             if not func.endswith(")"): func += "()"
-            output.append(f"#{index: <2} 0x{pc:08x} in {func} at {file}:{line}")
+        else:
+            func = "??"
+        output.append(f"#{index: <2} 0x{pc:08x} in {func} at {file}:{line}")
         frame = frame.older()
         index += 1
     return "\n".join(output)
