@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 import re
+from pathlib import Path
 from .priority import _BoostOperation
 
 class Frame:
@@ -15,16 +16,20 @@ class Frame:
         """
         self.is_valid = False
         self.description = description
-        if match := re.match(r"#(\d+) +(?:0x.+? in )?(.+?) *\((.*?)\) at (.+?):(\d+)", description):
+        if match := re.match(r"#(\d+) +(?:0x.+? in )?(.+)\((.*?)\) at (.+?):(\d+)", description):
             self.index = int(match.group(1))
-            self.function = match.group(2)
+            self._function = match.group(2)
             self.args = match.group(3)
             self.filename = match.group(4)
             self.line = match.group(5)
             self.is_valid = True
+            self.function = f"{self._function}({self.args})"
+            self.location = f"{Path(self.filename).relative_to(Path().cwd())}:{self.line}"
+            self.uri = f"subl://open?url={Path(self.filename).absolute()}&line={self.line}"
+            self._node = self.function + "\n" + self.location
 
     def __hash__(self) -> int:
-        return hash(self.filename + self.function)
+        return hash(self._node)
 
     def __eq__(self, other) -> int:
         return self.function == other.function and self.filename == other.filename
@@ -208,4 +213,3 @@ class SemaphoreBacktrace(Backtrace):
                 self.type += "_255"
             else:
                 self.type = "255"
-

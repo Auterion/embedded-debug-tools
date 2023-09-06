@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+- Better visualization of the number of backtraces in callgraphs.
+
 ## 1.1.0
 
 - Add ORBetto tool to convert ITM/DWT traces to perfetto.dev format.

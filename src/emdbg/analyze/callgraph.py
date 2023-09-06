@@ -16,12 +16,14 @@ from .utils import read_gdb_log
 LOGGER = logging.getLogger(__name__)
 
 
-def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
-                             output_graphviz: Path = None, output_pyvis: Path = None):
+def callgraph_from_backtrace(backtraces: list[str],
+                             BacktraceClass: Backtrace = None,
+                             output_graphviz: Path = None,
+                             output_pyvis: Path = None):
     """
     Convert a GDB backtrace log file into a dot, svg and pyvis file.
 
-    :param logfile: path of the GDB log file containing backtraces.
+    :param backtraces: list of strings each containing a backtrace.
     :param BacktraceClass: One of the classes of `emdbg.analyze.backtrace`.
     :param output_graphviz: Output path of the graphviz file (`.dot` suffix).
         If you set its suffix to `.svg`, the `dot` command is used to generate
@@ -30,11 +32,14 @@ def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
         module to be installed).
     """
 
-    backtraces = defaultdict(set)
-    for description in re.split(r"(?:Breakpoint|Hardware .*?watchpoint) \d", read_gdb_log(logfile)[20:]):
+    if BacktraceClass is None:
+        BacktraceClass = Backtrace
+
+    backts = defaultdict(set)
+    for description in backtraces:
         bt = BacktraceClass(description)
         if bt.is_valid:
-            backtraces[bt.type].add(bt)
+            backts[bt.type].add(bt)
             # if bt.type == "unknown":
             #     print(bt)
             #     print(bt.description)
@@ -42,24 +47,25 @@ def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
             LOGGER.error(bt)
             LOGGER.error(bt.description)
 
-    nodes = set()
-    edges = set()
+    nodes = {}
+    edges = defaultdict(int)
 
     def itertools_pairwise(iterable):
         a, b = itertools.tee(iterable)
         next(b, None)
         return zip(a, b)
 
-    for btype, bts in backtraces.items():
+    for btype, bts in backts.items():
         for bt in bts:
             for frame in bt.frames:
-                nodes.add(frame.function)
+                nodes[frame._node] = frame
             for f1, f2 in itertools_pairwise(bt.frames):
-                edges.add( (f2.function, f1.function, str((btype or "").lower())) )
+                edges[(f2._node, f1._node, str((btype or "").lower()))] += 1
 
     sources = set(nodes)
     sinks = set(nodes)
-    for source, sink, _ in edges:
+    max_calls = max(edges.values())
+    for source, sink, _ in edges.keys():
         sources.discard(sink)
         sinks.discard(source)
 
@@ -82,10 +88,12 @@ def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
         net.show(output_pyvis, notebook=False)
 
     if output_graphviz:
+        output_graphviz = Path(output_graphviz)
         import graphviz
         dot = graphviz.Digraph()
         for node in sorted(nodes):
-            kwargs = {"label": node}
+            frame = nodes[node]
+            kwargs = {"label": frame.function, "URL": frame.uri}
             for pattern, style in BacktraceClass.COLORS.items():
                 if re.search(pattern, node):
                     kwargs.update(style)
@@ -95,7 +103,8 @@ def callgraph_from_backtrace(logfile: Path, BacktraceClass: Backtrace,
                 kwargs.update({"style": "bold,filled", "fillcolor": "LightGreen"})
             dot.node(_n(node), **kwargs)
         for edge in sorted(edges):
-            dot.edge(_n(edge[0]), _n(edge[1]), label=edge[2])
+            dot.edge(_n(edge[0]), _n(edge[1]), label=edge[2] or str(edges[edge]),
+                     penwidth=str(max(edges[edge]/max_calls * 10, 0.5)))
         output_dot = output_graphviz.with_suffix(".dot")
         output_dot.write_text(dot.source)
         if output_graphviz.suffix == ".svg":
@@ -162,6 +171,6 @@ if __name__ == "__main__":
     if args.svg:
         graphviz = Path(str(args.file.with_suffix(".svg")).replace("calltrace_", "callgraph_"))
 
-    callgraph_from_backtrace(args.file, BacktraceClass,
-                             output_graphviz=graphviz,
-                             output_pyvis=args.pyvis)
+    backtraces = re.split(r"(?:Breakpoint|Hardware .*?watchpoint) \d", read_gdb_log(args.file)[20:])
+    callgraph_from_backtrace(backtraces, BacktraceClass,
+                             output_graphviz=graphviz, output_pyvis=args.pyvis)

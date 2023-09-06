@@ -10,6 +10,7 @@ if __name__ == "__main__":
     import emdbg
     import argparse
     from pathlib import Path
+    from .utils import read_gdb_log
 
 
     if __name__ == "__main__":
@@ -95,5 +96,7 @@ if __name__ == "__main__":
             # halt the debugger and stop logging
             bench.gdb.interrupt_and_wait()
             bench.gdb.execute("px4_log_stop")
-            emdbg.analyze.callgraph_from_backtrace(calltrace, values.get(args.type),
+
+            backtraces = re.split(r"(?:Breakpoint|Hardware .*?watchpoint) \d", read_gdb_log(calltrace)[20:])
+            emdbg.analyze.callgraph_from_backtrace(backtraces, values.get(args.type),
                                                    output_graphviz=calltrace.with_suffix(".svg"))
