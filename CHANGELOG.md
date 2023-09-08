@@ -3,6 +3,7 @@
 ## 1.2.0
 
 - Add support for loading PX4 hardfault logs into the crashdebug backend.
+- Trap fault vectors while debugging to allow backtrace to work correctly.
 
 ## 1.1.1
 

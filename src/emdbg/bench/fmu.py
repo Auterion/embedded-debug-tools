@@ -15,17 +15,20 @@ import emdbg
 
 class Fmu:
     """
-    FMU test bench with optional nsh, power, and logic analyzer attachements.
+    FMU test bench with optional nsh, power, and logic analyzer attachments.
     """
     def _DBGMCU_CONFIG(target):
+        # Vector catch all exceptions, but not reset
+        common = ["set *(short*)0xE000EDFC = 0xfff0"]
+        # Halt all timers and peripherals while debugging
         if "fmu-v5x" in target:
             return ["set *0xE0042008 = 0xffffffff",
-                    "set *0xE004200C = 0xffffffff"]
+                    "set *0xE004200C = 0xffffffff"] + common
         if "fmu-v6x" in target:
             return ["set *0xE00E1034 = 0xffffffff",
                     "set *0xE00E103C = 0xffffffff",
                     "set *0xE00E104C = 0xffffffff",
-                    "set *0xE00E1054 = 0xffffffff"]
+                    "set *0xE00E1054 = 0xffffffff"] + common
         return []
 
     def __init__(self, target: str, elf: Path,

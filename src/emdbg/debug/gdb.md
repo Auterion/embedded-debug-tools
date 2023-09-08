@@ -566,7 +566,6 @@ Differences for DMA1:
 +     FEIF4                          ...............................0 - 0               // Stream x FIFO error interrupt flag (x=7..4)
 +     HTIF4                          ...........................0.... - 0               // Stream x half transfer interrupt flag (x=7..4)
 +     TCIF4                          ..........................0..... - 0               // Stream x transfer complete interrupt flag (x=7..4)
-(gdb)
 ```
 
 Attach a write watchpoint to a register range: `px4_pwatch -a -ww PER.REG`.  
@@ -590,7 +589,76 @@ Differences for DMA1:
 -     M0A                            00000000000000000000000000000000 - 00000000        // Memory 0 address
 + DMA1.S2M0AR                      = 00100000000000110000000111100000                   // stream x memory 0 address register
 +     M0A                            00100000000000110000000111100000 - 200301e0        // Memory 0 address
-(gdb)
+```
+
+
+## Debugging HardFaults
+
+When attaching GDB to your target, it enables exception vector catching so that
+any fault triggers a breakpoint *before* the NuttX hardfault handler takes over.
+This allows you to perform a backtrace and see the problematic location
+immediately instead of using the hardfault log (see `emdbg.debug.crashdebug`):
+
+```
+Program received signal SIGTRAP, Trace/breakpoint trap.
+exception_common () at armv7-m/arm_exception.S:144
+144             mrs             r0, ipsr                                /* R0=exception number */
+(gdb) bt
+#0  exception_common () at armv7-m/arm_exception.S:144
+#1  <signal handler called>
+#2  inode_insert (parent=0x0, peer=0x0, node=0x2007c010) at inode/fs_inodereserve.c:117
+#3  inode_reserve (path=path@entry=0x81895f4 "/dev/console", mode=mode@entry=438, inode=inode@entry=0x20036bac) at inode/fs_inodereserve.c:222
+#4  0x0800ac90 in register_driver (path=path@entry=0x81895f4 "/dev/console", fops=fops@entry=0x8189968 <g_serialops>, mode=mode@entry=438, priv=priv@entry=0x20020570 <g_usart3priv>) at driver/fs_registerdriver.c:78
+#5  0x0800a6f2 in uart_register (path=path@entry=0x81895f4 "/dev/console", dev=dev@entry=0x20020570 <g_usart3priv>) at serial/serial.c:1743
+#6  0x080093a6 in arm_serialinit () at chip/stm32_serial.c:3660
+#7  0x08014554 in up_initialize () at common/arm_initialize.c:122
+#8  0x0800b122 in nx_start () at init/nx_start.c:656
+#9  0x080082be in __start () at chip/stm32_start.c:273
+#10 0x08000306 in ?? ()
+Backtrace stopped: previous frame identical to this frame (corrupt stack?)
+```
+
+To understand what exactly triggered the hardfault, you can use the `arm scb /h`
+command to display the fault registers:
+
+```
+(gdb) arm scb /h
+CPUID                            = 411fc270                   // CPUID Base Register
+    Variant                        ..1..... - Revision: r1pX
+    Architecture                   ...f.... - ARMv7-M
+    PartNo                         ....c27. - Cortex-M7
+    Revision                       .......0 - Patch: rXp0
+CFSR                             = 00008200                   // Configurable Fault Status Register
+    MMFSR                          ......00 - 00              // MemManage Fault Status Register
+    BFSR                           ....82.. - 82              // BusFault Status Register
+    BFARVALID                      ....8... - 1               // Indicates if BFAR has valid contents.
+    PRECISERR                      .....2.. - 1               // Indicates if a precise data access error has occurred, and the processor has written the faulting address to the BFAR.
+    UFSR                           0000.... - 0000            // UsageFault Status Register
+HFSR                             = 40000000                   // HardFault Status Register
+    FORCED                         4....... - 1               // Indicates that a fault with configurable priority has been escalated to a HardFault exception.
+DFSR                             = 00000008                   // Debug Fault Status Register
+    VCATCH                         .......8 - Vector catch triggered // Indicates triggering of a Vector catch
+MMFAR                            = 00000008                   // MemManage Fault Address Register
+BFAR                             = 00000008                   // BusFault Address Register
+AFSR                             = 00000000                   // Auxiliary Fault Status Register
+```
+
+In this example, a precise bus fault occurred when accessing address 8. Since
+the bus fault is precise, we can walk up the stack frames to the exact offending
+instruction:
+
+```
+(gdb) frame 2
+#2  inode_insert (parent=0x0, peer=0x0, node=0x2007c010) at inode/fs_inodereserve.c:117
+117           node->i_peer    = parent->i_child;
+```
+
+In this example, the `parent` pointer is zero, which attempts to perform a read
+at offset 8, which corresponds to `offsetof(parent, i_child)`:
+
+```
+(gdb) p &((struct inode *)0)->i_child
+$1 = (struct inode **) 0x8
 ```
 
 

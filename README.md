@@ -39,6 +39,7 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
         - Backtrace generation.
         - Register state visualization using SVD files.
         - Register access watching and difference visualization.
+    - Hardfault trapping with immediate backtrace.
 - [Real-time instrumentation using ITM/DWT](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto).
     - Up to 2MB/s SWO capture via STLinkv3, 3MB/s via JLink.
     - Visualization of task switching and interrupts via [perfetto](https://perfetto.dev).
