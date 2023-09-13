@@ -5,6 +5,7 @@
 - Add support for loading PX4 hardfault logs into the crashdebug backend.
 - Trap fault vectors while debugging to allow backtrace to work correctly.
 - Fix incorrect sorting of tasks in `px4_tasks` command.
+- Display interrupt frame correctly in `px4_backtrace` command.
 
 ## 1.1.1
 
