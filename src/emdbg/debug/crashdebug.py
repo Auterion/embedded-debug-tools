@@ -7,9 +7,10 @@
 """
 
 from __future__ import annotations
-import os, platform
+import os, platform, tempfile
 from pathlib import Path
 from .backend import ProbeBackend
+
 
 class CrashProbeBackend(ProbeBackend):
     """
@@ -23,7 +24,18 @@ class CrashProbeBackend(ProbeBackend):
     """
     def __init__(self, coredump: Path):
         super().__init__()
-        self.coredump = coredump
+        coredump = Path(coredump)
+        if (coredump.suffix.lower() == ".log" and
+            "[hardfault_log]" in (contents := coredump.read_text())):
+            from ..analyze import convert_hardfault
+            tmpfile = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
+            tmpfile.writelines(convert_hardfault(contents))
+            tmpfile.flush()
+            self.coredump = tmpfile.name
+            self._tmpfile = tmpfile
+        else:
+            self.coredump = coredump
+            self._tmpfile = None
         self.binary = "CrashDebug"
         if "Windows" in platform.platform():
             self.binary = "CrashDebug.exe"
@@ -34,6 +46,11 @@ class CrashProbeBackend(ProbeBackend):
                 "target remote | {} --elf {} --dump {}"
                 .format(self.binary, elf, self.coredump)]
 
+    def stop(self):
+        if self._tmpfile is not None:
+            self._tmpfile.close()
+            os.unlink(self._tmpfile.name)
+
 
 def _add_subparser(subparser):
     parser = subparser.add_parser("crashdebug", help="Use CrashDebug as Backend.")
@@ -41,6 +58,7 @@ def _add_subparser(subparser):
             "--dump",
             dest="coredump",
             default="coredump.txt",
+            type=Path,
             help="Path to coredump file.")
     parser.set_defaults(backend=lambda args: CrashProbeBackend(args.coredump))
     return parser

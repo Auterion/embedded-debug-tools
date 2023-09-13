@@ -81,6 +81,8 @@ Coredumps can be analyzed offline as well (see `emdbg.debug.crashdebug`):
 
 ```sh
 python3 -m emdbg.debug.gdb -py --elf path/to/firmware.elf crashdebug --dump coredump.txt
+# This also works with PX4 hardfault logs
+python3 -m emdbg.debug.gdb -py --elf path/to/firmware.elf crashdebug --dump px4_hardfault.log
 ```
 
 

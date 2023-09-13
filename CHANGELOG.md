@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+
+- Add support for loading PX4 hardfault logs into the crashdebug backend.
+
 ## 1.1.1
 
 - Better visualization of the number of backtraces in callgraphs.

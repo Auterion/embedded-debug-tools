@@ -9,3 +9,4 @@ from .backtrace import Backtrace, FileSystemBacktrace, SpiBacktrace, I2cBacktrac
 from .backtrace import CanBacktrace, UartBacktrace, SemaphoreBacktrace
 from .callgraph import callgraph_from_backtrace
 from .priority import summarize_semaphore_boostlog
+from .hardfault import convert as convert_hardfault

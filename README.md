@@ -23,7 +23,7 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
 - Debug Probes: SWD and ITM/DWT over SWO.
     - [SEGGER J-Link](https://www.segger.com/products/debug-probes/j-link/): BASE Compact, EDU Mini.
     - [OpenOCD](https://openocd.org): [STMicro STLinkv3](https://www.st.com/en/development-tools/stlink-v3minie.html).
-    - Coredump: [CrashDebug](https://github.com/adamgreen/CrashDebug).
+    - Coredump: [CrashDebug](https://github.com/adamgreen/CrashDebug) with support for PX4 Hardfault logs.
 - Trace Probes: ITM/DWT/ETM over TRACE (planned).
     - [SEGGER J-Trace](https://www.segger.com/products/debug-probes/j-trace/models/j-trace/) (planned).
     - [Orbcode ORBTrace mini](https://orbcode.org/orbtrace-mini) (planned).
