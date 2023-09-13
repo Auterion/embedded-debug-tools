@@ -366,7 +366,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
         rows.append(row)
 
     # Sort the rows by PID by default and format the table
-    rows.sort(key=(lambda l: l[1]) if sort_key is None else sort_key)
+    rows.sort(key=(lambda l: l[2]) if sort_key is None else sort_key)
     output = utils.format_table(fmtstr, header, rows) + "\n"
 
     # Add the task information
