@@ -7,6 +7,7 @@
 - Fix incorrect sorting of tasks in `px4_tasks` command.
 - Display interrupt frame correctly in `px4_backtrace` command.
 - Output a warning when a stack overflow has been detected in `px4_tasks` command.
+- Configure GDB to display absolute filenames and one line of disassembly.
 
 ## 1.1.1
 

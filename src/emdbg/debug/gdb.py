@@ -49,9 +49,13 @@ def command_string(backend: ProbeBackend, source: Path = None, config: list[Path
     :param with_python: Uses `arm-none-eabi-gdb-py3` and loads the Python
                         debug modules in `emdbg.debug.px4` as `px4`.
     """
-    args = ['-ex "set pagination off"', '-ex "set print pretty"',
-            '-ex "set mem inaccessible-by-default off"', '-ex "set confirm off"',
-            '-ex "set history save"', "-q"]
+    args = [
+        "set pagination off", "set print pretty", "set history save",
+        "set mem inaccessible-by-default off", "set confirm off",
+        "set filename-display absolute", "set disassemble-next-line on",
+        "maintenance set internal-error backtrace on",
+        "maintenance set internal-warning backtrace on"]
+    args = [f'-ex "{a}"' for a in args] + ["-q"]
     args += list(map('-ex "{}"'.format, listify(backend.init(source))))
     args += list(map('-x "{}"'.format, listify(config)))
     site_packages = sysconfig.get_paths()["purelib"]

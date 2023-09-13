@@ -13,6 +13,12 @@ end
 define hook-continue
     px4_switch_task -1
 end
+define hook-backtrace
+    set disassemble-next-line off
+end
+define hookpost-backtrace
+    set disassemble-next-line on
+end
 
 define px4_log_start
     set pagination off
