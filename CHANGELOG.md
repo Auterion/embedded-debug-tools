@@ -8,6 +8,7 @@
 - Display interrupt frame correctly in `px4_backtrace` command.
 - Output a warning when a stack overflow has been detected in `px4_tasks` command.
 - Configure GDB to display absolute filenames and one line of disassembly.
+- Show function and file line in callgraph to easier distinguish nodes.
 
 ## 1.1.1
 

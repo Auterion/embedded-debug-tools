@@ -58,9 +58,9 @@ def callgraph_from_backtrace(backtraces: list[str],
     for btype, bts in backts.items():
         for bt in bts:
             for frame in bt.frames:
-                nodes[frame._node] = frame
+                nodes[frame._unique_location] = frame
             for f1, f2 in itertools_pairwise(bt.frames):
-                edges[(f2._node, f1._node, str((btype or "").lower()))] += 1
+                edges[(f2._unique_location, f1._unique_location, str((btype or "").lower()))] += 1
 
     sources = set(nodes)
     sinks = set(nodes)
@@ -93,7 +93,10 @@ def callgraph_from_backtrace(backtraces: list[str],
         dot = graphviz.Digraph()
         for node in sorted(nodes):
             frame = nodes[node]
-            kwargs = {"label": frame.function, "URL": frame.uri}
+            kwargs = {
+                "label": f"{frame.function}:{frame.line}",
+                "URL": f"subl://open?url={Path(frame.filename).absolute()}&line={frame.line}",
+            }
             for pattern, style in BacktraceClass.COLORS.items():
                 if re.search(pattern, node):
                     kwargs.update(style)

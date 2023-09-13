@@ -18,15 +18,14 @@ class Frame:
         self.description = description
         if match := re.match(r"#(\d+) +(?:0x.+? in )?(.+)\((.*?)\) at (.+?):(\d+)", description):
             self.index = int(match.group(1))
-            self._function = match.group(2)
+            self.function_name = match.group(2)
             self.args = match.group(3)
             self.filename = match.group(4)
             self.line = match.group(5)
             self.is_valid = True
-            self.function = f"{self._function}({self.args})"
+            self.function = f"{self.function_name}({self.args})"
             self.location = f"{Path(self.filename).relative_to(Path().cwd())}:{self.line}"
-            self.uri = f"subl://open?url={Path(self.filename).absolute()}&line={self.line}"
-            self._node = self.function + "\n" + self.location
+            self._unique_location = self.function + "\n" + self.location
 
     def __hash__(self) -> int:
         return hash(self._node)
