@@ -75,3 +75,17 @@ def nuttx_sdmmc_reg_access(px4_root: Path) -> PatchManager:
         PatchOperation(px4_root, _data("sdmmc_no_inline.patch")),
     ]
     return PatchManager("Un-inline SDMMC register access", operations)
+
+
+def malloc_return_null(px4_root: Path) -> PatchManager:
+    """
+    Instruments the mm_malloc in NuttX to fail if call count equals global
+    `emdbg_malloc_count_null` variable, which is placed in `.noinit` section.
+    You can use this to find code that doesn't check the malloc return value for
+    NULL or see how the error handling performs.
+    """
+    px4_root = Path(px4_root)
+    operations = [
+        PatchOperation(px4_root, _data("malloc_return_null.patch")),
+    ]
+    return PatchManager("Make the n-th malloc call return NULL", operations)

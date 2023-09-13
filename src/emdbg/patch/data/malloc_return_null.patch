@@ -1,0 +1,21 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/mm/mm_heap/mm_malloc.c b/mm/mm_heap/mm_malloc.c
+diff --git a/mm/mm_heap/mm_malloc.c b/mm/mm_heap/mm_malloc.c
+index a38633bbfe..baf663cd7a 100644
+--- a/mm/mm_heap/mm_malloc.c
++++ b/mm/mm_heap/mm_malloc.c
+@@ -102,8 +103,12 @@ void mm_dump_handler(FAR struct tcb_s *tcb, FAR void *arg)
+  *
+  ****************************************************************************/
+
++int32_t emdbg_malloc_count = 0;
++__attribute__((section(".noinit"))) int32_t emdbg_malloc_count_null;
++__attribute__((noinline)) void* emdbg_malloc_is_null() { return NULL; }
+ FAR void *mm_malloc(FAR struct mm_heap_s *heap, size_t size)
+ {
++  if (emdbg_malloc_count_null == emdbg_malloc_count++) return emdbg_malloc_is_null();
+   FAR struct mm_freenode_s *node;
+   size_t alignsize;
+   FAR void *ret = NULL;
