@@ -6,6 +6,7 @@
 - Trap fault vectors while debugging to allow backtrace to work correctly.
 - Fix incorrect sorting of tasks in `px4_tasks` command.
 - Display interrupt frame correctly in `px4_backtrace` command.
+- Output a warning when a stack overflow has been detected in `px4_tasks` command.
 
 ## 1.1.1
 

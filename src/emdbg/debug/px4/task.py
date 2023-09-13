@@ -318,8 +318,8 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     :param with_waiting: show what the task is waiting for.
     :param with_file_names: show what files the task has open.
     """
-    fmtstr = "{:>%d}{:>%d} {:>%d} {:%d} {:%d}  {:>%d} {:>%d}  {:>%d}/{:>%d}  {:>%d}({:>%d})  "
-    header = [" ", "TCB", "PID", "NAME", "LOCATION", "CPU(ms)", "CPU(%)", "USED", "STACK", "PRIO", "BASE"]
+    fmtstr = "{:>%d}{:>%d} {:>%d} {:%d} {:%d}  {:>%d} {:>%d}  {:>%d}/{:>%d}{:>%d}  {:>%d}({:>%d})  "
+    header = ["", "TCB", "PID", "NAME", "LOCATION", "CPU(ms)", "CPU(%)", "USED", "STACK", "", "PRIO", "BASE"]
     if with_file_names:
         fmtstr += "{:%d}"
         header += ["OPEN FILE NAMES"]
@@ -359,6 +359,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
                hex(task.location) if isinstance(task.location, int) else task.location.name,
                task.load.total//1000, f"{(relative * 100):.1f}",
                task.stack_used if with_stack_usage else "", task.stack_limit,
+               " OVERFLOW!" if with_stack_usage and task.stack_used >= task.stack_limit else "",
                task.sched_priority, task.init_priority,
                file_description, task.short_state]
         if with_waiting:
