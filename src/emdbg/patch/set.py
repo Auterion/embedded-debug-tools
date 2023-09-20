@@ -38,9 +38,10 @@ def reduce_firmware_size_v5x(px4_root: Path) -> PatchManager:
     return PatchManager("Make the Firmware fit on the FMUv5x Flash", operations)
 
 
-def itm_logging(px4_root: Path) -> PatchManager:
+def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
     """
-    Adds ITM access to NuttX as a driver.
+    Adds scheduler and heap instrumentation to NuttX via ITM.
+    Requires the `itm_logging` patch.
     """
     px4_root = Path(px4_root)
     operations = [
@@ -49,17 +50,6 @@ def itm_logging(px4_root: Path) -> PatchManager:
         CopyOperation(_data("itm_Make.defs"),
                       px4_root / "platforms/nuttx/NuttX/nuttx/drivers/itm/Make.defs"),
         PatchOperation(px4_root, _data("itm_nuttx_Makefile.patch")),
-    ]
-    return PatchManager("Add ITM access to NuttX", operations)
-
-
-def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
-    """
-    Adds scheduler and heap instrumentation to NuttX via ITM.
-    Requires the `itm_logging` patch.
-    """
-    px4_root = Path(px4_root)
-    operations = [
         PatchOperation(px4_root, _data("nuttx_tracing_itm.patch")),
     ]
     return PatchManager("Add tracing support to NuttX via ITM", operations)

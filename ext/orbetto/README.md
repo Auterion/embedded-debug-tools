@@ -48,11 +48,10 @@ ninja -C build
 
 ## Instrumentation
 
-You need to apply two patches to your PX4 source tree:
+You need to apply one patches to your PX4 source tree:
 
 ```sh
 # cd PX4-Autopilot
-python3 -m emdbg.patch itm_logging --apply -v
 python3 -m emdbg.patch nuttx_tracing_itm --apply -v
 ```
 
