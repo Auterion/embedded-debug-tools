@@ -1,11 +1,11 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
-diff --git a/mm/mm_heap/mm_malloc.c b/mm/mm_heap/mm_malloc.c
-diff --git a/mm/mm_heap/mm_malloc.c b/mm/mm_heap/mm_malloc.c
+diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
+diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
 index a38633bbfe..baf663cd7a 100644
---- a/mm/mm_heap/mm_malloc.c
-+++ b/mm/mm_heap/mm_malloc.c
+--- a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
++++ b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
 @@ -102,8 +103,12 @@ void mm_dump_handler(FAR struct tcb_s *tcb, FAR void *arg)
   *
   ****************************************************************************/

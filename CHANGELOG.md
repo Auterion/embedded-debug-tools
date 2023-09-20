@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Fix paths in null malloc patch.
+
 ## 1.2.0
 
 - Add support for loading PX4 hardfault logs into the crashdebug backend.
