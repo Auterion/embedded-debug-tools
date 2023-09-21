@@ -172,6 +172,7 @@ class Device(Base):
     @cached_property
     def uptime(self) -> int:
         """The uptime in microseconds as read from the NuttX high-resolution timer (HRT)"""
+        if self._hrt_base is None: return 0
         return int(self._hrt_base.dereference() + self._hrt_counter.dereference())
 
     @cached_property
@@ -242,9 +243,20 @@ class Device(Base):
         lines = []
         total_size = 0
         for addr, size in memories:
-            total_size += size
-            try: data = self.read_memory(addr, size).cast("I")
-            except: print(f"Failed to read [{addr:#x}, {addr+size:#x}]")
+            try:
+                data = self.read_memory(addr, size).cast("I")
+                total_size += size
+            except Exception as e:
+                print(f"Failed to read whole range [{addr:#x}, {addr+size:#x}]! {e}")
+                data = []
+                for offset in range(0, size, 4):
+                    try:
+                        data.append(self.read_memory(addr + offset, 4).cast("I")[0])
+                        total_size += 4
+                    except Exception as e:
+                        print(f"Failed to read uint32_t {addr+offset:#x}! {e}")
+                        data.append(0)
+                        continue
             for ii, values in enumerate(utils.chunks(data, 4, 0)):
                 values = (hex(v & 0xffffffff) for v in values)
                 lines.append(f"{hex(addr + ii * 16)}: {' '.join(values)}")

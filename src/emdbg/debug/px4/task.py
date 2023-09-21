@@ -98,7 +98,10 @@ class Task(Base):
     @cached_property
     def name(self) -> str:
         """Name of the task"""
-        return self._tcb["name"].string()
+        try:
+            return self._tcb["name"].string()
+        except:
+            return "?"
 
     @cached_property
     def sched_priority(self) -> int:
@@ -217,15 +220,16 @@ class Task(Base):
         return self.registers
 
     @cached_property
-    def is_current_task(self):
+    def is_current_task(self) -> bool:
         """If the task is currently running"""
         if self._is_running_switched is not None:
             return self._is_running_switched
         return self.short_state == "RUN"
 
     @cached_property
-    def load(self):
+    def load(self) -> Load:
         """The task load based on the system load monitor"""
+        if self._system_load is None: return self.Load(0, 0, 0)
         _, interval, sl = self._system_load.sample
         total, delta = sl.get(int(self._tcb), (0,0))
         return self.Load(total, interval, delta)
@@ -247,7 +251,9 @@ def all_tasks(gdb) -> list[Task]:
     type_tcb_s = gdb.lookup_type("struct tcb_s").pointer()
     def _tasks(name):
         tcbs = []
-        task_list = gdb.lookup_global_symbol(name).value()
+        if (task_list := gdb.lookup_global_symbol(name)) is None:
+            return []
+        task_list = task_list.value()
         current_task = task_list["head"]
         if current_task:
             while True:
@@ -333,6 +339,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
         header += ["WAITING FOR"]
 
     tasks = all_tasks(gdb)
+    if not tasks: return "No tasks found!"
     interval_us = tasks[0].load.interval
     if not interval_us:
         start, *_ = tasks[0]._system_load.sample

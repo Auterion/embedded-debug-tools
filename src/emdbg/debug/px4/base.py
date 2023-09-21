@@ -71,7 +71,9 @@ class Base:
 
         :return: the symbol if found or `None`
         """
-        function = self._gdb.lookup_global_symbol(function_name).value()
+        if (function := self._gdb.lookup_global_symbol(function_name)) is None:
+            return None
+        function = function.value()
         function_block = self._gdb.block_for_pc(int(function.address))
         for symbol in function_block:
             if symbol.addr_class == self._gdb.SYMBOL_LOC_STATIC:
@@ -81,18 +83,19 @@ class Base:
 
     def lookup_static_symbol_ptr(self, name: str) -> "gdb.Value":
         """:return: a Value to a static symbol name"""
-        symbol = self._gdb.lookup_static_symbol(name)
-        return self.value_ptr(symbol)
+        if symbol := self._gdb.lookup_static_symbol(name):
+            return self.value_ptr(symbol)
+        return None
 
     def lookup_global_symbol_ptr(self, name) -> "gdb.Value":
         """:return: a Value to a global symbol name"""
-        symbol = self._gdb.lookup_global_symbol(name)
-        return self.value_ptr(symbol)
+        if symbol := self._gdb.lookup_global_symbol(name):
+            return self.value_ptr(symbol)
+        return None
 
     def lookup_static_symbol_in_function_ptr(self, symbol_name: str, function_name: str) -> "gdb.Value | None":
         """:return: a Value to a global symbol name"""
-        symbol = self.lookup_static_symbol_in_function(symbol_name, function_name)
-        if symbol is not None:
+        if symbol := self.lookup_static_symbol_in_function(symbol_name, function_name):
             return self.value_ptr(symbol)
         return None
 
@@ -124,13 +127,15 @@ class Base:
 
     def read_uint(self, addr: int, size: int) -> int:
         """Reads an unsigned integer from a memory address"""
-        inttype = self.integer_type(size, False)
-        return int(self._gdb.Value(addr).cast(inttype.pointer()).dereference())
+        if (itype := {1: "B", 2: "H", 4: "I", 8: "Q"}.get(size)) is None:
+            raise ValueError("Unsupported unsigned integer size!")
+        return self.read_memory(addr, size).cast(itype)[0]
 
     def read_int(self, addr: int, size: int) -> int:
         """Reads a signed integer from a memory address"""
-        inttype = self.integer_type(size, True)
-        return int(self._gdb.Value(addr).cast(inttype.pointer()).dereference())
+        if (itype := {1: "b", 2: "h", 4: "i", 8: "q"}.get(size)) is None:
+            raise ValueError("Unsupported signed integer size!")
+        return self.read_memory(addr, size).cast(itype)[0]
 
     def symtab_line(self, pc: int) -> "gdb.Symtab_and_line":
         """:return: the symbol table and line for a program location"""

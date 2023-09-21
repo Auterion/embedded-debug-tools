@@ -38,6 +38,7 @@ class SystemLoad(Base):
         """
         Enables the cpuload monitor in PX4 and loads the first reference value.
         """
+        if self._system_load is None: return
         if self._monitor.dereference()["_value"] == 0:
             self._gdb.execute("set cpuload_monitor_all_count = 1")
             self._gdb.execute(f"set system_load.start_time = {self._device.uptime}")
@@ -49,6 +50,7 @@ class SystemLoad(Base):
 
     def stop(self):
         """Disables the cpuload monitor"""
+        if self._monitor is None: return
         self._gdb.execute("set cpuload_monitor_all_count = 0")
 
     @cached_property
@@ -60,7 +62,7 @@ class SystemLoad(Base):
                  sample [µs], tasks dict[tcb [ptr] -> (total runtime [µs], difference
                  from last sample [µs])]).
         """
-        if not self._system_load["initialized"]:
+        if self._system_load is None or not self._system_load["initialized"]:
             return (0, 0, {})
 
         sl = self._load()
