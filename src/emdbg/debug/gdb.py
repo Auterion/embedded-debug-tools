@@ -28,9 +28,10 @@ from .backend import ProbeBackend
 from . import remote
 
 # -----------------------------------------------------------------------------
-def command_string(backend: ProbeBackend, source: Path = None, config: list[Path] = None,
-                   commands: list[str] = None, ui: str = None, svd: Path = None,
-                   socket: Path = None, with_python: bool = True) -> str:
+def command_string(backend: ProbeBackend, source: Path = None,
+                   config: list[Path] = None, commands: list[str] = None,
+                   ui: str = None, svd: Path = None, socket: Path = None,
+                   with_python: bool = True, coredump: Path = None) -> str:
     """
     Constructs a command string to launch GDB with the correct options.
     By default, this disables pagination and command confirmation.
@@ -61,6 +62,7 @@ def command_string(backend: ProbeBackend, source: Path = None, config: list[Path
     if (backend_gdb := debug_dir / f"data/{backend.name}.gdb").exists():
         cmds += [f"source {backend_gdb}"]
     cmds += listify(backend.init(source))
+    args = [f"-c {coredump}"] if coredump else []
     args += [f'-ex "{a}"' for a in cmds] + ["-q"]
     args += list(map('-x "{}"'.format, listify(config)))
     site_packages = sysconfig.get_paths()["purelib"]
@@ -220,7 +222,7 @@ def _empty_signal_handler(sig, frame):
 
 def call(backend: ProbeBackend, source: Path = None, config: list[Path] = None,
          commands: list[str] = None, ui: str = None, svd: Path = None,
-         with_python: bool = True) -> int:
+         with_python: bool = True, coredump: Path = None) -> int:
     """
     Launches the backend in the background and GDB as a blocking process in
     the foreground for user interaction.
@@ -237,7 +239,8 @@ def call(backend: ProbeBackend, source: Path = None, config: list[Path] = None,
     :param with_python: Uses `arm-none-eabi-gdb-py3` and loads the Python
                         debug modules in `emdbg.debug.px4` as `px4`.
     """
-    gdb_command = command_string(backend, source, config, commands, ui, svd, with_python=with_python)
+    gdb_command = command_string(backend, source, config, commands, ui, svd,
+                                 with_python=with_python, coredump=coredump)
 
     signal.signal(signal.SIGINT, _empty_signal_handler)
     with backend.scope():
@@ -284,6 +287,11 @@ if __name__ == "__main__":
         default=False,
         help="Use GDB with Python API and load PX4 tools.")
     parser.add_argument(
+        "-c", "--core",
+        type=Path,
+        default=None,
+        help="Use coredump file.")
+    parser.add_argument(
         "--svd",
         type=Path,
         help="The CMSIS-SVD file to use for this device, requires `--python` flag.")
@@ -317,5 +325,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     emdbg.logger.configure(args.verbosity)
 
-    call(args.backend(args), args.source, args.config, args.commands, args.ui, args.svd, args.with_python)
+    call(args.backend(args) if args.backend else ProbeBackend(), ui=args.ui,
+         source=args.source, config=args.config, commands=args.commands,
+         svd=args.svd, with_python=args.with_python, coredump=args.core)
 
