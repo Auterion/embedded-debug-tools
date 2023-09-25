@@ -223,8 +223,8 @@ class Device(Base):
                 _1v = lambda index: (gper[index] >> ii) & 0x1
                 _2v = lambda index: (gper[index] >> ii*2) & 0x3
                 moder, speedr, pupdr = _2v(0), _2v(2), _2v(3)
-                otyper, idr, odr, lockr = _1v(1), _1v(4), _1v(5), _1v(6)
-                afr = ((gper[8] << 32 | gper[7]) >> ii*4) & 0xf
+                otyper, idr, odr, lockr = _1v(1), _1v(4), _1v(5), _1v(7)
+                afr = ((gper[9] << 32 | gper[8]) >> ii*4) & 0xf
                 g = self.Gpio(port, ii, moder, otyper, speedr, pupdr, idr, odr, lockr, afr)
                 result.append(g)
         return result
@@ -408,7 +408,8 @@ def all_gpios_as_table(gdb, pinout: dict[str, tuple[str, str]] = None,
         config = "".join([["IN", "OUT", "ALT", "AN"][gpio.moder],
                           ["", "+OD"][gpio.otyper],
                           ["", "+PU", "+PD", "+!!"][gpio.pupdr],
-                          ["", "+M", "+H", "+VH"][gpio.speedr]])
+                          ["", "+M", "+H", "+VH"][gpio.speedr],
+                          ["", "+L"][gpio.lockr]])
         idr = "" if gpio.moder == 3 else ["_", "^"][gpio.idr]
         odr = ["_", "^"][gpio.odr] if gpio.moder == 1 else ""
         afr = gpio.afr if gpio.moder == 2 else ""

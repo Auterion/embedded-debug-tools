@@ -346,9 +346,10 @@ provided, the pins will be matched with their names and functions.
 
 - Config: Condensed view with omitted defaults.  
     MODER:  IN=Input, OUT=Output, ALT=Alternate Function, AN=Analog,  
-    OTYPER: +OD=OpenDrain, (+PP=PushPull omitted),  
-    PUPDR:  +PU=PullUp, +PD=PullDown, (+FL=Floating omitted),  
-    SPEEDR: +M=Medium, +H=High, +VH=Very High, (+L=Low omitted).
+    OTYPER: +OD=OpenDrain, (PushPull omitted),  
+    PUPDR:  +PU=PullUp, +PD=PullDown, (Floating omitted),  
+    SPEEDR: +M=Medium, +H=High, +VH=Very High, (Low omitted).  
+    LOCKR: +L=Locked, (Unlocked omitted).
 
 - Input (IDR), Output (ODR): _=Low, ^=High  
     Input only shown for IN, OUT, and ALT.  
@@ -361,24 +362,24 @@ provided, the pins will be matched with their names and functions.
 (gdb) px4_gpios -c 1
 PIN  CONFIG     I O  AF  NAME             FUNCTION
 A0   AN                  ADC1_IN0         SCALED_VDD_3V3_SENSORS1
-A1   IN         _        ETH_REF_CLK      ETH_REF_CLK
-A2   IN         ^        ETH_MDIO         ETH_MDIO
+A1   ALT+VH     _    11  ETH_REF_CLK      ETH_REF_CLK
+A2   ALT+VH     ^    11  ETH_MDIO         ETH_MDIO
 A3   IN         _        USART2_RX        USART2_RX_TELEM3
 A4   AN                  ADC1_IN4         SCALED_VDD_3V3_SENSORS2
-A5   ALT+H      ^     0  SPI1_SCK         SPI1_SCK_SENSOR1_ICM20602
-A6   IN         ^        SPI6_MISO        SPI6_MISO_EXTERNAL1
-A7   IN         _        ETH_CRS_DV       ETH_CRS_DV
-A8   IN+PU      ^        TIM1_CH1         FMU_CH4
+A5   ALT+H      ^     5  SPI1_SCK         SPI1_SCK_SENSOR1_ICM20602
+A6   IN         _        SPI6_MISO        SPI6_MISO_EXTERNAL1
+A7   ALT+VH     _    11  ETH_CRS_DV       ETH_CRS_DV
+A8   ALT+H      _     1  TIM1_CH1         FMU_CH4
 A9   IN+PD      _        USB_OTG_FS_VBUS  VBUS_SENSE
-A10  IN+PU      ^        TIM1_CH3         FMU_CH2
-A11  ALT+VH     _     0  USB_OTG_FS_DM    USB_D_N
-A12  ALT+VH     _     0  USB_OTG_FS_DP    USB_D_P
-A13  ALT+PU+VH  _     5  SWDIO            FMU_SWDIO
-A14  ALT+PD     ^     0  SWCLK            FMU_SWCLK
+A10  ALT+H      _     1  TIM1_CH3         FMU_CH2
+A11  ALT+VH     _    10  USB_OTG_FS_DM    USB_D_N
+A12  ALT+VH     _    10  USB_OTG_FS_DP    USB_D_P
+A13  ALT+PU+VH  _     0  SWDIO            FMU_SWDIO
+A14  ALT+PD     _     0  SWCLK            FMU_SWCLK
 A15  OUT        ^ ^                       SPI6_nCS2_EXTERNAL1
 B0   AN                  ADC1_IN8         SCALED_VDD_3V3_SENSORS3
 B1   AN                  ADC1_IN9         SCALED_V5
-B2   ALT+H      _     0  SPI3_MOSI        SPI3_MOSI_SENSOR3_BMI088
+B2   ALT+H      _     7  SPI3_MOSI        SPI3_MOSI_SENSOR3_BMI088
 ```
 
 You can also regex filter and sort pin names:
@@ -386,28 +387,28 @@ You can also regex filter and sort pin names:
 ```
 (gdb) px4_gpios -ff US?ART -s name
 PIN  CONFIG     I O  AF  NAME        FUNCTION
-H14  ALT+PU+VH  ^     9  UART4_RX    UART4_RX
-H13  ALT+PU+VH  ^     0  UART4_TX    UART4_TX
-C9   ALT        _     0  UART5_CTS   UART5_CTS_TELEM2
-C8   OUT        ^ ^      UART5_RTS   UART5_RTS_TELEM2
-D2   ALT+PU+VH  ^     0  UART5_RX    UART5_RX_TELEM2
-B9   ALT+PU+VH  ^     0  UART5_TX    UART5_TX_TELEM2
-E10  ALT        _     0  UART7_CTS   UART7_CTS_TELEM1
+H14  IN         ^        UART4_RX    UART4_RX
+H13  IN         _        UART4_TX    UART4_TX
+C9   ALT        _     7  UART5_CTS   UART5_CTS_TELEM2
+C8   OUT        _ _      UART5_RTS   UART5_RTS_TELEM2
+D2   ALT+PU+VH  ^     8  UART5_RX    UART5_RX_TELEM2
+B9   ALT+PU+VH  ^     7  UART5_TX    UART5_TX_TELEM2
+E10  ALT        ^     8  UART7_CTS   UART7_CTS_TELEM1
 E9   OUT        _ _      UART7_RTS   UART7_RTS_TELEM1
-F6   ALT+PU+VH  ^     0  UART7_RX    UART7_RX_TELEM1
-E8   ALT+PU+VH  ^     0  UART7_TX    UART7_TX_TELEM1
+F6   ALT+PU+VH  ^     8  UART7_RX    UART7_RX_TELEM1
+E8   ALT+PU+VH  ^     8  UART7_TX    UART7_TX_TELEM1
 E0   IN         ^        UART8_RX    UART8_RX_GPS2
 E1   IN         _        UART8_TX    UART8_TX_GPS2
 B15  ALT+PU+VH  ^     4  USART1_RX   USART1_RX_GPS1
-B14  ALT+PU+VH  ^     9  USART1_TX   USART1_TX_GPS1
+B14  ALT+PU+VH  ^     4  USART1_TX   USART1_TX_GPS1
 D3   IN         ^        USART2_CTS  USART2_CTS_TELEM3
-D4   IN         _        USART2_RTS  USART2_RTS_TELEM3
+D4   IN         ^        USART2_RTS  USART2_RTS_TELEM3
 A3   IN         _        USART2_RX   USART2_RX_TELEM3
-D5   IN         _        USART2_TX   USART2_TX_TELEM3
-D9   ALT+PU+VH  ^     9  USART3_RX   USART3_RX_DEBUG
-D8   ALT+PU+VH  ^     9  USART3_TX   USART3_TX_DEBUG
-C7   ALT+PU+VH  ^     0  USART6_RX   USART6_RX_FROM_IO__RC_INPUT
-C6   ALT+PU+VH  ^     0  USART6_TX   USART6_TX_TO_IO__NC
+D5   IN         ^        USART2_TX   USART2_TX_TELEM3
+D9   ALT+PU+VH  ^     7  USART3_RX   USART3_RX_DEBUG
+D8   ALT+PU+VH  ^     7  USART3_TX   USART3_TX_DEBUG
+C7   ALT+PU+VH  ^     8  USART6_RX   USART6_RX_FROM_IO__RC_INPUT
+C6   ALT+PU+VH  ^     8  USART6_TX   USART6_TX_TO_IO__NC
 ```
 
 ### px4_backtrace

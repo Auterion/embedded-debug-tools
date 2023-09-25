@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- Fix px4_gpios AFR and LOCKR register offsets.
 - Fix paths in null malloc patch.
 
 ## 1.2.0
