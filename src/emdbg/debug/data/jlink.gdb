@@ -3,18 +3,19 @@
 
 define px4_reset
     monitor reset
+    px4_enable_vector_catch
 end
 
-define px4_trace_swo_v5x
+define px4_trace_swo_stm32f7
     px4_reset
     monitor SWO EnableTarget 216000000 27000000 1 0
-    px4_trace_swo_gdb
+    px4_configure_orbuculum
     shell nc localhost 2332 > trace.swo &
 end
 
-define px4_trace_swo_v6x
+define px4_trace_swo_stm32h7
     px4_reset
     monitor SWO EnableTarget 120000000 30000000 1 0
-    px4_trace_swo_gdb
+    px4_configure_orbuculum
     shell nc localhost 2332 > trace.swo &
 end

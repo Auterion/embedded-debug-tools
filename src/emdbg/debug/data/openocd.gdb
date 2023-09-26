@@ -3,9 +3,10 @@
 
 define px4_reset
     monitor reset halt
+    px4_enable_vector_catch
 end
 
-define px4_trace_swo_v5x
+define px4_trace_swo_stm32f7
     px4_reset
     monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
     monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
@@ -13,7 +14,7 @@ define px4_trace_swo_v5x
     monitor tpiu init
     monitor itm ports off
 
-    px4_trace_swo_gdb
+    px4_configure_orbuculum
 
     # Enable the SWO output
     enableSTM32SWO 4

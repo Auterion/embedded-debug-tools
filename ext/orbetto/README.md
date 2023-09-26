@@ -84,7 +84,7 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v5x --openocd
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_v5x
+(gdb) px4_trace_swo_stm32f7
 (gdb) continue
 ```
 
@@ -101,7 +101,7 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v6x --jlink
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_v6x
+(gdb) px4_trace_swo_stm32h7
 (gdb) continue
 ```
 

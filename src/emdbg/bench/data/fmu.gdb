@@ -19,6 +19,9 @@ end
 define hookpost-backtrace
     set disassemble-next-line on
 end
+define px4_enable_vector_catch
+    set *0xE000EDFC = *0xE000EDFC | 0x07f0
+end
 
 define px4_log_start
     set pagination off
@@ -214,7 +217,7 @@ define px4_trace_swo_v6x_gdb
 
     # SWO current output divisor register
     # SWO_CODR = (CPU/4 / SWO) - 1
-    set *0xE00E3010 = ((120 / 20) - 1);
+    set *0xE00E3010 = ((480/4 / 20) - 1);
     # SWO selected pin protocol register SWO_SPPR
     set *0xE00E30F0 = 0x00000002;
     # Enable ITM input of SWO trace funnel SWFT_CTRL

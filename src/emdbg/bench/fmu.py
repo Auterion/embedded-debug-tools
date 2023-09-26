@@ -19,7 +19,7 @@ class Fmu:
     """
     def _DBGMCU_CONFIG(target):
         # Vector catch all exceptions, but not reset
-        common = ["set *(short*)0xE000EDFC = 0xfff0"]
+        common = ["set *0xE000EDFC = *0xE000EDFC | 0x07f0"]
         # Halt all timers and peripherals while debugging
         if "fmu-v5x" in target:
             return ["set *0xE0042008 = 0xffffffff",
@@ -166,16 +166,12 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     elif ":" in backend:
         backend_obj = emdbg.debug.ProbeBackend(backend)
     else:
-        raise ValueError(f"Unknown backend '{backend}'. Use 'openocd', 'jlink' or 'IP:PORT'!")
+        raise ValueError(f"Unknown backend '{backend}'!")
 
     elf = px4_dir / f"build/{target}/{target}.elf"
-    backend_gdb = data_dir / f"fmu_{backend}.gdb"
     cmds = [f"dir {px4_dir}",
             f"source {data_dir}/fmu.gdb",
-            f"source {data_dir}/orbuculum.gdb",
             f"python px4._TARGET='{target.lower()}'"]
-    if backend_gdb.exists():
-        cmds += [f"source {backend_gdb}"]
     if ui is not None:
         cmds += Fmu._DBGMCU_CONFIG(target)
     cmds += (commands or [])

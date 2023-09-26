@@ -40,6 +40,7 @@ class CrashProbeBackend(ProbeBackend):
         if "Windows" in platform.platform():
             self.binary = "CrashDebug.exe"
         self.binary = os.environ.get("PX4_CRASHDEBUG_BINARY", self.binary)
+        self.name = "crashdebug"
 
     def init(self, elf: Path):
         return ["set target-charset ASCII",

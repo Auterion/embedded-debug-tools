@@ -56,6 +56,7 @@ where = ["src"]
 emdbg = ["*.md", "*/*.md", "*/*/*.md", "*/*/*/*.md"]
 "emdbg.patch.data" = ["*"]
 "emdbg.bench.data" = ["*"]
+"emdbg.debug.data" = ["*"]
 
 [tool.setuptools]
 # GDB expects plain text config files!

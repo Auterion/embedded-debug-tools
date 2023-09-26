@@ -99,8 +99,8 @@ class Device(Base):
     @cached_property
     def _SVD_FILE(self):
         return {
-            0x0451: Path(__file__).parents[2] / "bench/data/STM32F7x5.svd",
-            0x0450: Path(__file__).parents[2] / "bench/data/STM32H753x.svd"
+            0x0451: Path(__file__).parents[1] / "data/STM32F7x5.svd",
+            0x0450: Path(__file__).parents[1] / "data/STM32H753x.svd",
         }.get(self.devid)
 
     @dataclass

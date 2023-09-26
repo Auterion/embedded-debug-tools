@@ -40,6 +40,7 @@ class JLinkBackend(ProbeBackend):
         self.speed = speed
         self.rtos = rtos
         self.process = None
+        self.name = "jlink"
 
     def start(self):
         self.process = call(self.device, self.speed, self.rtos,

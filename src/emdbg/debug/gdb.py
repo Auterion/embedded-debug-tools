@@ -49,24 +49,28 @@ def command_string(backend: ProbeBackend, source: Path = None, config: list[Path
     :param with_python: Uses `arm-none-eabi-gdb-py3` and loads the Python
                         debug modules in `emdbg.debug.px4` as `px4`.
     """
-    args = [
+    debug_dir = Path(__file__).parent.resolve()
+    cmds = [
         "set pagination off", "set print pretty", "set history save",
         "set mem inaccessible-by-default off", "set confirm off",
         "set filename-display absolute", "set disassemble-next-line on",
         "maintenance set internal-error backtrace on",
-        "maintenance set internal-warning backtrace on"]
-    args = [f'-ex "{a}"' for a in args] + ["-q"]
-    args += list(map('-ex "{}"'.format, listify(backend.init(source))))
+        "maintenance set internal-warning backtrace on",
+        f"source {debug_dir}/data/orbuculum.gdb",
+        f"source {debug_dir}/data/cortex_m.gdb"]
+    if (backend_gdb := debug_dir / f"data/{backend.name}.gdb").exists():
+        cmds += [f"source {backend_gdb}"]
+    cmds += listify(backend.init(source))
+    args += [f'-ex "{a}"' for a in cmds] + ["-q"]
     args += list(map('-x "{}"'.format, listify(config)))
     site_packages = sysconfig.get_paths()["purelib"]
 
     gdb = "arm-none-eabi-gdb"
-    debug_path = Path(__file__).parent
     if with_python or socket:
         gdb += "-py3"
         # Import packages from both the host the from emdbg
         args += [f'-ex "python import sys; sys.path.append(\'{site_packages}\');"',
-                 f'-ex "python import sys; sys.path.append(\'{debug_path}\');"']
+                 f'-ex "python import sys; sys.path.append(\'{debug_dir}\');"']
         # We need to do this terrible hackery since pkg_resources fails on the first import
         args += ['-ex "python exec(\'try: import cmsis_svd;\\\\nexcept: pass\\\\nimport cmsis_svd\')"',
                  '-ex "python exec(\'try: import arm_gdb;\\\\nexcept: pass\\\\nimport arm_gdb\')"']
@@ -74,12 +78,12 @@ def command_string(backend: ProbeBackend, source: Path = None, config: list[Path
         if svd:
             args += [f'-ex "python import px4; px4._SVD_FILE=\'{svd}\'"']
         # Finally we can import the PX4 GDB user commands
-        args += [f'-ex "source {debug_path}/remote/px4.py"']
+        args += [f'-ex "source {debug_dir}/remote/px4.py"']
 
     if socket:
         # Import the API bridge that uses rpyc
         args += [f'-ex "python socket_path = \'{socket}\'"',
-                 f'-ex "source {debug_path}/remote/gdb_api_bridge.py"']
+                 f'-ex "source {debug_dir}/remote/gdb_api_bridge.py"']
         cmd = "{gdb} -nx -nh {args} {source}"
 
     elif ui is None or "batch" in ui:
@@ -253,11 +257,9 @@ def _add_subparser(subparser):
     parser = subparser.add_parser("remote", help="Use a generic extended remote as Backend.")
     parser.add_argument(
         "--port",
-        dest="port",
         default="localhost:3333",
         help="Connect to this host:port.")
     parser.set_defaults(backend=lambda args: ProbeBackend(args.port))
-
 
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":

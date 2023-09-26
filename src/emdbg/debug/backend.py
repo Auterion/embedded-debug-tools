@@ -16,6 +16,7 @@ class ProbeBackend:
         :param remote: Extended remote location.
         """
         self.remote = remote
+        self.name = "remote"
 
     def init(self, elf: Path) -> list[str]:
         """

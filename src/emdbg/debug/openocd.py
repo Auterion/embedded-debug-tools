@@ -42,6 +42,7 @@ class OpenOcdBackend(ProbeBackend):
         self.config = utils.listify(config)
         self.search = utils.listify(search)
         self.process = None
+        self.name = "openocd"
 
     def start(self):
         self.process = call(self.commands, self.config, self.search,
@@ -235,7 +236,7 @@ def _add_subparser(subparser):
         choices=[24000, 8000, 3300, 1000, 200, 50, 5],
         help="SWD baudrate in kHz.")
     parser.set_defaults(backend=lambda args:
-        OpenOcdBackend([f"adapter speed {args.speed}"] +
+        OpenOcdBackend([f"adapter speed {args.ospeed}"] +
                        utils.listify(args.ocommands),
                        args.oconfig, args.osearch))
     return parser
