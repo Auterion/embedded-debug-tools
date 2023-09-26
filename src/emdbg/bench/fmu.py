@@ -279,10 +279,9 @@ def shell(serial: str = None, power = None, keep_power_on: bool = True) -> Fmu:
                 pwr.off(delay=0)
 
 # -----------------------------------------------------------------------------
-if __name__ == "__main__":
+def _arguments(description, modifier=None):
     import argparse, emdbg
-
-    parser = argparse.ArgumentParser(description="Debug FMU")
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--px4-dir",
         default=".",
@@ -322,11 +321,17 @@ if __name__ == "__main__":
         dest="commands",
         action="append",
         help="Extra GDB commands.")
+    if modifier: modifier(parser)
     args = parser.parse_args()
     emdbg.logger.configure(args.verbosity)
     backend = args.remote
     if args.openocd: backend = "openocd"
     if args.jlink: backend = "jlink"
+    return args, backend
+
+
+if __name__ == "__main__":
+    args, backend = _arguments("Debug FMU")
 
     with debug(args.px4_dir, args.target, ui=args.ui, commands=args.commands,
                backend=backend) as gdb_call:

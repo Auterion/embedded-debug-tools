@@ -8,7 +8,7 @@
 from __future__ import annotations
 import time
 from pathlib import Path
-from .fmu import debug as fmu_debug, Fmu
+from .fmu import debug as fmu_debug, Fmu, _arguments
 
 import emdbg
 
@@ -71,58 +71,13 @@ def debug(px4_directory: Path, target: Path, serial: str = None,
 
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
-    import argparse, emdbg
-
-    parser = argparse.ArgumentParser(description="Debug Skynode FMU")
-    parser.add_argument(
-        "--px4-dir",
-        default=".",
-        type=Path,
-        help="The PX4 root directory you are working on.")
-    parser.add_argument(
-        "--target",
-        default="px4_fmu-v5x",
-        help="The target you want to debug.")
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
-        "--jlink",
-        default=False,
-        action="store_true",
-        help="Use a J-Link debug probe")
-    group.add_argument(
-        "--openocd",
-        default=False,
-        action="store_true",
-        help="Use an OpenOCD debug probe")
-    group.add_argument(
-        "--remote",
-        help="Connect to a remote GDB server: 'IP:PORT'")
-    parser.add_argument(
-        "--turn-off",
-        default=False,
-        action="store_true",
-        help="Turn Skynode off via relay after debugging.")
-    parser.add_argument(
-        "--ui",
-        default="cmd",
-        choices=["tui", "gdbgui", "cmd", "batch"],
-        help="The user interface you want to use.")
-    parser.add_argument(
-        "-v",
-        dest="verbosity",
-        action="count",
-        default=0,
-        help="Verbosity level.")
-    parser.add_argument(
-        "-ex",
-        dest="commands",
-        action="append",
-        help="Extra GDB commands.")
-    args = parser.parse_args()
-    emdbg.logger.configure(args.verbosity)
-    backend = args.remote
-    if args.openocd: backend = "openocd"
-    if args.jlink: backend = "jlink"
+    def _modifier(parser):
+        parser.add_argument(
+            "--turn-off",
+            default=False,
+            action="store_true",
+            help="Turn Skynode off via relay after debugging.")
+    args, backend = _arguments("Debug Skynode FMU", _modifier)
 
     with debug(args.px4_dir, args.target, ui=args.ui, commands=args.commands,
                backend=backend, keep_power_on=not args.turn_off) as gdb_call:
