@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- Fix decoding of file names in px4_tasks command.
 - Robustify the user commands when running on NuttX without PX4.
 - Set SWD clock to 8MHz for the built-in OpenOCD config files.
 - Merge itm_logging into nuttx_tracing_itm patch.

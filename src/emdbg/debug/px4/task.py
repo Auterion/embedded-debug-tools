@@ -353,7 +353,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
 
         # Find the file names or just the number of file descriptors
         if with_file_names:
-            file_names = [f["f_inode"]["i_name"].cast(gdb.lookup_type("char").pointer()).string()
+            file_names = [f["f_inode"]["i_name"].cast(gdb.lookup_type("char").pointer()).string(encoding="ascii", errors="ignore")
                           for f in task.files
                           if int(f["f_inode"]["i_name"].cast(task.uint32)) >= 0x0800_0000]
             file_description = ",".join(sorted(list(set(file_names))))
