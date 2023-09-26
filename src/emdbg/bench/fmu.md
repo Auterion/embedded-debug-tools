@@ -86,7 +86,11 @@ with emdbg.bench.fmu(px4_dir, target, nsh_serial) as bench:
 ## Command Line Interface
 
 To quickly debug something interactively on the test bench, you can launch GDB
-directly:
+directly with the debug backend of your choice:
+
+- `--jlink`: connect via J-Link debug probe.
+- `--openocd`: connect via STLink debug probe.
+- `--coredump`: Use the CrashDebug backend with a coredump or PX4 hardfault log.
 
 ```sh
 python3 -m emdbg.bench.fmu --px4-dir path/to/PX4-Autopilot \

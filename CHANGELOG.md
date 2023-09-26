@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- emdbg.bench.fmu can load coredump or PX4 hardfault files directly.
 - emdbg.debug.gdb can load corefiles in ELF format directly.
 - Improve the px4_discover user command to show UID, package, and flash size.
 - Fix decoding of file names in px4_tasks command.

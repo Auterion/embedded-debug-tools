@@ -163,6 +163,8 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
         rtos_so = px4_dir / f"platforms/nuttx/NuttX/nuttx/tools/jlink-nuttx.so"
         if not rtos_so.exists(): rtos_so = None
         backend_obj = emdbg.debug.JLinkBackend(device, speed, rtos_so)
+    elif isinstance(backend, Path):
+        backend_obj = emdbg.debug.CrashProbeBackend(backend)
     elif ":" in backend:
         backend_obj = emdbg.debug.ProbeBackend(backend)
     else:
@@ -301,6 +303,10 @@ def _arguments(description, modifier=None):
     group.add_argument(
         "--remote",
         help="Connect to a remote GDB server: 'IP:PORT'")
+    group.add_argument(
+        "--coredump",
+        type=Path,
+        help="Inspect a GDB coredump or PX4 hardfault log.")
     parser.add_argument(
         "--ui",
         default="cmd",
@@ -323,6 +329,7 @@ def _arguments(description, modifier=None):
     backend = args.remote
     if args.openocd: backend = "openocd"
     if args.jlink: backend = "jlink"
+    if args.coredump: backend = args.coredump
     return args, backend
 
 
