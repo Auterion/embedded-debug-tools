@@ -137,6 +137,13 @@ class Base:
             raise ValueError("Unsupported signed integer size!")
         return self.read_memory(addr, size).cast(itype)[0]
 
+    def read_string(self, addr: int, encoding: str = None,
+                    errors: str = None, length: int = None) -> str:
+        """Reads a string of a fixed length, or with 0 termination"""
+        return self.addr_ptr(addr, "char").string(encoding or "utf-8",
+                                                  errors=errors or "ignore",
+                                                  length=length)
+
     def symtab_line(self, pc: int) -> "gdb.Symtab_and_line":
         """:return: the symbol table and line for a program location"""
         return self._gdb.find_pc_line(int(pc))

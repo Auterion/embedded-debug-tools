@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- Improve the px4_discover user command to show UID, package, and flash size.
 - Fix decoding of file names in px4_tasks command.
 - Robustify the user commands when running on NuttX without PX4.
 - Set SWD clock to 8MHz for the built-in OpenOCD config files.

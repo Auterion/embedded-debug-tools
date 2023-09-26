@@ -26,8 +26,6 @@ class PX4_Discover(gdb.Command):
     @report_exception
     def invoke(self, argument, from_tty):
         print(px4.discover_device(gdb))
-        gdb.execute("arm scb")
-        gdb.execute("arm fpu")
 
 
 class PX4_Tasks(gdb.Command):

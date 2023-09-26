@@ -34,6 +34,7 @@ class Device(Base):
             0x1000: "A",
             0x1001: "Z",
             0x1003: "Y",
+            0x1007: "4",
             0x2001: "X",
             0x2003: "Y",
         }.get(self.rev, "")
@@ -41,19 +42,23 @@ class Device(Base):
     @cached_property
     def _IDCODE_DEVICE(self):
         return {
+            0x0415: "STM32L47/L48xx",
             0x0451: "STM32F76xx, STM32F77xx",
             0x0450: "STM32H742, STM32H743/753, STM32H750",
+            0x0483: "STM32H723/733, STM32H725/735, STM32H730",
         }.get(self.devid, "Unknown")
 
     @cached_property
     def _GPIOS(self):
         return {
+            0x0415: list(range(0x4800_0000, 0x4800_2000, 0x400)),
             # FMUv5x/v6x don't use ports J and K
             0x0451: list(range(0x4002_0000, 0x4002_2001, 0x400)),
             0x0450: list(range(0x5802_0000, 0x5802_2001, 0x400)),
+            0x0483: list(range(0x5802_0000, 0x5802_2C01, 0x400)),
         }.get(self.devid, [])
 
-    _SYSTEM_MEMORIES = [(0xE000_E000, 0x1100), (0xE004_2000, 4), (0x5C00_1000, 4)]
+    _SYSTEM_MEMORIES = [(0xE000_0000, 0x10_0000)]
 
     @cached_property
     def _PERIPHERALS(self):
@@ -79,18 +84,23 @@ class Device(Base):
     @cached_property
     def _MEMORIES(self):
         mems = {
+            0x0415: [
+                (0x1000_0000, 0x20000), # SRAM2
+                (0x2000_0000, 0x20000), # SRAM1
+            ],
             0x0451: [
                 # (0x0000_0000, 0x04000), # ITCM
                 (0x2000_0000, 0x80000), # DTCM, SRAM1, SRAM2
             ],
-            0x0450: [
+            **dict.fromkeys([0x0450, 0x0483], [
                 # (0x0000_0000, 0x10000), # ITCM
                 (0x2000_0000, 0x20000), # DTCM
                 (0x2400_0000, 0x80000), # AXI_SRAM
                 (0x3000_0000, 0x48000), # SRAM1, SRAM2, SRAM3
                 (0x3800_0000, 0x10000), # SRAM4
                 (0x3880_0000, 0x01000), # Backup SRAM
-            ]
+                (0x5C00_1000, 4),       # IDCODE
+            ]),
         }.get(self.devid, [])
         mems += self._PERIPHERALS
         mems += self._SYSTEM_MEMORIES
@@ -99,8 +109,10 @@ class Device(Base):
     @cached_property
     def _SVD_FILE(self):
         return {
+            # 0x0415: Path(__file__).parents[1] / "data/STM32L4x6.svd",
             0x0451: Path(__file__).parents[1] / "data/STM32F7x5.svd",
             0x0450: Path(__file__).parents[1] / "data/STM32H753x.svd",
+            # 0x0483: Path(__file__).parents[1] / "data/STM32H7x3.svd",
         }.get(self.devid)
 
     @dataclass
@@ -285,6 +297,83 @@ class Device(Base):
         return 0
 
     @cached_property
+    def flash_size(self) -> int:
+        """The FLASH size in bytes"""
+        addr = {
+            0x0415: 0x1FFF_75E0,
+            0x0451: 0x1FF0_F442,
+            0x0450: 0x1FF1_E880,
+            0x0483: 0x1FF1_E880,
+        }.get(self.devid)
+        if addr is None: return 0
+        return self.read_uint(addr, 2) * 1024
+
+    @cached_property
+    def line(self) -> str:
+        """The device family and name"""
+        if self.devid == 0x0483:
+            return self.read_string(0x1FF1_E8C0, length=4)[::-1]
+        return self._IDCODE_DEVICE
+
+    @cached_property
+    def uid(self) -> int:
+        """The device's unique identifier as a big integer"""
+        addr = {
+            0x0415: 0x1FFF_7590,
+            0x0451: 0x1FF0_F420,
+            0x0450: 0x1FF1_E800,
+            0x0483: 0x1FF1_E800,
+        }.get(self.devid)
+        if addr is None: return 0
+        return int.from_bytes(self.read_memory(addr, 3*4).tobytes(), "little")
+
+    @cached_property
+    def package(self) -> str:
+        """The device package"""
+
+        if self.devid == 0x0415:
+            return {
+                0b00000: "LQFP64",
+                0b00010: "LQFP100",
+                0b00011: "UFBGA132",
+                0b00100: "LQFP144, UFBGA144, WLCSP72, WLCSP81 or WLCSP86",
+                0b10000: "UFBGA169, WLCSP115",
+                0b10001: "WLCSP100",
+            }.get(self.read_uint(0x1FFF_7500, 1) & 0x1f, "Reserved")
+        if self.devid == 0x0451:
+            return {
+                0b111: "LQFP208 or TFBGA216",
+                0b110: "LQFP208 or TFBGA216",
+                0b101: "LQFP176",
+                0b100: "LQFP176",
+                0b011: "WLCSP180",
+                0b010: "LQFP144 ",
+                0b001: "LQFP100",
+            }.get(self.read_uint(0x1FFF_7BF1, 1) & 0x7, "Reserved")
+        if self.devid == 0x0450:
+            return {
+                0b0000: "LQFP100",
+                0b0010: "TQFP144",
+                0b0101: "TQFP176/UFBGA176",
+                0b1000: "LQFP208/TFBGA240",
+            }.get(self.read_uint(0x58000524, 1) & 0xf, "All pads enabled")
+        if self.devid == 0x0483:
+            return {
+                0b0000: "VFQFPN68 Industrial",
+                0b0001: "LQFP100 Legacy / TFBGA100 Legacy",
+                0b0010: "LQFP100 Industrial",
+                0b0011: "TFBGA100 Industrial",
+                0b0100: "WLCSP115 Industrial",
+                0b0101: "LQFP144 Legacy",
+                0b0110: "UFBGA144 Legacy",
+                0b0111: "LQFP144 Industrial",
+                0b1000: "UFBGA169 Industrial",
+                0b1001: "UFBGA176+25 Industrial",
+                0b1010: "LQFP176 Industrial",
+            }.get(self.read_uint(0x58000524, 1) & 0xf, "All pads enabled")
+        return "?"
+
+    @cached_property
     def devid(self) -> int:
         """The STM32-specific device id part of DBG->IDCODE"""
         return self.idcode & 0xfff
@@ -294,17 +383,6 @@ class Device(Base):
         """The STM32-specific revision part of DBG->IDCODE"""
         return self.idcode >> 16
 
-    @cached_property
-    def name(self) -> int:
-        """The device name based on the DBG->IDCODE value"""
-        dev = self._IDCODE_DEVICE
-        if self._IDCODE_REVISION:
-            dev += f" at revision {self._IDCODE_REVISION}"
-        return dev
-
-    def __repr__(self) -> str:
-        return f"Device({self.architecture}, {hex(self.cpuid)}, {hex(self.devid)}, {hex(self.rev)} -> {self.name})"
-
 
 def discover(gdb) -> str:
     """
@@ -312,7 +390,12 @@ def discover(gdb) -> str:
     :return: description string
     """
     dev = Device(gdb)
-    return repr(dev)
+    output = [
+        f"{dev.devid:#4x}={dev.line}, {dev.rev:#4x}=rev {dev._IDCODE_REVISION}",
+        f"flash={dev.flash_size//1024}kB, pkg={dev.package}",
+        f"uid={dev.uid:x}",
+    ]
+    return "\n".join(output)
 
 
 def all_registers(gdb) -> dict[str, int]:
