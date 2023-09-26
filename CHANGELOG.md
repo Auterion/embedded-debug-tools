@@ -2,6 +2,7 @@
 
 ## 1.2.1
 
+- Set SWD clock to 8MHz for the built-in OpenOCD config files.
 - Merge itm_logging into nuttx_tracing_itm patch.
 - Fix px4_gpios AFR and LOCKR register offsets.
 - Fix paths in null malloc patch.
