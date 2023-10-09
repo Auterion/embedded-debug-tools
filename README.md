@@ -70,6 +70,11 @@ Presented at Chaos Communication Camp by Niklas Hauser on 2023-08-18.
 
 [![](https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg)](https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers)
 
+### Debugging and Profiling NuttX and PX4
+
+Presented at the NuttX International Workshop by Niklas Hauser on 2023-09-29.
+
+[![](https://i3.ytimg.com/vi/_k1f4F2JVBA/maxresdefault.jpg)](https://www.youtube.com/watch?v=_k1f4F2JVBA)
 
 ## Installation
 
