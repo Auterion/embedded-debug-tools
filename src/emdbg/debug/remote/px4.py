@@ -365,4 +365,13 @@ class PX4_Reload(gdb.Command):
         importlib.reload(px4.utils)
         gdb.execute(f"source /Users/niklaut/dev/Better-Tooling/embedded-debug-tools/src/emdbg/debug/remote/px4.py")
 
+# Instantiate all internal commands
 PX4_Reload()
+
+# Pretty Printers
+def _px4_print_semaphore(val):
+    stype = str(val.type)
+    if stype == "sem_t" or stype == "struct sem_s":
+        return px4.Semaphore(gdb, val)
+    return None
+gdb.pretty_printers.append(_px4_print_semaphore)

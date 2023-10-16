@@ -23,7 +23,8 @@ class Semaphore(Base):
     def __init__(self, gdb, sem_ptr: "gdb.Value"):
         super().__init__(gdb)
         self._sem = sem_ptr
-        self.count = self._sem["semcount"]
+        self.count: int = self._sem["semcount"]
+        """Semaphore count, positive if available, 0 if taken, negative if tasks are waiting"""
 
     @cached_property
     def flags(self) -> int:
@@ -52,13 +53,10 @@ class Semaphore(Base):
         """:return: `True` if the semaphore supports priority inheritance"""
         return not (self.flags & 0b1)
 
-    def __repr__(self) -> str:
-        return f"Semaphore({self._sem}, {self.count})"
-
-    def __str__(self) -> str:
-        ostr = str(self._sem)
-        if descr := self.description_at(self._sem):
-            ostr += f" <{descr}>"
+    def to_string(self) -> str:
+        sc = self.count
+        ostr = f"{sc}{'i' if self.has_priority_inheritance else ''} "
+        ostr += "waiting" if sc < 0 else "available"
         if hstr := [f"{h.count}x {h.task.name}" for h in self.holders]:
             ostr += f": {', '.join(hstr)}"
         return ostr

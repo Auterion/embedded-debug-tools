@@ -163,14 +163,18 @@ class Task(Base):
         return self.stack_limit - watermark * 4
 
     @cached_property
-    def waiting_for(self) -> "str|emdbg.debug.px4.semaphore.Semaphore":
+    def waiting_for(self) -> str:
         """
         What the task is waiting for. If its a semaphore, return an object,
         otherwise a string.
         """
         if self._is_state_in("TSTATE_WAIT_SEM"):
             from .semaphore import Semaphore
-            return Semaphore(self._gdb, self._tcb["waitsem"])
+            sem = self._tcb['waitsem']
+            ostr = f"{int(sem):#08x} "
+            if descr := self.description_at(sem): ostr += f"<{descr}> "
+            ostr += Semaphore(self._gdb, sem).to_string()
+            return ostr
         if self._is_state_in("TSTATE_WAIT_SIG"):
             return "signal"
         return ""
