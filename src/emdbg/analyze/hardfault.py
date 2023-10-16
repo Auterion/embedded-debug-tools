@@ -31,7 +31,6 @@ from pathlib import Path
 import statistics
 import itertools
 from collections import defaultdict
-from ..debug.px4.utils import format_table
 
 # FIXME: hardcoded for FMUv6x memory layout (also works for FMUv5x)
 _ADDR_RANGES = [

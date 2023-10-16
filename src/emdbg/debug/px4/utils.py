@@ -205,6 +205,8 @@ def add_datetime(filename: str|Path):
 # -----------------------------------------------------------------------------
 def format_table(fmtstr: str, header: list[str], rows: list[list[str]], columns: int = 1) -> str:
     """
+    DEPRECATED: Use `rich.table.Table` instead!
+
     Formats a list of rows into a table of multiple meta-columns based on the format string.
     Example for formatting an array of registers into a table with three meta-columns:
 

@@ -3,9 +3,12 @@
 
 import gdb, argparse, shlex, re, traceback, functools
 from collections import defaultdict
+from rich.console import Console
 # The import is relative only to the emdbg/debug folder, so that we do not pull
 # in any other dependencies
 import px4
+
+_CONSOLE = Console(force_terminal=True)
 
 def report_exception(f):
     @functools.wraps(f)
@@ -25,7 +28,7 @@ class PX4_Discover(gdb.Command):
 
     @report_exception
     def invoke(self, argument, from_tty):
-        print(px4.discover_device(gdb))
+        _CONSOLE.print(px4.discover_device(gdb))
 
 
 class PX4_Tasks(gdb.Command):
@@ -41,7 +44,9 @@ class PX4_Tasks(gdb.Command):
     @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
-        print(px4.all_tasks_as_table(gdb, with_file_names=args.files))
+        table, output = px4.all_tasks_as_table(gdb, with_file_names=args.files)
+        _CONSOLE.print(table)
+        print(output)
 
 
 class PX4_Registers(gdb.Command):
@@ -54,7 +59,7 @@ class PX4_Registers(gdb.Command):
 
     @report_exception
     def invoke(self, argument, from_tty):
-        print(px4.all_registers_as_table(gdb, int(argument or 3)))
+        _CONSOLE.print(px4.all_registers_as_table(gdb, int(argument or 3)))
 
 
 class PX4_Interrupts(gdb.Command):
@@ -68,7 +73,7 @@ class PX4_Interrupts(gdb.Command):
 
     @report_exception
     def invoke(self, argument, from_tty):
-        print(px4.vector_table_as_table(gdb, int(argument or 1)))
+        _CONSOLE.print(px4.vector_table_as_table(gdb, int(argument or 1)))
 
 
 class PX4_Gpios(gdb.Command):
@@ -79,12 +84,13 @@ class PX4_Gpios(gdb.Command):
     """
     def __init__(self):
         super().__init__("px4_gpios", gdb.COMMAND_USER)
+        self.header = ["pin", "config", "in", "out", "af", "name", "function"]
         self.parser = argparse.ArgumentParser(self.__doc__)
         self.parser.add_argument("-f", "--filter", help="Regex filter for FMU names.")
         self.parser.add_argument("-ff", "--function-filter", help="Regex filter for FMU functions.")
         self.parser.add_argument("-pf", "--pin-filter", help="Regex filter for GPIO pin names.")
         self.parser.add_argument("-s", "--sort", help="Column name to sort the table by.",
-                                 choices=["pin", "config", "i", "o", "af", "name", "function"])
+                                 choices=self.header)
         self.parser.add_argument("-c", "--columns", type=int, default=2,
                                  help="Number of columns to print.")
 
@@ -104,7 +110,7 @@ class PX4_Gpios(gdb.Command):
                 if args.function_filter is not None and not re.search(args.function_filter, row[6]):
                     return False
             return True
-        print(px4.all_gpios_as_table(gdb, pinout, pin_filter, args.sort, columns))
+        _CONSOLE.print(px4.all_gpios_as_table(gdb, pinout, pin_filter, self.header.index(args.sort), columns))
 
 
 class PX4_Backtrace(gdb.Command):

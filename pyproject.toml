@@ -35,6 +35,7 @@ dependencies = [
     "pydwf",
     "yoctopuce",
     "rpyc",
+    "rich",
 ]
 dynamic = ["version"]
 

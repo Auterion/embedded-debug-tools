@@ -8,6 +8,10 @@ from .system_load import system_load
 from .device import Device
 from .base import Base
 from dataclasses import dataclass
+from collections import defaultdict
+import rich.box
+from rich.text import Text
+from rich.table import Table
 
 # The mapping from register name to position on the thread stack
 _XCP_REGS_MAP: dict[str, int] = {
@@ -321,7 +325,8 @@ def task_switch(gdb, pid: int) -> bool:
 
 
 def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
-                       with_file_names: bool = True, with_waiting: bool = True) -> str:
+                       with_file_names: bool = True,
+                       with_waiting: bool = True) -> tuple[Table, str]:
     """
     Return a table similar to the NSH top command, but at debug time.
 
@@ -329,19 +334,21 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     :param with_waiting: show what the task is waiting for.
     :param with_file_names: show what files the task has open.
     """
-    fmtstr = "{:>%d}{:>%d} {:>%d} {:%d} {:%d}  {:>%d} {:>%d}  {:>%d}/{:>%d}{:>%d}  {:>%d}({:>%d})  "
-    header = ["", "TCB", "PID", "NAME", "LOCATION", "CPU(ms)", "CPU(%)", "USED", "STACK", "", "PRIO", "BASE"]
-    if with_file_names:
-        fmtstr += "{:%d}"
-        header += ["OPEN FILE NAMES"]
-    else:
-        fmtstr += "{:>%d}"
-        header += ["FDs"]
-    fmtstr += "  {:%d}"
-    header += ["STATE"]
-    if with_waiting:
-        fmtstr += "  {:%d}"
-        header += ["WAITING FOR"]
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("struct tcb_s*", justify="right", no_wrap=True)
+    table.add_column("pid", justify="right", no_wrap=True)
+    table.add_column("Task Name")
+    table.add_column("Location", no_wrap=True)
+    table.add_column("CPU(ms)", justify="right")
+    table.add_column("CPU(%)", justify="right")
+    table.add_column("Stack\nUsage", justify="right")
+    table.add_column("Avail\nStack", justify="right")
+    table.add_column("Prio", justify="right")
+    table.add_column("Base", justify="right")
+    if with_file_names: table.add_column("Open File Names")
+    else: table.add_column("FDs", justify="right")
+    table.add_column("State")
+    if with_waiting: table.add_column("Waiting For")
 
     tasks = all_tasks(gdb)
     if not tasks: return "No tasks found!"
@@ -358,34 +365,33 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
 
         # Find the file names or just the number of file descriptors
         if with_file_names:
-            file_names = [f["f_inode"]["i_name"].cast(gdb.lookup_type("char").pointer()).string(encoding="ascii", errors="ignore")
-                          for f in task.files
-                          if int(f["f_inode"]["i_name"].cast(task.uint32)) >= 0x0800_0000]
-            file_description = ",".join(sorted(list(set(file_names))))
+            file_names = [task.read_string(f["f_inode"]["i_name"]) for f in task.files]
+            file_description = ", ".join(sorted(list(set(file_names))))
         else:
             file_description = len(task.files)
 
         # Add all the values per row
         relative = task.load.relative if interval_us else task.load.total / total_interval_us
-        row = ["*" if task.is_current_task else "", hex(task._tcb), task.pid, task.name,
+        stack_overflow = with_stack_usage and task.stack_used >= task.stack_limit
+        row = [hex(task._tcb), task.pid, task.name,
                hex(task.location) if isinstance(task.location, int) else task.location.name,
                task.load.total//1000, f"{(relative * 100):.1f}",
-               task.stack_used if with_stack_usage else "", task.stack_limit,
-               " OVERFLOW!" if with_stack_usage and task.stack_used >= task.stack_limit else "",
-               task.sched_priority, task.init_priority,
-               file_description, task.short_state]
+               Text.assemble((str(task.stack_used) if with_stack_usage else "", "bold red" if stack_overflow else "")),
+               Text.assemble((str(task.stack_limit), "bold" if stack_overflow else "")),
+               task.sched_priority, task.init_priority, file_description, task.short_state]
         if with_waiting:
             row.append(task.waiting_for)
         rows.append(row)
 
     # Sort the rows by PID by default and format the table
-    rows.sort(key=(lambda l: l[2]) if sort_key is None else sort_key)
-    output = utils.format_table(fmtstr, header, rows) + "\n"
+    for row in sorted(rows, key=lambda l: l[1] if sort_key is None else sort_key):
+        table.add_row(*[r if isinstance(r, Text) else str(r) for r in row],
+                      style="bold blue" if row[11] == "RUN" else None)
 
     # Add the task information
     running = sum(1 for t in tasks if t.is_runnable)
     sleeping = sum(1 for t in tasks if t.is_waiting)
-    output += f"Processes: {len(tasks)} total, {running} running, {sleeping} sleeping\n"
+    output = f"Processes: {len(tasks)} total, {running} running, {sleeping} sleeping\n"
 
     # Add CPU utilization and guard against division by zero
     if not interval_us: interval_us = total_interval_us
@@ -396,4 +402,4 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
 
     # Uptime finally
     output += f"Uptime: {Device(gdb).uptime/1e6:.2f}s total, {interval_us/1e6:.2f}s interval\n"
-    return output
+    return table, output

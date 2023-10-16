@@ -8,6 +8,9 @@ from .base import Base
 from functools import cached_property
 from pathlib import Path
 import re, time
+import rich.box
+from rich.text import Text
+from rich.table import Table
 
 
 class Device(Base):
@@ -396,18 +399,23 @@ class Device(Base):
         return self.idcode >> 16
 
 
-def discover(gdb) -> str:
+def discover(gdb) -> Table:
     """
     Reads the device identifier registers and outputs a human readable string if possible.
     :return: description string
     """
     dev = Device(gdb)
-    output = [
-        f"{dev.devid:#4x}={dev.line}, {dev.rev:#4x}=rev {dev._IDCODE_REVISION}",
-        f"flash={dev.flash_size//1024}kB, pkg={dev.package}",
-        f"uid={dev.uid:x}",
-    ]
-    return "\n".join(output)
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("Device")
+    table.add_column("Revision")
+    table.add_column("Flash")
+    table.add_column("Package")
+    table.add_column("UID")
+    table.add_row(f"{dev.devid:#4x}: {dev.line}",
+                  f"{dev.rev:#4x}: rev {dev._IDCODE_REVISION}",
+                  f"{dev.flash_size//1024}kB", dev.package,
+                  f"{dev.uid:x}")
+    return table
 
 
 def all_registers(gdb) -> dict[str, int]:
@@ -415,17 +423,20 @@ def all_registers(gdb) -> dict[str, int]:
     return Device(gdb).registers
 
 
-def all_registers_as_table(gdb, columns: int = 3) -> str:
+def all_registers_as_table(gdb, columns: int = 3) -> Table:
     """
     Format the Cortex-M CPU+FPU registers and their values into a simple table.
 
     :param columns: The number of columns to spread the registers across.
     """
-    fmtstr = "{:%d}  {:>%d}  {:>%d}"
-    # Format all registers into single array
-    rows = [[reg, hex(value), value] for reg, value in all_registers(gdb).items()]
-    # Format the table without header
-    return utils.format_table(fmtstr, None, rows, columns)
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("Name")
+    table.add_column("Hexadecimal", justify="right")
+    table.add_column("Decimal", justify="right")
+    table.add_column("Binary", justify="right")
+    for reg, value in all_registers(gdb).items():
+        table.add_row(reg, f"{value:x}", str(value), f"{value:b}")
+    return table
 
 
 def vector_table(gdb) -> dict[int, Device.IrqNuttX]:
@@ -433,7 +444,7 @@ def vector_table(gdb) -> dict[int, Device.IrqNuttX]:
     return Device(gdb).vector_table_nuttx
 
 
-def vector_table_as_table(gdb, columns: int = 1) -> str:
+def vector_table_as_table(gdb, columns: int = 1) -> Table:
     """
     Format the NuttX interrupts and their handlers with arguments into a simple table.
 
@@ -445,18 +456,25 @@ def vector_table_as_table(gdb, columns: int = 1) -> str:
             block = block.superblock
             count += 1
         if block.function:
-            return "^" * count, block.function.name
-        return "?", block
+            return f"{block.function.name} {'^' * count}"
+        return f"{block} ?"
 
-    fmtstr = "{:>%d} {:>%d}{:>%d}{:>%d} {:>%d}  {:>%d} = {:>%d} {:%d}  {:%d}"
-    header = ["IRQ", "E", "P", "A", "P", "ADDR", "", "FUNCTION", "ARGUMENT"]
-    # Format all registers into single array
-    rows = [[idx, "e" if irq.is_enabled else "", "p" if irq.is_pending else "",
-             "a" if irq.is_active else "", f"{irq.priority:x}", hex(irq.handler.start),
-             *_fname(irq.handler), irq.arg or ""]
-            for idx, irq in vector_table(gdb).items()]
-    # Format the table without header
-    return utils.format_table(fmtstr, header, rows, columns)
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("IRQ", justify="right")
+    table.add_column("EPA")
+    table.add_column("Prio")
+    table.add_column("Address")
+    table.add_column("Function")
+    table.add_column("Argument")
+    for idx, irq in vector_table(gdb).items():
+        table.add_row(str(idx),
+                      ("e" if irq.is_enabled else " ") +
+                      ("p" if irq.is_pending else " ") +
+                      ("a" if irq.is_active else " "),
+                      f"{irq.priority:x}", hex(irq.handler.start),
+                      _fname(irq.handler), str(irq.arg) or "",
+                      style="bold blue" if irq.is_active else None)
+    return table
 
 
 def coredump(gdb, memories: list[tuple[int, int]] = None,
@@ -479,7 +497,7 @@ def coredump(gdb, memories: list[tuple[int, int]] = None,
 
 
 def all_gpios_as_table(gdb, pinout: dict[str, tuple[str, str]] = None,
-                       fn_filter = None, sort_by = None, columns: int = 2):
+                       fn_filter = None, sort_by = None, columns: int = 2) -> Table:
     """
     Reads the GPIO peripheral space and prints a table of the individual pin
     configuration, input/output state and alternate function. If a pinout is
@@ -504,11 +522,6 @@ def all_gpios_as_table(gdb, pinout: dict[str, tuple[str, str]] = None,
     :param sort_by: The name of the column to sort by: default is `PIN`.
     :param columns: The number of columns to spread the GPIO table across.
     """
-    fmtstr = "{:%d}  {:%d}  {:%d} {:%d}  {:>%d}"
-    header = ["PIN", "CONFIG", "I", "O", "AF"]
-    if pinout is not None:
-        fmtstr += "  {:%d}  {:%d}"
-        header += ["NAME", "FUNCTION"]
     rows = []
     for gpio in Device(gdb).gpios:
         name = f"{gpio.port}{gpio.index}"
@@ -521,21 +534,32 @@ def all_gpios_as_table(gdb, pinout: dict[str, tuple[str, str]] = None,
                           ["", "+L"][gpio.lockr]])
         idr = "" if gpio.moder == 3 else ["_", "^"][gpio.idr]
         odr = ["_", "^"][gpio.odr] if gpio.moder == 1 else ""
-        afr = gpio.afr if gpio.moder == 2 else ""
+        afr = str(gpio.afr) if gpio.moder == 2 else ""
         row = [name, config, idr, odr, afr]
         if pinout is not None:
             row += list(pinout.get(name, [""]*2))
         if fn_filter is None or fn_filter(row):
             rows.append(row)
-    if sort_by:
-        idx = header.index(sort_by.upper())
+    if sort_by is not None:
         def _sort(row):
             pinf = ord(row[0][0]) * 100 + int(row[0][1:])
-            if idx == 0: return pinf
-            if idx == 4: return -1 if row[4] == "" else row[4]
-            if idx == 5: return (row[5], row[6], pinf)
-            if idx == 6: return (row[6], row[5], pinf)
-            return row[idx]
+            if sort_by == 0: return pinf
+            if sort_by == 4: return -1 if row[4] == "" else row[4]
+            if sort_by == 5: return (row[5], row[6], pinf)
+            if sort_by == 6: return (row[6], row[5], pinf)
+            return row[sort_by]
         rows.sort(key=_sort)
-    return utils.format_table(fmtstr, header, rows, columns)
+
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("Pin")
+    table.add_column("Config")
+    table.add_column("I")
+    table.add_column("O")
+    table.add_column("AF", justify="right")
+    if pinout is not None:
+        table.add_column("Name")
+        table.add_column("Function")
+    for row in rows:
+        table.add_row(*row)
+    return table
 

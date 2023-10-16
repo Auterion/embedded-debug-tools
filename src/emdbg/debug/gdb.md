@@ -112,13 +112,11 @@ Shows information about the connected device.
 
 ```
 (gdb) px4_discover
-Device(armv7e-m, 0x411fc271, 0x450, 0x2003 -> STM32H742, STM32H743/753, STM32H750 at revision Y)
-SCB registers:
-CPUID                            = 411fc271
-    Variant                        ..1..... - Revision: r1pX
-    Architecture                   ...f.... - ARMv7-M
-    PartNo                         ....c27. - Cortex-M7
-    Revision                       .......1 - Patch: rXp1
+                                ╷               ╷        ╷                     ╷
+  Device                        │ Revision      │ Flash  │ Package             │ UID
+ ═══════════════════════════════╪═══════════════╪════════╪═════════════════════╪══════════════════════════
+  0x451: STM32F76xx, STM32F77xx │ 0x1001: rev Z │ 2048kB │ LQFP208 or TFBGA216 │ 20373658375650140045002c
+                                ╵               ╵        ╵                     ╵
 ```
 
 ### px4_reset
@@ -139,41 +137,47 @@ it using `px4_switch_task [PID]`.
 
 ```
 (gdb) px4_tasks
-       TCB  PID NAME                   LOCATION         CPU(ms) CPU(%)  USED/STACK  PRIO(BASE)  FDs  STATE  WAITING FOR
-0x20028164    0 Idle Task              nx_start            8873   30.5   354/  726     0(   0)    3  RUN
-0x2007c2d0    1 hpwork                 nxsig_timedwait        0    0.0   332/ 1264   249( 249)    3  w:sig  signal
-0x2007ce80    2 lpwork                 nxsig_timedwait        0    0.0   588/ 1616    50(  50)    3  w:sig  signal
-0x2007db90    3 init                   nxsem_wait             0    0.0  2348/ 3080   100( 100)    3  w:sem  0x2007dbe0 <g_usart3priv + 36>
-0x2007f3e0    4 wq:manager             nxsem_wait             0    0.0   452/ 1256   255( 255)    5  w:sem  0x2007f430: 22x wq:manager
-0x20003cd0   63 wq:hp_default          nxsem_wait           132    4.1  1132/ 1904   237( 237)    5  w:sem  0x20003d20
-0x200045f0   77 wq:I2C3                nxsem_wait            30    0.9   724/ 2336   244( 244)    5  w:sem  0x20004640
-0x200025f0  613 dataman                nxsem_wait             0    0.0   860/ 1208    90(  90)    4  w:sem  0x20002640 <g_work_queued_sema>
-0x200021b0  615 wq:lp_default          nxsem_wait             5    0.2  1004/ 1920   205( 205)    5  w:sem  0x20002200
-0x200039b0  634 wq:uavcan              nxsem_wait            52    1.5  1692/ 3624   236( 236)    5  w:sem  0x20003a00
-0x20005410  699 wq:SPI3                nxsem_wait           246    7.2  1336/ 2336   251( 251)    5  w:sem  0x20005460
-0x2000dd40  710 wq:SPI2                nxsem_wait           174    5.1  1812/ 2336   252( 252)    5  w:sem  0x2000dd90
-0x2000ebd0  713 wq:SPI1                nxsem_wait           151    4.4  1724/ 2336   253( 253)    5  w:sem  0x2000ec20
-0x2000fd30  718 wq:I2C4                nxsem_wait            13    0.4   912/ 2336   243( 243)    5  w:sem  0x2000fd80
-0x20010ab0  747 wq:I2C1                nxsem_wait             3    0.1  1116/ 2336   246( 246)    5  w:sem  0x20010b00
-0x20013890  754 wq:I2C2                nxsem_wait             9    0.3   792/ 2336   245( 245)    5  w:sem  0x200138e0
-0x2000c2b0  830 wq:nav_and_controllers nxsem_wait           140    4.1  1276/ 2280   242( 242)    5  w:sem  0x2000c300
-0x200163d0  840 wq:rate_ctrl           nxsem_wait           264    7.7  1492/ 3152   255( 255)    5  w:sem  0x20016420
-0x20019050  842 wq:INS0                nxsem_wait           391   11.4  4252/ 6000   241( 241)    5  w:sem  0x200190a0
-0x2001c260  847 commander              nxsig_timedwait       50    1.5  1244/ 3224   231( 231)    5  w:sig  signal
-0x20038cf0  940 mavlink_if0            nxsig_timedwait      260    7.7  1916/ 2736   101( 101)    4  w:sig  signal
-0x2003bfb0  944 mavlink_rcv_if0        nxsem_wait            19    0.7  1756/ 5064   175( 175)    4  w:sem  0x2003c000
-0x200321b0 1113 gps                    nxsem_wait             2    0.1  1204/ 1912   205( 205)    4  w:sem  0x20032200
-0x20036230 1297 mavlink_if1            nxsig_timedwait       88    2.5  1908/ 2736   101( 101)    4  w:sig  signal
-0x20042390 1299 mavlink_rcv_if1        nxsem_wait            13    0.4  1300/ 5064   175( 175)    4  w:sem  0x200423e0
-0x2003d5e0 1372 mavlink_if2            nxsig_timedwait      162    4.7  1916/ 2744   101( 101)    4  w:sig  signal
-0x20046f50 1373 mavlink_rcv_if2        nxsem_wait            15    0.5  1300/ 5064   175( 175)    4  w:sem  0x20046fa0
-0x20012610 1399 navigator              nxsem_wait             4    0.1  1000/ 2072   105( 105)    6  w:sem  0x20012660
-0x2003f1b0 1557 logger                 nxsem_wait            13    0.4  2556/ 3648   230( 230)    3  w:sem  0x2003f200
-0x2004ff30 1592 log_writer_file        nxsem_wait             0    0.0   372/ 1176    60(  60)    3  w:sem  0x2004ff80
-
-Processes: 30 total, 1 running, 29 sleeping
-CPU usage: 66.0% tasks, 3.5% sched, 30.5% idle
-Uptime: 16.91s total, 0.48s interval
+                ╷      ╷                        ╷                 ╷         ╷        ╷       ╷       ╷      ╷      ╷     ╷       ╷
+                │      │                        │                 │         │        │ Stack │ Avail │      │      │     │       │
+  struct tcb_s* │  pid │ Task Name              │ Location        │ CPU(ms) │ CPU(%) │ Usage │ Stack │ Prio │ Base │ FDs │ State │ Waiting For
+ ═══════════════╪══════╪════════════════════════╪═════════════════╪═════════╪════════╪═══════╪═══════╪══════╪══════╪═════╪═══════╪══════════════════════════════════════
+     0x2002673c │    0 │ Idle Task              │ nx_start        │   10256 │   53.8 │   398 │   726 │    0 │    0 │   3 │ RUN   │
+     0x2007c310 │    1 │ hpwork                 │ nxsem_wait      │       0 │    0.0 │   292 │  1224 │  249 │  249 │   3 │ w:sem │ 0x200208e8 -1 waiting
+     0x2007cde0 │    2 │ lpwork                 │ nxsem_wait      │       6 │    0.0 │   500 │  1576 │   50 │   50 │   3 │ w:sem │ 0x200208fc -1 waiting
+     0x2007da10 │    3 │ nsh_main               │ nxsem_wait      │       0 │    0.0 │  1980 │  3040 │  100 │  100 │   4 │ w:sem │ 0x20020594 -1 waiting
+     0x2007f0c0 │    4 │ wq:manager             │ nxsem_wait      │       0 │    0.0 │   588 │  1232 │  255 │  255 │   5 │ w:sem │ 0x2007fce8 -1 waiting: 1x wq:manager
+     0x2007fe20 │    5 │ wq:lp_default          │ nxsem_wait      │      74 │    0.4 │  1388 │  1896 │  205 │  205 │   5 │ w:sem │ 0x2000072c -1 waiting
+     0x20001e40 │    6 │ Telnet daemon          │ nxsem_wait      │       0 │    0.0 │   556 │  1984 │  100 │  100 │   1 │ w:sem │ 0x20002ad0 -1 waiting
+     0x20002f20 │    7 │ netinit                │ nxsem_wait      │       1 │    0.0 │   764 │  2024 │   49 │   49 │   4 │ w:sem │ 0x20027014 -1 waiting
+     0x20004980 │   60 │ wq:hp_default          │ nxsem_wait      │     182 │    1.0 │  1052 │  1872 │  237 │  237 │   5 │ w:sem │ 0x20005c54 -1 waiting
+     0x20005d10 │   63 │ wq:I2C3                │ nxsem_wait      │      62 │    0.3 │   736 │  2312 │  244 │  244 │   5 │ w:sem │ 0x200066bc -1 waiting
+     0x200040e0 │   88 │ dataman                │ nxsem_wait      │       0 │    0.0 │  1068 │  1376 │   90 │   90 │   5 │ w:sem │ 0x200072d0 -1 waiting
+     0x20007fb0 │  141 │ wq:ttyS5               │ nxsem_wait      │      95 │    0.6 │  1084 │  1704 │  229 │  229 │   5 │ w:sem │ 0x2000873c -1 waiting
+     0x20005300 │  217 │ wq:SPI3                │ nxsem_wait      │     724 │    4.0 │  1484 │  2368 │  251 │  251 │   5 │ w:sem │ 0x2000a864 -1 waiting
+     0x20005090 │  235 │ wq:SPI1                │ nxsem_wait      │     479 │    2.6 │  1780 │  2368 │  253 │  253 │   5 │ w:sem │ 0x2000c224 -1 waiting
+     0x2000b5b0 │  250 │ wq:I2C4                │ nxsem_wait      │     100 │    0.5 │   960 │  2312 │  243 │  243 │   5 │ w:sem │ 0x2000cb4c -1 waiting
+     0x2000d810 │  393 │ wq:nav_and_controllers │ nxsem_wait      │     516 │    3.0 │  1248 │  2216 │  242 │  242 │   5 │ w:sem │ 0x2000ff4c -1 waiting
+     0x2000e170 │  394 │ wq:rate_ctrl           │ nxsem_wait      │     213 │    1.2 │  1532 │  3120 │  255 │  255 │   5 │ w:sem │ 0x20010ba4 -1 waiting
+     0x200128a0 │  396 │ wq:INS0                │ nxsem_wait      │     956 │    5.2 │  4244 │  5976 │  241 │  241 │   5 │ w:sem │ 0x2001409c -1 waiting
+     0x200149c0 │  398 │ wq:INS1                │ nxsem_wait      │     887 │    4.8 │  4244 │  5976 │  240 │  240 │   5 │ w:sem │ 0x200161bc -1 waiting
+     0x20016430 │  400 │ commander              │ nxsig_timedwait │     242 │    1.3 │  1468 │  3192 │  140 │  140 │   5 │ w:sig │ signal
+     0x20009ab0 │  403 │ ekf2                   │ nxsig_timedwait │     167 │    0.9 │  1300 │  2000 │  237 │  237 │   3 │ w:sig │ signal
+     0x2003c0b0 │  411 │ mavlink_if0            │ nxsig_timedwait │    1327 │    7.3 │  1916 │  3064 │  100 │  100 │   5 │ w:sig │ signal
+     0x20040890 │  413 │ mavlink_rcv_if0        │ nxsem_wait      │      89 │    0.5 │   212 │  6056 │  175 │  175 │   5 │ w:sem │ 0x20041ad8 -1 waiting
+     0x2003baa0 │  625 │ gps                    │ nxsem_wait      │      11 │    0.1 │  1220 │  1936 │  205 │  205 │   4 │ w:sem │ 0x200436d0 -1 waiting
+     0x20004dd0 │  786 │ mavlink_if1            │ nxsig_timedwait │     420 │    2.4 │  1916 │  3048 │  100 │  100 │   5 │ w:sig │ signal
+     0x20046970 │  788 │ mavlink_rcv_if1        │ nxsem_wait      │      79 │    0.4 │   212 │  6056 │  175 │  175 │   5 │ w:sem │ 0x20047bb8 -1 waiting
+     0x200439f0 │  894 │ mavlink_if2            │ nxsig_timedwait │     978 │    5.5 │  1860 │  3048 │  100 │  100 │   5 │ w:sig │ signal
+     0x2004b270 │  904 │ mavlink_rcv_if2        │ nxsem_wait      │      72 │    0.4 │   212 │  6056 │  175 │  175 │   5 │ w:sem │ 0x2004c4b8 -1 waiting
+     0x20042590 │  975 │ uxrce_dds_client       │ nxsem_wait      │       5 │    0.0 │   540 │  9920 │  100 │  100 │   4 │ w:sem │ 0x2004f8d0 -1 waiting
+     0x20042850 │ 1014 │ navigator              │ nxsem_wait      │      26 │    0.1 │  1068 │  2104 │  105 │  105 │   7 │ w:sem │ 0x2004e250 -1 waiting
+     0x2004d560 │ 1333 │ logger                 │ nxsem_wait      │      64 │    0.4 │  3116 │  3616 │  230 │  230 │   3 │ w:sem │ 0x20054720 -1 waiting
+     0x200482a0 │ 1400 │ wq:uavcan              │ nxsem_wait      │     284 │    1.5 │  2252 │  3600 │  236 │  236 │   5 │ w:sem │ 0x20058784 -1 waiting
+     0x2004e610 │ 1401 │ log_writer_file        │ nxsem_wait      │       0 │    0.0 │   388 │  1144 │   60 │   60 │   3 │ w:sem │ 0x2004ece0 -1 waiting
+                ╵      ╵                        ╵                 ╵         ╵        ╵       ╵       ╵      ╵      ╵     ╵       ╵
+Processes: 33 total, 1 running, 32 sleeping
+CPU usage: 44.4% tasks, 1.8% sched, 53.8% idle
+Uptime: 19.33s total, 0.62s interval
 ```
 
 
@@ -210,114 +214,81 @@ Switched to task 'mavlink_rcv_if0' (799).
 ### px4_registers
 
 ```
-px4_registers [COLUMNS=3]
+px4_registers
 ```
 
-Pretty prints a compact, multi-column table with all register values.
+Pretty prints a table with all register values.
 
 ```
-(gdb) px4_registers 2
-r0                    0x2                    2      :      primask           0x0           0
-r1             0x2003b15c            537112924      :      basepri          0x80         128
-r2             0x2007dc1c            537386012      :      faultmask         0x0           0
-r3             0x2002d0d8            537055448      :      control           0x4           4
-r4             0x2003c3f0            537117680      :      s0                0x0           0
-r5             0x2003b0d0            537112784      :      s1                0x0           0
-r6                   0xf0                  240      :      s2                0x0           0
-r7             0x2003b108            537112840      :      s3                0x0           0
-r8             0x2003c3f0            537117680      :      s4                0x0           0
-r9                    0x1                    1      :      s5                0x0           0
-r10                   0xa                   10      :      s6                0x0           0
-r11                   0x0                    0      :      s7                0x0           0
-r12            0x2003c2d8            537117400      :      s8                0x0           0
-sp             0x2003c3c8            537117640      :      s9                0x0           0
-lr              0x800b3cf            134263759      :      s10               0x0           0
-pc              0x8012b48            134294344      :      s11               0x0           0
-xpsr           0x41000000           1090519040      :      s12               0x0           0
-d0                    0x0                    0      :      s13        0x7ff80000  2146959360
-d1                    0x0                    0      :      s14               0x0           0
-d2                    0x0                    0      :      s15               0x0           0
-d3                    0x0                    0      :      s16               0x0           0
-d4                    0x0                    0      :      s17               0x0           0
-d5                    0x0                    0      :      s18               0x0           0
-d6     0x7ff8000000000000  9221120237041090560      :      s19               0x0           0
-d7                    0x0                    0      :      s20               0x0           0
-d8                    0x0                    0      :      s21               0x0           0
-d9                    0x0                    0      :      s22               0x0           0
-d10                   0x0                    0      :      s23               0x0           0
-d11                   0x0                    0      :      s24               0x0           0
-d12                   0x0                    0      :      s25               0x0           0
-d13                   0x0                    0      :      s26               0x0           0
-d14                   0x0                    0      :      s27               0x0           0
-d15                   0x0                    0      :      s28               0x0           0
-fpscr          0x30000001            805306369      :      s29               0x0           0
-msp            0x20030e28            537071144      :      s30               0x0           0
-psp                   0x0                    0      :      s31               0x0           0
+(gdb) px4_registers
+            ╷                  ╷                      ╷
+  Name      │      Hexadecimal │              Decimal │                                                           Binary
+ ═══════════╪══════════════════╪══════════════════════╪══════════════════════════════════════════════════════════════════
+  r0        │                0 │                    0 │                                                                0
+  r1        │         200267c4 │            537028548 │                                   100000000000100110011111000100
+  r2        │         2007ccfc │            537382140 │                                   100000000001111100110011111100
+  r3        │         200267c4 │            537028548 │                                   100000000000100110011111000100
+  r4        │         2002673c │            537028412 │                                   100000000000100110011100111100
+  r5        │         200267f4 │            537028596 │                                   100000000000100110011111110100
+  r6        │         200267f0 │            537028592 │                                   100000000000100110011111110000
+  r7        │         20026734 │            537028404 │                                   100000000000100110011100110100
+  r8        │                0 │                    0 │                                                                0
+  r9        │                0 │                    0 │                                                                0
+  r10       │                0 │                    0 │                                                                0
+  r11       │                0 │                    0 │                                                                0
+  r12       │                0 │                    0 │                                                                0
+  sp        │         20036b44 │            537094980 │                                   100000000000110110101101000100
+  lr        │          800b14b │            134263115 │                                     1000000000001011000101001011
+  pc        │          800b14a │            134263114 │                                     1000000000001011000101001010
+  xpsr      │         41000000 │           1090519040 │                                  1000001000000000000000000000000
+  d0        │                0 │                    0 │                                                                0
+  ...       │              ... │                  ... │                                                              ...
+  d15       │ ffffffff00000000 │ 18446744069414584320 │ 1111111111111111111111111111111100000000000000000000000000000000
+  fpscr     │                0 │                    0 │                                                                0
+  msp       │         20036b44 │            537094980 │                                   100000000000110110101101000100
+  psp       │                0 │                    0 │                                                                0
+  primask   │                0 │                    0 │                                                                0
+  basepri   │               f0 │                  240 │                                                         11110000
+  faultmask │                0 │                    0 │                                                                0
+  control   │                4 │                    4 │                                                              100
+  s0        │                0 │                    0 │                                                                0
+  ...       │              ... │                  ... │                                                              ...
+  s31       │         ffffffff │           4294967295 │                                 11111111111111111111111111111111
+            ╵                  ╵                      ╵
 ```
 
 
 ### px4_interrupts
 
 ```
-px4_interrupts [COLUMNS=1]
+px4_interrupts
 ```
 
 Pretty prints a table of all non-empty NuttX interrupts showing their state
-(E=enabled, P=pending, A=active), priority (P), function pointer, name, and
+(E=enabled, P=pending, A=active), priority, function pointer, name, and
 argument.
 
 ```
 (gdb) px4_interrupts
-IRQ EPA P       ADDR =  FUNCTION                                        ARGUMENT
--13     8  0x800972c =  arm_hardfault
- -5 e   8  0x800981c =  arm_svcall
- -1 e   8  0x8011efc =  stm32_timerisr
-  8     8  0x8167d40 =  stm32_exti2_isr
- 11 e   8  0x800936c =  stm32_dmainterrupt                              0x20020740 <g_dma>
- 12     8  0x800936c =  stm32_dmainterrupt                              0x20020758 <g_dma+24>
- 13     8  0x800936c =  stm32_dmainterrupt                              0x20020770 <g_dma+48>
- 14 e   8  0x800936c =  stm32_dmainterrupt                              0x20020788 <g_dma+72>
- 15 e   8  0x800936c =  stm32_dmainterrupt                              0x200207a0 <g_dma+96>
- 16 e   8  0x800936c =  stm32_dmainterrupt                              0x200207b8 <g_dma+120>
- 17 e   8  0x800936c =  stm32_dmainterrupt                              0x200207d0 <g_dma+144>
- 19     8  0x81300d8 =  can1_irq(int, void*, void*)
- 20     8  0x81300d8 =  can1_irq(int, void*, void*)
- 21 e   8  0x81300d8 =  can1_irq(int, void*, void*)
- 23 e   8  0x8167df0 =  stm32_exti95_isr
- 27 e   8  0x816b0f8 =  io_timer_handler0
- 30 e   8  0x816b0f0 =  io_timer_handler1
- 31 e   8  0x816826a =  stm32_i2c_isr                                   0x20020b44 <stm32_i2c1_priv>
- 32     8  0x816826a =  stm32_i2c_isr                                   0x20020b44 <stm32_i2c1_priv>
- 33     8  0x816826a =  stm32_i2c_isr                                   0x20020b78 <stm32_i2c2_priv>
- 34     8  0x816826a =  stm32_i2c_isr                                   0x20020b78 <stm32_i2c2_priv>
- 37 e   8  0x8008dd4 =  up_interrupt                                    0x200203a0 <g_usart1priv>
- 39     8  0x8008dd4 =  up_interrupt                                    0x20020570 <g_usart3priv>
- 40 e   8  0x8167df8 =  stm32_exti1510_isr
- 43 e   8  0x816b0e8 =  io_timer_handler2
- 46     8  0x816da88 =  hrt_tim_isr
- 47 e   8  0x800936c =  stm32_dmainterrupt                              0x200207e8 <g_dma+168>
- 52 e   8  0x8008dd4 =  up_interrupt                                    0x20020000 <g_uart4priv>
- 53 e   8  0x8008dd4 =  up_interrupt                                    0x200200e8 <g_uart5priv>
- 54 e   8  0x8130608 =  TIMX_IRQHandler(int, void*, void*)
- 56 e   8  0x800936c =  stm32_dmainterrupt                              0x20020800 <g_dma+192>
- 57 e   8  0x800936c =  stm32_dmainterrupt                              0x20020818 <g_dma+216>
- 58     8  0x800936c =  stm32_dmainterrupt                              0x20020830 <g_dma+240>
- 59   a 8  0x800936c =  stm32_dmainterrupt                              0x20020848 <g_dma+264>
- 60     8  0x800936c =  stm32_dmainterrupt                              0x20020860 <g_dma+288>
- 63     8  0x81300a4 =  can2_irq(int, void*, void*)
- 64     8  0x81300a4 =  can2_irq(int, void*, void*)
- 65  p  8  0x81300a4 =  can2_irq(int, void*, void*)
- 67     8  0x80137e4 =  stm32_usbinterrupt
- 68     8  0x800936c =  stm32_dmainterrupt                              0x20020878 <g_dma+312>
- 69     8  0x800936c =  stm32_dmainterrupt                              0x20020890 <g_dma+336>
- 70     8  0x800936c =  stm32_dmainterrupt                              0x200208a8 <g_dma+360>
- 71     8  0x8129c30 =  ArchPX4IOSerial::_interrupt(int, void*, void*)  0x20006170
- 72     8  0x816826a =  stm32_i2c_isr                                   0x20020bac <stm32_i2c3_priv>
- 73     8  0x816826a =  stm32_i2c_isr                                   0x20020bac <stm32_i2c3_priv>
- 82     8  0x8008dd4 =  up_interrupt                                    0x200201d0 <g_uart7priv>
- 95     8  0x816826a =  stm32_i2c_isr                                   0x20020be0 <stm32_i2c4_priv>
- 96     8  0x816826a =  stm32_i2c_isr                                   0x20020be0 <stm32_i2c4_priv>
-103     8  0x816cf64 =  stm32_sdmmc_interrupt                           0x20020ef4 <g_sdmmcdev2>
+      ╷     ╷      ╷           ╷                             ╷
+  IRQ │ EPA │ Prio │ Address   │ Function                    │ Argument
+ ═════╪═════╪══════╪═══════════╪═════════════════════════════╪══════════════════════════════
+  -13 │ e   │ -1   │ 0x8009914 │ arm_hardfault               │ 0x0
+   -5 │     │ 0    │ 0x8009a08 │ arm_svcall                  │ 0x0
+   -1 │     │ 80   │ 0x8013c40 │ stm32_timerisr              │ 0x0
+    8 │ ep  │ 80   │ 0x8175054 │ stm32_exti2_isr             │ 0x0
+   11 │ ep  │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x20020740 <g_dma>
+   12 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x20020758 <g_dma+24>
+   13 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x20020770 <g_dma+48>
+   14 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x20020788 <g_dma+72>
+   15 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x200207a0 <g_dma+96>
+   16 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x200207b8 <g_dma+120>
+   17 │ e   │ 80   │ 0x800949c │ stm32_dmainterrupt          │ 0x200207d0 <g_dma+144>
+   19 │ e   │ 80   │ 0x8132bb8 │ can1_irq(int, void*, void*) │ 0x0
+   20 │ e   │ 80   │ 0x8132bb8 │ can1_irq(int, void*, void*) │ 0x0
+   21 │ e   │ 80   │ 0x8132bb8 │ can1_irq(int, void*, void*) │ 0x0
+   23 │ e a │ 80   │ 0x8175104 │ stm32_exti95_isr            │ 0x0
+      ╵     ╵      ╵           ╵                             ╵
 ```
 
 
@@ -360,55 +331,60 @@ provided, the pins will be matched with their names and functions.
 
 ```
 (gdb) px4_gpios -c 1
-PIN  CONFIG     I O  AF  NAME             FUNCTION
-A0   AN                  ADC1_IN0         SCALED_VDD_3V3_SENSORS1
-A1   ALT+VH     _    11  ETH_REF_CLK      ETH_REF_CLK
-A2   ALT+VH     ^    11  ETH_MDIO         ETH_MDIO
-A3   IN         _        USART2_RX        USART2_RX_TELEM3
-A4   AN                  ADC1_IN4         SCALED_VDD_3V3_SENSORS2
-A5   ALT+H      ^     5  SPI1_SCK         SPI1_SCK_SENSOR1_ICM20602
-A6   IN         _        SPI6_MISO        SPI6_MISO_EXTERNAL1
-A7   ALT+VH     _    11  ETH_CRS_DV       ETH_CRS_DV
-A8   ALT+H      _     1  TIM1_CH1         FMU_CH4
-A9   IN+PD      _        USB_OTG_FS_VBUS  VBUS_SENSE
-A10  ALT+H      _     1  TIM1_CH3         FMU_CH2
-A11  ALT+VH     _    10  USB_OTG_FS_DM    USB_D_N
-A12  ALT+VH     _    10  USB_OTG_FS_DP    USB_D_P
-A13  ALT+PU+VH  _     0  SWDIO            FMU_SWDIO
-A14  ALT+PD     _     0  SWCLK            FMU_SWCLK
-A15  OUT        ^ ^                       SPI6_nCS2_EXTERNAL1
-B0   AN                  ADC1_IN8         SCALED_VDD_3V3_SENSORS3
-B1   AN                  ADC1_IN9         SCALED_V5
-B2   ALT+H      _     7  SPI3_MOSI        SPI3_MOSI_SENSOR3_BMI088
+      ╷           ╷   ╷   ╷    ╷                 ╷
+  Pin │ Config    │ I │ O │ AF │ Name            │ Function
+ ═════╪═══════════╪═══╪═══╪════╪═════════════════╪═══════════════════════════════════════
+  A0  │ AN        │   │   │    │ ADC1_IN0        │ SCALED_VDD_3V3_SENSORS1
+  A1  │ ALT+VH    │ ^ │   │ 11 │ ETH_REF_CLK     │ ETH_REF_CLK
+  A2  │ ALT+VH    │ ^ │   │ 11 │ ETH_MDIO        │ ETH_MDIO
+  A3  │ IN        │ ^ │   │    │ USART2_RX       │ USART2_RX_TELEM3
+  A4  │ AN        │   │   │    │ ADC1_IN4        │ SCALED_VDD_3V3_SENSORS2
+  A5  │ ALT+H     │ ^ │   │  5 │ SPI1_SCK        │ SPI1_SCK_SENSOR1_ICM20602
+  A6  │ IN        │ _ │   │    │ SPI6_MISO       │ SPI6_MISO_EXTERNAL1
+  A7  │ ALT+VH    │ _ │   │ 11 │ ETH_CRS_DV      │ ETH_CRS_DV
+  A8  │ ALT+H     │ _ │   │  1 │ TIM1_CH1        │ FMU_CH4
+  A9  │ IN+PD     │ _ │   │    │ USB_OTG_FS_VBUS │ VBUS_SENSE
+  A10 │ ALT+H     │ ^ │   │  1 │ TIM1_CH3        │ FMU_CH2
+  A11 │ ALT+VH    │ _ │   │ 10 │ USB_OTG_FS_DM   │ USB_D_N
+  A12 │ ALT+VH    │ _ │   │ 10 │ USB_OTG_FS_DP   │ USB_D_P
+  A13 │ ALT+PU+VH │ _ │   │  0 │ SWDIO           │ FMU_SWDIO
+  A14 │ ALT+PD    │ _ │   │  0 │ SWCLK           │ FMU_SWCLK
+  A15 │ OUT       │ ^ │ ^ │    │                 │ SPI6_nCS2_EXTERNAL1
+  B0  │ AN        │   │   │    │ ADC1_IN8        │ SCALED_VDD_3V3_SENSORS3
+  B1  │ AN        │   │   │    │ ADC1_IN9        │ SCALED_V5
+  B2  │ ALT+H     │ _ │   │  7 │ SPI3_MOSI       │ SPI3_MOSI_SENSOR3_BMI088
 ```
 
 You can also regex filter and sort pin names:
 
 ```
 (gdb) px4_gpios -ff US?ART -s name
-PIN  CONFIG     I O  AF  NAME        FUNCTION
-H14  IN         ^        UART4_RX    UART4_RX
-H13  IN         _        UART4_TX    UART4_TX
-C9   ALT        _     7  UART5_CTS   UART5_CTS_TELEM2
-C8   OUT        _ _      UART5_RTS   UART5_RTS_TELEM2
-D2   ALT+PU+VH  ^     8  UART5_RX    UART5_RX_TELEM2
-B9   ALT+PU+VH  ^     7  UART5_TX    UART5_TX_TELEM2
-E10  ALT        ^     8  UART7_CTS   UART7_CTS_TELEM1
-E9   OUT        _ _      UART7_RTS   UART7_RTS_TELEM1
-F6   ALT+PU+VH  ^     8  UART7_RX    UART7_RX_TELEM1
-E8   ALT+PU+VH  ^     8  UART7_TX    UART7_TX_TELEM1
-E0   IN         ^        UART8_RX    UART8_RX_GPS2
-E1   IN         _        UART8_TX    UART8_TX_GPS2
-B15  ALT+PU+VH  ^     4  USART1_RX   USART1_RX_GPS1
-B14  ALT+PU+VH  ^     4  USART1_TX   USART1_TX_GPS1
-D3   IN         ^        USART2_CTS  USART2_CTS_TELEM3
-D4   IN         ^        USART2_RTS  USART2_RTS_TELEM3
-A3   IN         _        USART2_RX   USART2_RX_TELEM3
-D5   IN         ^        USART2_TX   USART2_TX_TELEM3
-D9   ALT+PU+VH  ^     7  USART3_RX   USART3_RX_DEBUG
-D8   ALT+PU+VH  ^     7  USART3_TX   USART3_TX_DEBUG
-C7   ALT+PU+VH  ^     8  USART6_RX   USART6_RX_FROM_IO__RC_INPUT
-C6   ALT+PU+VH  ^     8  USART6_TX   USART6_TX_TO_IO__NC
+      ╷           ╷   ╷   ╷    ╷            ╷
+  Pin │ Config    │ I │ O │ AF │ Name       │ Function
+ ═════╪═══════════╪═══╪═══╪════╪════════════╪═════════════════════════════
+  H14 │ IN        │ ^ │   │    │ UART4_RX   │ UART4_RX
+  H13 │ IN        │ _ │   │    │ UART4_TX   │ UART4_TX
+  C9  │ ALT       │ _ │   │  7 │ UART5_CTS  │ UART5_CTS_TELEM2
+  C8  │ OUT       │ _ │ _ │    │ UART5_RTS  │ UART5_RTS_TELEM2
+  D2  │ ALT+PU+VH │ ^ │   │  8 │ UART5_RX   │ UART5_RX_TELEM2
+  B9  │ ALT+PU+VH │ ^ │   │  7 │ UART5_TX   │ UART5_TX_TELEM2
+  E10 │ ALT       │ ^ │   │  8 │ UART7_CTS  │ UART7_CTS_TELEM1
+  E9  │ OUT       │ _ │ _ │    │ UART7_RTS  │ UART7_RTS_TELEM1
+  F6  │ ALT+PU+VH │ ^ │   │  8 │ UART7_RX   │ UART7_RX_TELEM1
+  E8  │ ALT+PU+VH │ ^ │   │  8 │ UART7_TX   │ UART7_TX_TELEM1
+  E0  │ IN        │ ^ │   │    │ UART8_RX   │ UART8_RX_GPS2
+  E1  │ IN        │ ^ │   │    │ UART8_TX   │ UART8_TX_GPS2
+  B15 │ ALT+PU+VH │ ^ │   │  4 │ USART1_RX  │ USART1_RX_GPS1
+  B14 │ ALT+PU+VH │ ^ │   │  4 │ USART1_TX  │ USART1_TX_GPS1
+  D3  │ IN        │ ^ │   │    │ USART2_CTS │ USART2_CTS_TELEM3
+  D4  │ IN        │ ^ │   │    │ USART2_RTS │ USART2_RTS_TELEM3
+  A3  │ IN        │ ^ │   │    │ USART2_RX  │ USART2_RX_TELEM3
+  D5  │ IN        │ ^ │   │    │ USART2_TX  │ USART2_TX_TELEM3
+  D9  │ ALT+PU+VH │ ^ │   │  7 │ USART3_RX  │ USART3_RX_DEBUG
+  D8  │ ALT+PU+VH │ ^ │   │  7 │ USART3_TX  │ USART3_TX_DEBUG
+  C7  │ ALT+PU+VH │ ^ │   │  8 │ USART6_RX  │ USART6_RX_FROM_IO__RC_INPUT
+  C6  │ ALT+PU+VH │ ^ │   │  8 │ USART6_TX  │ USART6_TX_TO_IO__NC
+      ╵           ╵   ╵   ╵    ╵            ╵
 ```
 
 ### px4_backtrace
