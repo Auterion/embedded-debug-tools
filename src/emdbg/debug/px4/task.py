@@ -403,3 +403,28 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     # Uptime finally
     output += f"Uptime: {Device(gdb).uptime/1e6:.2f}s total, {interval_us/1e6:.2f}s interval\n"
     return table, output
+
+
+def all_files_as_table(gdb, sort_key: str = None) -> Table:
+    tasks = all_tasks(gdb)
+    if not tasks: return "No tasks found!"
+
+    files = {}
+    file_tasks = defaultdict(set)
+    for task in tasks:
+        # Find the file names or just the number of file descriptors
+        for f in task.files:
+            files[int(f["f_inode"])] = f["f_inode"]
+            file_tasks[int(f["f_inode"])].add(task)
+
+    table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+    table.add_column("struct inode*", justify="right", no_wrap=True)
+    table.add_column("i_private*", justify="right", no_wrap=True)
+    table.add_column("Name")
+    table.add_column("Tasks")
+    for addr, inode in files.items():
+        table.add_row(hex(addr),
+                      hex(inode["i_private"]) if inode["i_private"] else "",
+                      task.read_string(inode["i_name"]),
+                      ", ".join(sorted(t.name for t in file_tasks[addr])))
+    return table

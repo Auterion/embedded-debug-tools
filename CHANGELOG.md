@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Add px4_files command for showing open files.
 - Use rich for displaying tables.
 - Save device identifier memories in coredump.
 - Add a pretty-printer for NuttX semaphores.

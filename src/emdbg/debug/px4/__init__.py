@@ -22,7 +22,7 @@ as a function argument so that it can be replaced by
 
 
 
-from .task import all_tasks, all_tasks_as_table, task_switch
+from .task import all_tasks, all_tasks_as_table, all_files_as_table, task_switch
 from .semaphore import Semaphore
 from .device import all_registers, all_registers_as_table, all_gpios_as_table
 from .device import vector_table, vector_table_as_table, Device, coredump

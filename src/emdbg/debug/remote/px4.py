@@ -49,6 +49,18 @@ class PX4_Tasks(gdb.Command):
         print(output)
 
 
+class PX4_Files(gdb.Command):
+    """
+    Print a table of all open files and who is holding them.
+    """
+    def __init__(self):
+        super().__init__("px4_files", gdb.COMMAND_USER)
+
+    @report_exception
+    def invoke(self, argument, from_tty):
+        _CONSOLE.print(px4.all_files_as_table(gdb))
+
+
 class PX4_Registers(gdb.Command):
     """
     Print a table of all Cortex-M registers.
@@ -300,9 +312,11 @@ class PX4_Show_Peripheral(gdb.Command):
     def invoke(self, argument, from_tty):
         gdb.execute(f"arm inspect /hab st {argument}")
 
+
 # Instantiate all user commands
 PX4_Discover()
 PX4_Tasks()
+PX4_Files()
 PX4_Registers()
 PX4_Interrupts()
 PX4_Gpios()

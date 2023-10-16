@@ -181,6 +181,52 @@ Uptime: 19.33s total, 0.62s interval
 ```
 
 
+### px4_files
+
+```
+px4_files
+```
+
+Pretty prints a table of open files and their private data handle.
+
+```
+(gdb) px4_files
+                ╷            ╷                              ╷
+  struct inode* │ i_private* │ Name                         │ Tasks
+ ═══════════════╪════════════╪══════════════════════════════╪═══════════════════════════════════════════════════════════════════════════════════════════════════════════
+     0x2007c070 │ 0x20020570 │ console                      │ Idle Task, commander, dataman, gimbal, gps, hpwork, init, log_writer_file, logger, lpwork, mavlink_if0,
+                │            │                              │ mavlink_if1, mavlink_if2, mavlink_rcv_if0, mavlink_rcv_if1, mavlink_rcv_if2, navigator, wq:I2C2, wq:I2C4,
+                │            │                              │ wq:INS0, wq:SPI1, wq:SPI2, wq:SPI3, wq:ff_escs, wq:hp_default, wq:lp_default, wq:manager,
+                │            │                              │ wq:nav_and_controllers, wq:rate_ctrl, wq:ttyS7
+     0x2007f100 │            │ console_buf                  │ commander, dataman, gimbal, gps, init, log_writer_file, logger, mavlink_if0, mavlink_if1, mavlink_if2,
+                │            │                              │ mavlink_rcv_if0, mavlink_rcv_if1, mavlink_rcv_if2, navigator, wq:I2C2, wq:I2C4, wq:INS0, wq:SPI1,
+                │            │                              │ wq:SPI2, wq:SPI3, wq:ff_escs, wq:hp_default, wq:lp_default, wq:manager, wq:nav_and_controllers,
+                │            │                              │ wq:rate_ctrl, wq:ttyS7
+     0x2007c1c0 │ 0x200201d0 │ ttyS6                        │ mavlink_if1, mavlink_rcv_if1
+     0x2007c130 │ 0x20020000 │ ttyS3                        │ mavlink_if2, mavlink_rcv_if2
+     0x20001600 │ 0x20021228 │ can0                         │ wq:I2C2, wq:I2C4, wq:INS0, wq:SPI1, wq:SPI2, wq:SPI3, wq:ff_escs, wq:hp_default, wq:lp_default,
+                │            │                              │ wq:manager, wq:nav_and_controllers, wq:rate_ctrl, wq:ttyS7
+     0x20001730 │ 0x2002ad00 │ gpin4                        │ wq:I2C2, wq:I2C4, wq:INS0, wq:SPI1, wq:SPI2, wq:SPI3, wq:ff_escs, wq:hp_default, wq:lp_default,
+                │            │                              │ wq:manager, wq:nav_and_controllers, wq:rate_ctrl, wq:ttyS7
+     0x20001760 │ 0x2002ad3c │ gpin5                        │ wq:I2C2, wq:I2C4, wq:INS0, wq:SPI1, wq:SPI2, wq:SPI3, wq:ff_escs, wq:hp_default, wq:lp_default,
+                │            │                              │ wq:manager, wq:nav_and_controllers, wq:rate_ctrl, wq:ttyS7
+     0x20002170 │ 0x200021a0 │ microsd                      │ commander, dataman, log_writer_file, logger
+     0x2005e720 │ 0x2005e6e0 │ pipe1                        │ mavlink, mavlink_shell
+     0x2005e510 │ 0x2005e650 │ pipe0                        │ mavlink, mavlink_if0, mavlink_rcv_if0, mavlink_shell
+     0x2007c160 │ 0x200200e8 │ ttyS4                        │ mavlink_if0, mavlink_rcv_if0
+     0x2001c7b0 │ 0x2001c740 │ vehicle_local_position0      │ navigator
+     0x2003a050 │ 0x2003a010 │ mission0                     │ navigator
+     0x2001a920 │ 0x2001a8c0 │ vehicle_status0              │ navigator
+     0x2000f520 │ 0x2003a190 │ vehicle_roi0                 │ gimbal
+     0x20041010 │ 0x20040fa0 │ position_setpoint_triplet0   │ gimbal
+     0x200410f0 │ 0x20041080 │ gimbal_manager_set_attitude0 │ gimbal
+     0x2007c0a0 │ 0x200203a0 │ ttyS0                        │ gps
+     0x200014b0 │ 0x20001490 │ led0                         │ commander
+     0x2001a4c0 │ 0x2001a450 │ vehicle_command_ack0         │ commander
+                ╵            ╵                              ╵
+```
+
+
 ### px4_switch_task
 
 ```
