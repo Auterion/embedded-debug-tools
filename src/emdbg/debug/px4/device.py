@@ -58,7 +58,16 @@ class Device(Base):
             0x0483: list(range(0x5802_0000, 0x5802_2C01, 0x400)),
         }.get(self.devid, [])
 
-    _SYSTEM_MEMORIES = [(0xE000_0000, 0x10_0000)]
+    @cached_property
+    def _SYSTEM_MEMORIES(self):
+        mems = [(0xE000_0000, 0x10_0000)]
+        mems += {
+            0x0415: [(0x1FFF_7500, 0x100)],
+            0x0451: [(0x1FF0_F420, 0x100), (0x1FFF_7B00, 0x100)],
+            **dict.fromkeys([0x0450, 0x0483],
+                    [(0x1FF1_E800, 0x100), (0x58000524, 4)])
+        }.get(self.devid, [])
+        return mems
 
     @cached_property
     def _PERIPHERALS(self):

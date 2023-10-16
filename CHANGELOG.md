@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Save device identifier memories in coredump.
 - Add a pretty-printer for NuttX semaphores.
 - Fix `gdb_getfield()` function to return the value and not the field.
 - Add optionally reading FLASH when coredumping.
