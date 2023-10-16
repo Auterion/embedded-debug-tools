@@ -140,9 +140,9 @@ class Base:
     def read_string(self, addr: int, encoding: str = None,
                     errors: str = None, length: int = None) -> str:
         """Reads a string of a fixed length, or with 0 termination"""
-        return self.addr_ptr(addr, "char").string(encoding or "utf-8",
-                                                  errors=errors or "ignore",
-                                                  length=length)
+        kwargs = {"encoding": encoding or "ascii", "errors": errors or "ignore"}
+        if length: kwargs["length"] = length
+        return self.addr_ptr(addr, "char").string(**kwargs)
 
     def symtab_line(self, pc: int) -> "gdb.Symtab_and_line":
         """:return: the symbol table and line for a program location"""
