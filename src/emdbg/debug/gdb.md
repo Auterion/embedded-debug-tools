@@ -453,13 +453,14 @@ Breakpoint 2 at 0x800b620: file semaphore/sem_holder.c, line 550.
 ### px4_coredump
 
 ```
-px4_coredump [--memory start:size] [--file coredump_{datetime}.txt]
+px4_coredump [--memory start:size] [--file coredump_{datetime}.txt] [--flash]
 ```
 
 Dumps the memories into a coredump file suffixed with the current date and time.
 The coredump file can be passed to the [CrashDebug](crashdebug.md) debug
 backend. By default, the SRAM memories and all peripherals listed in the SVD
-file of the target are copied.
+file of the target are copied. Optionally, the non-volatile FLASH memory can
+also be dumped for later analysis.
 
 ```
 (gdb) px4_coredump

@@ -242,16 +242,19 @@ class Device(Base):
                 result.append(g)
         return result
 
-    def coredump(self, memories: list[tuple[int, int]] = None) -> tuple[str, int]:
+    def coredump(self, memories: list[tuple[int, int]] = None, with_flash: bool = False) -> tuple[str, int]:
         """
         Reads the memories and registers and returns them as a formatted string
         that is compatible with CrashDebug (see `emdbg.debug.crashdebug`).
 
         :param memories: list of memory ranges (start, size) to dump
+        :param with_flash: also dump the entire non-volatile storage
         :return: coredump formatted as string and coredump size
         """
         if memories is None:
             memories = self._MEMORIES
+        if with_flash and self.flash_size:
+            memories += [(0x0800_0000, self.flash_size)]
         lines = []
         total_size = 0
         for addr, size in memories:
@@ -447,18 +450,20 @@ def vector_table_as_table(gdb, columns: int = 1) -> str:
     return utils.format_table(fmtstr, header, rows, columns)
 
 
-def coredump(gdb, memories: list[tuple[int, int]] = None, filename: Path = None):
+def coredump(gdb, memories: list[tuple[int, int]] = None,
+             with_flash: bool = False, filename: Path = None):
     """
     Dumps the memories and register state into a file.
 
     :param memories: List of (addr, size) tuples that describe which memories to dump.
+    :param with_flash: Also dump the entire non-volatile storage.
     :param filename: Target filename, or `coredump_{datetime}.txt` by default.
     """
     if filename is None:
         filename = utils.add_datetime("coredump.txt")
     print("Starting coredump...", flush=True)
     start = time.perf_counter()
-    output, size = Device(gdb).coredump(memories)
+    output, size = Device(gdb).coredump(memories, with_flash)
     Path(filename).write_text(output)
     end = time.perf_counter()
     print(f"Dumped {size//1000}kB in {(end - start):.1f}s ({int(size/((end - start)*1000))}kB/s)")

@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Add optionally reading FLASH when coredumping.
 - Fix `px4.Base.read_string()` function when length is unknown.
 - Search for ELF file in bench target folder.
 - Fix accessing open files of tasks.

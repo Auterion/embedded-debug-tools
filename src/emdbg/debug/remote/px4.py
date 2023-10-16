@@ -159,6 +159,8 @@ class PX4_Coredump(gdb.Command):
         self.parser = argparse.ArgumentParser(self.__doc__)
         self.parser.add_argument("--memory", action="append",
                                  help="Memory range in `start:size` format.")
+        self.parser.add_argument("--flash", action="store_true", default=False,
+                                 help="Also dump the non-volatile memory.")
         self.parser.add_argument("--file",
                                  help="Coredump filename, defaults to `coredump_{datetime}.txt`.")
 
@@ -168,7 +170,7 @@ class PX4_Coredump(gdb.Command):
         memories = None
         if args.memory:
             memories = [[int(h, 0) for h in m.split(":")] for m in args.memory]
-        px4.coredump(gdb, memories, args.file)
+        px4.coredump(gdb, memories, args.flash, args.file)
 
 
 class PX4_Watch_Peripheral(gdb.Command):
