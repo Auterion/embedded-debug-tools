@@ -15,7 +15,7 @@ def gdb_getfield(value: "gdb.Value", name: str, default=None):
     """Find the field of a struct/class by name"""
     for f in value.type.fields():
         if name == f.name:
-            return f
+            return value[name]
     return default
 
 
