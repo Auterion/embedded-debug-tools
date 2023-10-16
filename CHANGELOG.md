@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Search for ELF file in bench target folder.
 - Fix accessing open files of tasks.
 - Add support for ORBTrace mini debug probe.
 

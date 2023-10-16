@@ -171,7 +171,13 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     else:
         raise ValueError(f"Unknown backend '{backend}'!")
 
-    elf = px4_dir / f"build/{target}/{target}.elf"
+    if Path(target).suffix == ".elf":
+        elf = Path(target)
+    else:
+        elf = next((px4_dir / "build" / target).glob("*.elf"), None)
+        if elf is None:
+            raise ValueError(f"Cannot find ELF file in build folder '{px4_dir}/build/{target}'!")
+
     cmds = [f"dir {px4_dir}",
             f"source {data_dir}/fmu.gdb",
             f"python px4._TARGET='{target.lower()}'"]
@@ -203,6 +209,7 @@ def debug(px4_directory: Path, target: str, serial: str = None,
 
     :param px4_directory: path to the PX4-Autopilot repository you want to debug.
     :param target: target name as a string, for example, `px4_fmu-v5x`.
+                   Can also be a path to an ELF file.
     :param serial: optional serial number of the USB-Serial bridge for the NSH.
                    If `None`, then `Fmu.nsh` is empty and cannot be used.
     :param digilent: optional serial number of the Digilent. If `None`, then
