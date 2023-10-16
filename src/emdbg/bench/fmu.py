@@ -147,17 +147,18 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
                 ui: str = None, speed: int = 16000, backend: str = None) -> tuple:
     if "fmu-v5x" in target:
         device = "STM32F765II"
-        config = "fmu_v5x.cfg"
+        config = "fmu_v5x"
     elif "fmu-v6x" in target:
         device = "STM32H753II"
-        config = "fmu_v6x.cfg"
+        config = "fmu_v6x"
     else:
         raise ValueError(f"Unknown device for '{target}'!")
 
     px4_dir = Path(px4_directory).absolute().resolve()
     data_dir = Path(__file__).parent.resolve() / "data"
 
-    if backend == "openocd":
+    if backend in ["stlink", "orbtrace"]:
+        config += f"_{backend}.cfg"
         backend_obj = emdbg.debug.OpenOcdBackend(config=[data_dir / config])
     elif backend == "jlink":
         rtos_so = px4_dir / f"platforms/nuttx/NuttX/nuttx/tools/jlink-nuttx.so"
@@ -296,10 +297,15 @@ def _arguments(description, modifier=None):
         action="store_true",
         help="Use a J-Link debug probe")
     group.add_argument(
-        "--openocd",
+        "--stlink",
         default=False,
         action="store_true",
-        help="Use an OpenOCD debug probe")
+        help="Use an STLink debug probe")
+    group.add_argument(
+        "--orbtrace",
+        default=False,
+        action="store_true",
+        help="Use an ORBtrace mini debug probe")
     group.add_argument(
         "--remote",
         help="Connect to a remote GDB server: 'IP:PORT'")
@@ -327,8 +333,9 @@ def _arguments(description, modifier=None):
     args = parser.parse_args()
     emdbg.logger.configure(args.verbosity)
     backend = args.remote
-    if args.openocd: backend = "openocd"
+    if args.stlink: backend = "stlink"
     if args.jlink: backend = "jlink"
+    if args.orbtrace: backend = "orbtrace"
     if args.coredump: backend = args.coredump
     return args, backend
 

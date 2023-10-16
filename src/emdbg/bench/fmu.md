@@ -89,10 +89,12 @@ To quickly debug something interactively on the test bench, you can launch GDB
 directly with the debug backend of your choice:
 
 - `--jlink`: connect via J-Link debug probe.
-- `--openocd`: connect via STLink debug probe.
+- `--stlink`: connect via STLink debug probe.
+- `--orbtrace`: connect via Orbtrace mini debug probe.
 - `--coredump`: Use the CrashDebug backend with a coredump or PX4 hardfault log.
 
 ```sh
 python3 -m emdbg.bench.fmu --px4-dir path/to/PX4-Autopilot \
-    --target px4_fmu-v5x -ui tui --openocd
+    --target px4_fmu-v5x -ui tui --stlink
 ```
+

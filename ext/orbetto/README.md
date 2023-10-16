@@ -78,7 +78,7 @@ Launch GDB inside your PX4-Autopilot source code directory:
 
 ```sh
 # cd PX4-Autopilot
-python3 -m emdbg.bench.fmu --target px4_fmu-v5x --openocd
+python3 -m emdbg.bench.fmu --target px4_fmu-v5x --stlink
 ```
 
 Reset your target and start the capture:

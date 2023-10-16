@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Add support for ORBTrace mini debug probe.
+
 ## 1.2.1
 
 - emdbg.bench.fmu can load coredump or PX4 hardfault files directly.

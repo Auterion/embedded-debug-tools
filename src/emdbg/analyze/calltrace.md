@@ -38,6 +38,6 @@ registers!
 python3 -m emdbg.patch nuttx_sdmmc_reg_access --apply -v
 make px4_fmu-v5x
 python3 -m emdbg.analyze.calltrace -v --target px4_fmu-v5x --type FileSystem \
-    --sample 180 --ex load --ex "mon reset halt" --ex px4_calltrace_sdmmc --openocd
+    --sample 180 --ex load --ex "mon reset halt" --ex px4_calltrace_sdmmc --stlink
 # Get a coffee, this is gonna take a while, then check for a calltrace_*.svg file
 ```

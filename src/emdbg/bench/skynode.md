@@ -15,5 +15,5 @@ directly:
 
 ```sh
 python3 -m emdbg.bench.skynode --px4-dir path/to/PX4-Autopilot \
-	--target px4_fmu-v5x -ui tui --openocd
+	--target px4_fmu-v5x -ui tui --stlink
 ```
