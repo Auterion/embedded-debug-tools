@@ -180,12 +180,13 @@ class Task(Base):
         """The list of inode pointers the task holds"""
         filelist = self._tcb["group"]["tg_filelist"]
         rows = filelist["fl_rows"]
-        files = filelist["fl_files"].dereference()
+        files = filelist["fl_files"]
         result = []
-        for ii in range(rows * self._FILE_DESCRIPTORS_PER_BLOCK):
-            file = files[ii]
-            if inode := file["f_inode"]:
-                result.append(file)
+        for ri in range(rows):
+            for ci in range(self._FILE_DESCRIPTORS_PER_BLOCK):
+                file = files[ri][ci]
+                if inode := file["f_inode"]:
+                    result.append(file)
         return result
 
     @cached_property

@@ -2,6 +2,7 @@
 
 ## 1.3.0
 
+- Fix accessing open files of tasks.
 - Add support for ORBTrace mini debug probe.
 
 ## 1.2.1
