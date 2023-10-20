@@ -122,7 +122,8 @@ class PX4_Gpios(gdb.Command):
                 if args.function_filter is not None and not re.search(args.function_filter, row[6]):
                     return False
             return True
-        _CONSOLE.print(px4.all_gpios_as_table(gdb, pinout, pin_filter, self.header.index(args.sort), columns))
+        sort_by = self.header.index(args.sort) if args.sort is not None else None
+        _CONSOLE.print(px4.all_gpios_as_table(gdb, pinout, pin_filter, sort_by, columns))
 
 
 class PX4_Backtrace(gdb.Command):

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Fix `px4_gpio` default sort key indexing.
+
 ## 1.3.0
 
 - Add px4_files command for showing open files.
