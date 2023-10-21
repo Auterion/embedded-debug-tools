@@ -381,7 +381,8 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
                task.load.total//1000, f"{(relative * 100):.1f}",
                Text.assemble((str(task.stack_used) if with_stack_usage else "", "bold red" if stack_overflow else "")),
                Text.assemble((str(task.stack_limit), "bold" if stack_overflow else "")),
-               task.sched_priority, task.init_priority, file_description, task.short_state]
+               Text.assemble((str(task.sched_priority), "bold red" if task.sched_priority > task.init_priority else "")),
+               task.init_priority, file_description, task.short_state]
         if with_waiting:
             row.append(task.waiting_for)
         rows.append(row)

@@ -2,6 +2,7 @@
 
 ## 1.3.1
 
+- Highlight priority boosts in `px4_tasks` command.
 - Fix `px4_tasks` and `px4_files` rendering when no tasks are present.
 - Fix `px4_gpio` default sort key indexing.
 
