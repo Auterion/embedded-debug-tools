@@ -45,8 +45,11 @@ class PX4_Tasks(gdb.Command):
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
         table, output = px4.all_tasks_as_table(gdb, with_file_names=args.files)
-        _CONSOLE.print(table)
-        print(output)
+        if table is not None:
+            _CONSOLE.print(table)
+            print(output)
+        else:
+            print("No tasks found!")
 
 
 class PX4_Files(gdb.Command):
@@ -58,7 +61,11 @@ class PX4_Files(gdb.Command):
 
     @report_exception
     def invoke(self, argument, from_tty):
-        _CONSOLE.print(px4.all_files_as_table(gdb))
+        table = px4.all_files_as_table(gdb)
+        if table is not None:
+            _CONSOLE.print(table)
+        else:
+            print("No tasks found!")
 
 
 class PX4_Registers(gdb.Command):

@@ -325,14 +325,17 @@ def task_switch(gdb, pid: int) -> bool:
 
 
 def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
-                       with_file_names: bool = True,
-                       with_waiting: bool = True) -> tuple[Table, str]:
+                       with_file_names: bool = True, with_waiting: bool = True) \
+                                    -> tuple[Table, str] | tuple[None, None]:
     """
-    Return a table similar to the NSH top command, but at debug time.
+    Return a table of running tasks similar to the NSH top command.
 
     :param sort_key: optional lambda function to sort the table rows.
-    :param with_waiting: show what the task is waiting for.
+    :param with_stack_usage: compute and show the task stack usage.
     :param with_file_names: show what files the task has open.
+    :param with_waiting: show what the task is waiting for.
+
+    :return: The task table and additional output. If no tasks are found, return `None`.
     """
     table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
     table.add_column("struct tcb_s*", justify="right", no_wrap=True)
@@ -351,7 +354,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     if with_waiting: table.add_column("Waiting For")
 
     tasks = all_tasks(gdb)
-    if not tasks: return "No tasks found!"
+    if not tasks: return None, None
     interval_us = tasks[0].load.interval
     if not interval_us:
         start, *_ = tasks[0]._system_load.sample
@@ -405,9 +408,16 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     return table, output
 
 
-def all_files_as_table(gdb, sort_key: str = None) -> Table:
+def all_files_as_table(gdb, sort_key: str = None) -> Table | None:
+    """
+    Return a table of open files owned by tasks.
+
+    :param sort_key: optional lambda function to sort the table rows.
+
+    :return: The file table or `None` if no tasks exist.
+    """
     tasks = all_tasks(gdb)
-    if not tasks: return "No tasks found!"
+    if not tasks: return None
 
     files = {}
     file_tasks = defaultdict(set)
@@ -416,15 +426,19 @@ def all_files_as_table(gdb, sort_key: str = None) -> Table:
         for f in task.files:
             files[int(f["f_inode"])] = f["f_inode"]
             file_tasks[int(f["f_inode"])].add(task)
-
+    # Format the rows
+    rows = []
+    for addr, inode in files.items():
+        rows.append((hex(addr),
+                     hex(inode["i_private"]) if inode["i_private"] else "",
+                     task.read_string(inode["i_name"]),
+                     ", ".join(sorted(t.name for t in file_tasks[addr]))))
+    # sort and add rows
     table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
     table.add_column("struct inode*", justify="right", no_wrap=True)
     table.add_column("i_private*", justify="right", no_wrap=True)
     table.add_column("Name")
     table.add_column("Tasks")
-    for addr, inode in files.items():
-        table.add_row(hex(addr),
-                      hex(inode["i_private"]) if inode["i_private"] else "",
-                      task.read_string(inode["i_name"]),
-                      ", ".join(sorted(t.name for t in file_tasks[addr])))
+    for row in sorted(rows, key=lambda l: l[2] if sort_key is None else sort_key):
+        table.add_row(*row)
     return table
