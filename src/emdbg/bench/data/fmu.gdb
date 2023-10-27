@@ -171,42 +171,6 @@ define px4_calltrace_semaphore_boosts
     end
 end
 
-define px4_trace_swo_gdb
-    # send out sync packets every CYCCNT[28] ~268M cycles
-    dwtSyncTap 3
-    # enable the CYCCNT
-    dwtCycEna 1
-    # enable exception tracing
-    dwtTraceException 1
-    # Set POSTCNT source to CYCCNT[10] /1024
-    dwtPostTap 1
-    # Set POSTCNT init/reload value to /1 -> every 1024*2=1024 cycles = 9.5µs
-    dwtPostReset 2
-    # enable PC sampling
-    dwtSamplePC 0
-
-    # Set the ITM ID to 1
-    ITMId 1
-    # Use processor clock
-    ITMSWOEna 0
-    # send global timestamp every 8192 cycles ~38µs, STM32 doesn't support this
-    # ITMGTSFreq 2
-    # timestamp prescaler /64, STM32 doesn't support this
-    # ITMTSPrescale 3
-    # Enable local timestamp generation
-    ITMTSEna 1
-    # DWT packets are forwarded to the ITM
-    ITMTXEna 1
-    # Sync packets are transmitted
-    ITMSYNCEna 1
-    # Enable tasks, workqueues, heap
-    ITMTER 0 0x001F801B
-    # Enable tasks and workqueues
-    # ITMTER 0 0x0001801B
-    # Enable the ITM
-    ITMEna 1
-end
-
 define px4_trace_swo_v6x_gdb
     # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
     set *0xE00E1004 |= 0x00700000;
