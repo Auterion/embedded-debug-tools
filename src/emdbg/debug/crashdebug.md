@@ -88,7 +88,23 @@ passed a NULL pointer from inside `uORB::DeviceNode::write`.
 ## Installation
 
 You need to have the [platform-specific `CrashDebug` binary][binary] available
-in your path, alternatively you can specify the binary path in your environment:
+in your path:
+
+```sh
+# x86_64 macOS
+curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/osx64/CrashDebug \
+        /usr/local/bin/CrashDebug
+# Clear the quarantine flag
+sudo xattr -r -d com.apple.quarantine /usr/local/bin/CrashDebug
+
+# ARM64 macOS
+curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/osx64/CrashDebug \
+        /opt/homebrew/bin/CrashDebug
+# Clear the quarantine flag
+sudo xattr -r -d com.apple.quarantine /opt/homebrew/bin/CrashDebug
+```
+
+Alternatively you can specify the binary path in your environment:
 
 ```sh
 export PX4_CRASHDEBUG_BINARY=path/to/CrashDebug

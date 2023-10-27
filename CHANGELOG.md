@@ -2,6 +2,7 @@
 
 ## 1.3.2
 
+- Improve installation guides for GDB and CrashDebug.
 - Create a new `trace.swo` file when using OpenOCD instead of appending.
 - Fix broken ITM tracing macro.
 
