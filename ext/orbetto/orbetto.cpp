@@ -80,11 +80,11 @@ struct
 
 } options =
 {
-    .forceITMSync = true,
     .tpiuChannel = 1,
+    .forceITMSync = true,
+    .tsTrigger = DEFAULT_TS_TRIGGER,
     .port = NWCLIENT_SERVER_PORT,
-    .server = (char *)"localhost",
-    .tsTrigger = DEFAULT_TS_TRIGGER
+    .server = (char *)"localhost"
 };
 
 struct
@@ -1382,7 +1382,7 @@ int main( int argc, char *argv[] )
     if ( options.elfFile )
     {
         /* Only load memory for now */
-        _r.symbols = symbolAqquire(options.elfFile, false, true, false);
+        _r.symbols = symbolAcquire(options.elfFile, false, true, false);
         assert( _r.symbols );
         printf("Loaded ELF file %s with %u sections\n", options.elfFile, _r.symbols->nsect_mem);
         for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)

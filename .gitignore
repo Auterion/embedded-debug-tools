@@ -6,5 +6,7 @@ eggs/
 dist/
 /ext/orbetto/subprojects/perfetto/perfetto_src
 /ext/orbetto/subprojects/orbuculum
+/ext/orbetto/subprojects/libdwarf*
+/ext/orbetto/subprojects/packagecache
 /ext/orbetto/*.perf
 /ext/orbetto/*.debug

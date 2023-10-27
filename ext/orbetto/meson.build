@@ -1,4 +1,4 @@
-project('orbuculum', ['c', 'cpp'], default_options: ['cpp_std=c++20'])
+project('orbetto', ['c', 'cpp'], default_options: ['cpp_std=c++20'])
 
 orbuculum = subproject('orbuculum')
 liborb = orbuculum.get_variable('liborb')
@@ -13,8 +13,8 @@ executable('orbetto',
         'loadelf.c',
         git_version_info_h,
     ],
-    include_directories: include_directories(['subprojects/orbuculum/Inc', 'subprojects/perfetto', '.']),
-    dependencies: [dependency('protobuf'), dependency('libelf'), dependency('libdwarf')],
+    include_directories: include_directories(['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external', 'subprojects/perfetto']),
+    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
     link_with: [liborb, libperfetto_protos],
     install: true,
 )
