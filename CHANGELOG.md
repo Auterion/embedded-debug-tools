@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Fix broken ITM tracing macro.
+
 ## 1.3.1
 
 - Highlight priority boosts in `px4_tasks` command.

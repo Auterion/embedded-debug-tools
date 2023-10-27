@@ -73,7 +73,7 @@ enum
 
 #define EMDBG_HEAP_ADDREGION(start, size) \
     { emdbg_itm32_block(EMDBG_HEAP_REGIONS, (uint32_t)start | 0x80000000); \
-      emdbg_itm_block(EMDBG_HEAP_REGIONS, (uint32_t)size);
+      emdbg_itm_block(EMDBG_HEAP_REGIONS, (uint32_t)size); }
 
 #define EMDBG_HEAP_MALLOC(size) \
     emdbg_itm_block(EMDBG_HEAP_MALLOC_ATTEMPT, (uint32_t)size)
