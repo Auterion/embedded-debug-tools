@@ -8,6 +8,7 @@ end
 
 define px4_trace_swo_stm32f7
     px4_reset
+    shell rm -f trace.swo
     monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
     monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
     monitor itm.tpiu enable
