@@ -387,6 +387,7 @@ class PX4_Reload(gdb.Command):
         importlib.reload(px4.device)
         importlib.reload(px4.data)
         importlib.reload(px4.semaphore)
+        importlib.reload(px4.buffer)
         importlib.reload(px4.svd)
         importlib.reload(px4.system_load)
         importlib.reload(px4.task)
@@ -401,5 +402,7 @@ def _px4_print_semaphore(val):
     stype = str(val.type)
     if stype == "sem_t" or stype == "struct sem_s":
         return px4.Semaphore(gdb, val)
+    if stype == "struct uart_buffer_s":
+        return px4.UartBuffer(gdb, val)
     return None
 gdb.pretty_printers.append(_px4_print_semaphore)
