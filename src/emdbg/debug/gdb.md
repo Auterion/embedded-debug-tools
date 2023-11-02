@@ -18,7 +18,8 @@ We strongly recommend to *only* symlink the `arm-none-eabi-gdb-py3` binary into
 your path, and keep the remaining `arm-none-eabi-gcc` at v9 as done for PX4.
 
 ```sh
-sudo -u {username} mkdir -p /opt/xpack
+sudo install -d -o $USER /opt/xpack
+
 curl -L https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v12.2.1-1.2/xpack-arm-none-eabi-gcc-12.2.1-1.2-linux-x64.tar.gz | \
         tar -xvzf - -C /opt/xpack/
 # Only link the -py3 into your path
@@ -29,32 +30,19 @@ ln -s /opt/xpack/xpack-arm-none-eabi-gcc-12.2.1-1.2/bin/arm-none-eabi-gdb-py3 \
 On macOS you additionally need to clear the quarantine flags after expansion:
 
 ```sh
-sudo -u {username} mkdir -p /opt/xpack
+sudo install -d -o $USER /opt/xpack
 
-# x86_64 binary
-curl -L https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v12.2.1-1.2/xpack-arm-none-eabi-gcc-12.2.1-1.2-darwin-x64.tar.gz | \
-        tar -xvzf - -C /opt/xpack/
-# ARM64 binary
-curl -L https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v12.2.1-1.2/xpack-arm-none-eabi-gcc-12.2.1-1.2-darwin-arm64.tar.gz | \
+if [[ $(arch) == 'arm64' ]]; then export gdbarch='arm'; else export gdbarch='x'; fi
+curl -L "https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/download/v12.2.1-1.2/xpack-arm-none-eabi-gcc-12.2.1-1.2-darwin-${gdbarch}64.tar.gz" | \
         tar -xvzf - -C /opt/xpack/
 
 # Clear the quarantine flag
 sudo xattr -r -d com.apple.quarantine /opt/xpack/
 
 # Only link the -py3 into your path
-# x86_64 path
 ln -s /opt/xpack/xpack-arm-none-eabi-gcc-12.2.1-1.2/bin/arm-none-eabi-gdb-py3 \
-      /usr/local/bin/arm-none-eabi-gdb-py3
-# ARM64 path
-ln -s /opt/xpack/xpack-arm-none-eabi-gcc-12.2.1-1.2/bin/arm-none-eabi-gdb-py3 \
-      /opt/homebrew/bin/arm-none-eabi-gdb-py3
+      $HOMEBREW_PREFIX/bin/arm-none-eabi-gdb-py3
 ```
-
-> **Note**
-> You need to have the Rosetta emulation layer installed on ARM64 macOS:
-> ```sh
-> softwareupdate --install-rosetta --agree-to-license
-> ```
 
 
 ## Command Line Interface

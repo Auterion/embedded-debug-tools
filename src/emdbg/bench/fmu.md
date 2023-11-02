@@ -95,6 +95,9 @@ directly with the debug backend of your choice:
 
 ```sh
 python3 -m emdbg.bench.fmu --px4-dir path/to/PX4-Autopilot \
-    --target px4_fmu-v5x -ui tui --stlink
+    --target px4_fmu-v5x_default -ui tui --stlink
+
+python3 -m emdbg.bench.fmu --px4-dir path/to/PX4-Autopilot \
+    --target px4_fmu-v6x_default --coredump px4_hardfault.log
 ```
 

@@ -91,17 +91,10 @@ You need to have the [platform-specific `CrashDebug` binary][binary] available
 in your path:
 
 ```sh
-# x86_64 macOS
 curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/osx64/CrashDebug \
-        /usr/local/bin/CrashDebug
+        $HOMEBREW_PREFIX/bin/CrashDebug
 # Clear the quarantine flag
-sudo xattr -r -d com.apple.quarantine /usr/local/bin/CrashDebug
-
-# ARM64 macOS
-curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/osx64/CrashDebug \
-        /opt/homebrew/bin/CrashDebug
-# Clear the quarantine flag
-sudo xattr -r -d com.apple.quarantine /opt/homebrew/bin/CrashDebug
+sudo xattr -r -d com.apple.quarantine $HOMEBREW_PREFIX/bin/CrashDebug
 ```
 
 Alternatively you can specify the binary path in your environment:
@@ -109,6 +102,12 @@ Alternatively you can specify the binary path in your environment:
 ```sh
 export PX4_CRASHDEBUG_BINARY=path/to/CrashDebug
 ```
+
+> **Note**
+> You need to have the Rosetta emulation layer installed on ARM64 macOS:
+> ```sh
+> softwareupdate --install-rosetta --agree-to-license
+> ```
 
 [crashdebug]: https://github.com/adamgreen/CrashDebug
 [binary]: https://github.com/adamgreen/CrashDebug/tree/master/bins
