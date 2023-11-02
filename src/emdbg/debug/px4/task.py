@@ -15,7 +15,7 @@ from rich.table import Table
 
 # The mapping from register name to position on the thread stack
 _XCP_REGS_MAP: dict[str, int] = {
-    "r13":     0,
+    "msp":     0,
     "basepri": 1,
     "r4":      2,
     "r5":      3,

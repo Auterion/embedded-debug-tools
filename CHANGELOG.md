@@ -2,6 +2,7 @@
 
 ## 1.3.3
 
+- Set MSP in addition to SP to get proper task switches also on OpenOCD.
 - Fix semaphore pretty printer: 0 also means taken, not available.
 
 ## 1.3.2

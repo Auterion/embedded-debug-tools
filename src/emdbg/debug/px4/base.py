@@ -58,8 +58,11 @@ class Base:
         for name, value in values.items():
             #
             if name in ["control", "faultmask", "primask"]: continue
-            # GDB does not know SP, only R13
-            if name == "sp": name = "r13"
+            # GDB does not know SP, only MSP and PSP
+            if name in ["sp", "r13"]:
+                name = "msp"
+            if name == "msp":
+                self.write_register("r13", value)
             # Remove double FP registers
             if name.startswith("d"): continue
             self.write_register(name, value)
