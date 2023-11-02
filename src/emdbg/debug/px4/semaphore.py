@@ -55,10 +55,8 @@ class Semaphore(Base):
 
     def to_string(self) -> str:
         sc = self.count
-        ostr = f"{sc}{'i' if self.has_priority_inheritance else ''} "
-        ostr += "waiting" if sc < 0 else "available"
+        state = "taken" if sc <= 0 else "available"
+        ostr = f"{state} ({sc}{'i' if self.has_priority_inheritance else ''})"
         if hstr := [f"{h.count}x {h.task.name}" for h in self.holders]:
-            ostr += f": {', '.join(hstr)}"
+            ostr += f" holders: {', '.join(hstr)}"
         return ostr
-
-

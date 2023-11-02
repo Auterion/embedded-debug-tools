@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.3
+
+- Fix semaphore pretty printer: 0 also means taken, not available.
+
 ## 1.3.2
 
 - Improve installation guides for GDB and CrashDebug.
