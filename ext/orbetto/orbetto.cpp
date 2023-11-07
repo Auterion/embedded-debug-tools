@@ -53,7 +53,7 @@ enum TSType { TSNone, TSAbsolute, TSRelative, TSDelta, TSStamp, TSStampDelta, TS
 const char *tsTypeString[TSNumTypes] = { "None", "Absolute", "Relative", "Delta", "System Timestamp", "System Timestamp Delta" };
 
 // Record for options, either defaults or from command line
-struct
+struct Options
 {
     /* Config information */
     bool useTPIU;
@@ -73,9 +73,11 @@ struct
     char *server;
 
     char *file;                              /* File host connection */
+    std::string std_file;
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
     char *elfFile;
+    std::string std_elfFile;
     bool outputDebugFile;
 
 } options =
@@ -969,253 +971,6 @@ static struct option _longOptions[] =
     {NULL, no_argument, NULL, 0}
 };
 // ====================================================================================================
-bool _processOptions( int argc, char *argv[] )
-
-{
-    int c, optionIndex = 0;
-    unsigned int chan;
-    char *chanIndex;
-#define DELIMITER ','
-
-    while ( ( c = getopt_long ( argc, argv, "c:C:Ef:de:g:hVns:t:T:v:", _longOptions, &optionIndex ) ) != -1 )
-        switch ( c )
-        {
-            // ------------------------------------
-            case 'C':
-                options.cps = atoi( optarg ) * 1000;
-                break;
-
-            // ------------------------------------
-            case 'h':
-                _printHelp( argv[0] );
-                return false;
-
-            // ------------------------------------
-            case 'V':
-                _printVersion();
-                return false;
-
-            // ------------------------------------
-            case 'E':
-                options.endTerminate = true;
-                break;
-
-            // ------------------------------------
-            case 'd':
-                options.outputDebugFile = true;
-                break;
-
-            // ------------------------------------
-            case 'f':
-                options.file = optarg;
-                break;
-
-            // ------------------------------------
-            case 'g':
-                printf( "%s" EOL, optarg );
-                options.tsTrigger = genericsUnescape( optarg )[0];
-                break;
-
-            // ------------------------------------
-            case 'n':
-                options.forceITMSync = false;
-                break;
-
-            // ------------------------------------
-            case 'e':
-                options.elfFile = optarg;
-                break;
-
-            // ------------------------------------
-            case 's':
-            {
-                options.server = optarg;
-                // See if we have an optional port number too
-                char *a = optarg;
-
-                while ( ( *a ) && ( *a != ':' ) )
-                {
-                    a++;
-                }
-
-                if ( *a == ':' )
-                {
-                    *a = 0;
-                    options.port = atoi( ++a );
-                }
-
-                if ( !options.port )
-                {
-                    options.port = NWCLIENT_SERVER_PORT;
-                }
-
-                break;
-            }
-
-            // ------------------------------------
-            case 't':
-                options.useTPIU = true;
-                options.tpiuChannel = atoi( optarg );
-                break;
-
-            // ------------------------------------
-            case 'T':
-                switch ( *optarg )
-                {
-                    case 'a':
-                        options.tsType = TSAbsolute;
-                        break;
-
-                    case 'r':
-                        options.tsType = TSRelative;
-                        break;
-
-                    case 'd':
-                        options.tsType = TSDelta;
-                        break;
-
-                    case 's':
-                        options.tsType = TSStamp;
-                        break;
-
-                    case 't':
-                        options.tsType = TSStampDelta;
-                        break;
-
-                    default:
-                        genericsReport( V_ERROR, "Unrecognised Timestamp type" EOL );
-                        return false;
-                }
-
-                break;
-
-            // ------------------------------------
-            case 'v':
-                if ( !isdigit( *optarg ) )
-                {
-                    genericsReport( V_ERROR, "-v requires a numeric argument." EOL );
-                    return false;
-                }
-
-                genericsSetReportLevel( (enum verbLevel)atoi( optarg ) );
-                break;
-
-            // ------------------------------------
-            /* Individual channel setup */
-            case 'c':
-                chanIndex = optarg;
-
-                chan = atoi( optarg );
-
-                if ( chan >= NUM_CHANNELS )
-                {
-                    genericsReport( V_ERROR, "Channel index out of range" EOL );
-                    return false;
-                }
-
-                /* Scan for format */
-                while ( ( *chanIndex ) && ( *chanIndex != DELIMITER ) )
-                {
-                    chanIndex++;
-                }
-
-                /* Step over delimiter */
-                chanIndex++;
-
-                /* Scan past any whitespace */
-                while ( ( *chanIndex ) && ( isspace( *chanIndex ) ) )
-                {
-                    chanIndex++;
-                }
-
-                if ( !*chanIndex )
-                {
-                    genericsReport( V_ERROR, "No output format for channel %d (avoid spaces before the output spec)" EOL, chan );
-                    return false;
-                }
-
-                //*chanIndex++ = 0;
-                options.presFormat[chan] = strdup( genericsUnescape( chanIndex ) );
-                break;
-
-            // ------------------------------------
-            case '?':
-                if ( optopt == 'b' )
-                {
-                    genericsReport( V_ERROR, "Option '%c' requires an argument." EOL, optopt );
-                }
-                else if ( !isprint ( optopt ) )
-                {
-                    genericsReport( V_ERROR, "Unknown option character `\\x%x'." EOL, optopt );
-                }
-
-                return false;
-
-            // ------------------------------------
-            default:
-                return false;
-                // ------------------------------------
-        }
-
-    if ( ( options.useTPIU ) && ( !options.tpiuChannel ) )
-    {
-        genericsReport( V_ERROR, "TPIU set for use but no channel set for ITM output" EOL );
-        return false;
-    }
-
-    genericsReport( V_INFO, "orbcat version " GIT_DESCRIBE EOL );
-    genericsReport( V_INFO, "Server     : %s:%d" EOL, options.server, options.port );
-    genericsReport( V_INFO, "ForceSync  : %s" EOL, options.forceITMSync ? "true" : "false" );
-    genericsReport( V_INFO, "Timestamp  : %s" EOL, tsTypeString[options.tsType] );
-
-    if ( options.cps )
-    {
-        genericsReport( V_INFO, "S-CPU Speed: %d KHz" EOL, options.cps );
-    }
-
-    if ( options.tsType != TSNone )
-    {
-        char unesc[2] = {options.tsTrigger, 0};
-        genericsReport( V_INFO, "TriggerChr : '%s'" EOL, genericsEscape( unesc ) );
-    }
-
-    if ( options.file )
-    {
-
-        genericsReport( V_INFO, "Input File : %s", options.file );
-
-        if ( options.endTerminate )
-        {
-            genericsReport( V_INFO, " (Terminate on exhaustion)" EOL );
-        }
-        else
-        {
-            genericsReport( V_INFO, " (Ongoing read)" EOL );
-        }
-    }
-
-    if ( options.useTPIU )
-    {
-        genericsReport( V_INFO, "Using TPIU : true (ITM on channel %d)" EOL, options.tpiuChannel );
-    }
-    else
-    {
-        genericsReport( V_INFO, "Using TPIU : false" EOL );
-    }
-
-    genericsReport( V_INFO, "Channels   :" EOL );
-
-    for ( int g = 0; g < NUM_CHANNELS; g++ )
-    {
-        if ( options.presFormat[g] )
-        {
-            genericsReport( V_INFO, "             %02d [%s]" EOL, g, genericsEscape( options.presFormat[g] ) );
-        }
-    }
-
-    return true;
-}
-// ====================================================================================================
 static struct Stream *_tryOpenStream()
 {
     if ( options.file != NULL )
@@ -1365,16 +1120,20 @@ static void _feedStream( struct Stream *stream )
 
 // ====================================================================================================
 
-int main( int argc,  char *argv[])
+int main()
 
 {
-    printf("Arguments Count: '%d' \n",argc);
     bool alreadyReported = false;
-
+    /*
+    printf("Arguments Count: '%d' \n",argc);
     if ( !_processOptions( argc, argv ) )
+
+
     {
         exit( -1 );
     }
+    */
+
 
     /* Reset the TPIU handler before we start */
     TPIUDecoderInit( &_r.t );
@@ -1444,15 +1203,17 @@ int main( int argc,  char *argv[])
 
     return 0;
 }
-void main_pywrapper(int argc, std::vector<std::string> std_argv){
-    char** argv = new char*[std_argv.size() + 1]; // +1 for nullptr
-    // Copy the strings from std::vector to char*
-    for (size_t i = 0; i < std_argv.size(); ++i) {
-        // Allocate memory for each char* and copy the content
-        argv[i] = new char[std_argv[i].size() + 1]; // +1 for null-terminator
-        std::strcpy(argv[i], std_argv[i].c_str());
-    }
-    argv[std_argv.size()] = nullptr;
-    main(argc,argv);
+void main_pywrapper(Options py_op){
+    // printf("Options TPIU: %i",(int)py_op.endTerminate);
+    // printf("SWO File Directory: %s\n",py_op.std_file.c_str());
+    //printf("Elf File Directory: %s\n",py_op.std_elfFile.c_str());
+    // set option struct from python
+    options.cps = py_op.cps;
+    options.tsType = py_op.tsType;
+    options.endTerminate = py_op.endTerminate;
+    options.file = py_op.std_file.data();
+    options.elfFile = py_op.std_elfFile.data();
+    // call main
+    main();
 }
 // ====================================================================================================
