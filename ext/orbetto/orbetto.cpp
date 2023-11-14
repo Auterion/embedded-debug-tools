@@ -76,8 +76,7 @@ struct Options
     std::string std_file;
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
-    char *elfFile;
-    std::string std_elfFile;
+    std::vector<uint8_t> elf_file;
     bool outputDebugFile;
 
 } options =
@@ -636,9 +635,9 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         auto *workqueue_start = event->mutable_workqueue_execute_start();
         workqueue_start->set_function(m->value);
         workqueue_map.insert({prev_tid, m->value});
-        if (_r.symbols and not workqueue_names.contains(m->value))
+        if (not workqueue_names.contains(m->value))
         {
-            if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+            if (const char *name = (const char *) &options.elf_file[m->value - 0x08008000]; name)
             {
                 printf("Found Name %s for 0x%08x\n", name, m->value);
                 workqueue_names.insert({m->value, name});
@@ -1121,37 +1120,13 @@ static void _feedStream( struct Stream *stream )
 // ====================================================================================================
 
 int main()
-
 {
     bool alreadyReported = false;
-    /*
-    printf("Arguments Count: '%d' \n",argc);
-    if ( !_processOptions( argc, argv ) )
-
-
-    {
-        exit( -1 );
-    }
-    */
-
 
     /* Reset the TPIU handler before we start */
     TPIUDecoderInit( &_r.t );
     ITMDecoderInit( &_r.i, options.forceITMSync );
     MSGSeqInit( &_r.d, &_r.i, MSG_REORDER_BUFLEN );
-
-    if ( options.elfFile )
-    {
-        /* Only load memory for now */
-        _r.symbols = symbolAcquire(options.elfFile, false, true, false);
-        assert( _r.symbols );
-        printf("Loaded ELF file %s with %u sections\n", options.elfFile, _r.symbols->nsect_mem);
-        for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)
-        {
-            auto mem = _r.symbols->mem[ii];
-            printf("Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
-        }
-    }
 
     while ( true )
     {
@@ -1203,7 +1178,8 @@ int main()
 
     return 0;
 }
-void main_pywrapper(Options py_op){
+
+void main_pywrapper(Options py_op, std::vector<uint8_t> elfbin){
     // printf("Options TPIU: %i",(int)py_op.endTerminate);
     // printf("SWO File Directory: %s\n",py_op.std_file.c_str());
     //printf("Elf File Directory: %s\n",py_op.std_elfFile.c_str());
@@ -1212,7 +1188,7 @@ void main_pywrapper(Options py_op){
     options.tsType = py_op.tsType;
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
-    options.elfFile = py_op.std_elfFile.data();
+    options.elf_file = elfbin;
     // call main
     main();
 }

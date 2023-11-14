@@ -1,11 +1,12 @@
-# import os
+import os
 
-# os.system('rm -rf build')
-# os.system('meson setup build')
-# os.system('ninja -C build')
+os.system('rm -rf build')
+os.system('meson setup build')
+os.system('ninja -C build')
 
 from build.orbethon import *
 import argparse
+from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin
 
 arg2tsType = {
     "a" : TSType.TSAbsolute,
@@ -24,16 +25,14 @@ def processOptions(args):
     Return:
         - options struct
     """
+    print("Process Options ...")
     # init Options class
     options = Options_Struct()
     # set options based on args
     options.cps = args.cpufreq * 1000
     options.tsType = arg2tsType[args.timestamp]
     options.endTerminate = args.eof
-    print(args.input_file)
-    print(args.elf)
     options.file = args.input_file
-    options.elfFile = args.elf
     return options
 
 
@@ -81,4 +80,10 @@ def init_argparse():
 if __name__ == "__main__":
     args = init_argparse()
     options = processOptions(args)
-    orbethon(options)
+    print_sections(args.elf)
+    elf_bin = get_text_bin(args.elf)
+    #process_string_table(args.elf)
+    #process_symbol_table(args.elf)
+    #process_debug_string(args.elf)
+    print("Run Orbetto Tool ...")   
+    orbethon(options,elf_bin)
