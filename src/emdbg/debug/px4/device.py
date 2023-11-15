@@ -122,8 +122,8 @@ class Device(Base):
     def _SVD_FILE(self):
         return {
             # 0x0415: Path(__file__).parents[1] / "data/STM32L4x6.svd",
-            0x0451: Path(__file__).parents[1] / "data/STM32F7x5.svd",
-            0x0450: Path(__file__).parents[1] / "data/STM32H753x.svd",
+            0x0451: Path(__file__).parents[1] / "data/STM32F765.svd",
+            0x0450: Path(__file__).parents[1] / "data/STM32H753.svd",
             # 0x0483: Path(__file__).parents[1] / "data/STM32H7x3.svd",
         }.get(self.devid)
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.4
+
+- Update SVD files for FMUv5x and FMUv6x.
+
 ## 1.3.3
 
 - Simplify macOS installation instructions.
