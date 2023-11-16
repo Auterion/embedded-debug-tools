@@ -128,17 +128,23 @@ class Base:
         """
         self._inf.write_memory(address, buffer, length=length)
 
-    def read_uint(self, addr: int, size: int) -> int:
+    def read_uint(self, addr: int, size: int, default=None) -> int:
         """Reads an unsigned integer from a memory address"""
         if (itype := {1: "B", 2: "H", 4: "I", 8: "Q"}.get(size)) is None:
             raise ValueError("Unsupported unsigned integer size!")
-        return self.read_memory(addr, size).cast(itype)[0]
+        try:
+            return self.read_memory(addr, size).cast(itype)[0]
+        except self._gdb.MemoryError:
+            return default
 
-    def read_int(self, addr: int, size: int) -> int:
+    def read_int(self, addr: int, size: int, default=None) -> int:
         """Reads a signed integer from a memory address"""
         if (itype := {1: "b", 2: "h", 4: "i", 8: "q"}.get(size)) is None:
             raise ValueError("Unsupported signed integer size!")
-        return self.read_memory(addr, size).cast(itype)[0]
+        try:
+            return self.read_memory(addr, size).cast(itype)[0]
+        except self._gdb.MemoryError:
+            return default
 
     def read_string(self, addr: int, encoding: str = None,
                     errors: str = None, length: int = None) -> str:
