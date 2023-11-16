@@ -1,20 +1,30 @@
 project('orbetto', ['c', 'cpp'], default_options: ['cpp_std=c++20'])
 
+# Clone the perfetto git repository
+subproject('perfetto')
+
+# find the all relevant protobuf source files
+proto_sources_output = run_command('subprojects/proto.sh', check: true)
+proto_sources = proto_sources_output.stdout().strip().split('\n')
+
+# Configure the protoc compiler
+cpp_gen = generator(find_program('protoc'), output: ['@BASENAME@.pb.cc', '@BASENAME@.pb.h'],
+                    arguments: ['--proto_path=@CURRENT_SOURCE_DIR@/subprojects/perfetto/', '--cpp_out=@BUILD_DIR@', '@INPUT@'])
+# Generate the protobuf source and header files
+perfbuf_sources = cpp_gen.process(proto_sources, preserve_path_from: meson.current_source_dir() + '/subprojects/perfetto/')
+# Compile and link the protobuf source files
+perfbuf_lib = static_library('perfbuf', sources: perfbuf_sources, dependencies: [dependency('protobuf')])
+
+# Clone the orbuculum git repository
 orbuculum = subproject('orbuculum')
 liborb = orbuculum.get_variable('liborb')
 git_version_info_h = orbuculum.get_variable('git_version_info_h')
 
-perfetto = subproject('perfetto')
-libperfetto_protos = perfetto.get_variable('libperfetto_protos')
-
+# Compile and link everything together
 executable('orbetto',
-    sources: [
-        'orbetto.cpp',
-        'loadelf.c',
-        git_version_info_h,
-    ],
-    include_directories: include_directories(['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external', 'subprojects/perfetto']),
+    sources: ['orbetto.cpp', 'loadelf.c', git_version_info_h],
+    include_directories: ['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external'] + perfbuf_lib.private_dir_include(),
     dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
-    link_with: [liborb, libperfetto_protos],
+    link_with: [liborb, perfbuf_lib],
     install: true,
 )
