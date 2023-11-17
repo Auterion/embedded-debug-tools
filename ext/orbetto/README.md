@@ -34,8 +34,11 @@ to test it yourself.
 Please install the following dependencies:
 
 ```sh
+# Ubuntu
+sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev python3-pip ninja-build protobuf-compiler
+sudo pip3 install meson==1.2.0
 # macOS
-brew install protobuf libusb zeromq ncurses sdl2 meson ninja libelf libdwarf
+brew install zmq sdl2 libelf protobuf meson ninja
 ```
 
 Then build the `build/orbetto` binary:
