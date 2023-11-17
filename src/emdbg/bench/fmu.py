@@ -171,17 +171,21 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     else:
         raise ValueError(f"Unknown backend '{backend}'!")
 
+    boot_elf = None
     if Path(target).suffix == ".elf":
         elf = Path(target)
     else:
-        elf = next((px4_dir / "build" / target).glob("*.elf"), None)
-        if elf is None:
+        if (elf := next((px4_dir / "build" / target).glob("*.elf"), None)) is None:
             raise ValueError(f"Cannot find ELF file in build folder '{px4_dir}/build/{target}'!")
+        if "_default" in target: # try to find the bootloader elf too
+            boot_elf = next((px4_dir / "build" / target.replace("_default", "_bootloader")).glob("*.elf"), None)
 
     cmds = [f"dir {px4_dir}",
             f"source {data_dir}/fmu.gdb",
             f"python px4._TARGET='{target.lower()}'"]
-    if ui is not None:
+    if boot_elf is not None:
+        cmds += [f"add-symbol-file {boot_elf}"]
+    if ui is not None and backend_obj.name != "crashdebug":
         cmds += Fmu._DBGMCU_CONFIG(target)
     cmds += (commands or [])
 
