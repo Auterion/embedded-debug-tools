@@ -10,6 +10,8 @@ jobs:
     steps:
       - run: brew install zmq sdl2 libelf protobuf meson ninja
       - uses: actions/checkout@v3
+      - run: git clone https://github.com/pybind/pybind11.git
+        working-directory: ext/orbetto
       - run: meson setup ./build
         working-directory: ext/orbetto
       - run: ninja -C ./build
