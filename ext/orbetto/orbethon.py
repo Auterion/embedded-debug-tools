@@ -7,6 +7,7 @@ os.system('ninja -C build')
 from build.orbethon import *
 import argparse
 from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin
+from irq_names import irq_names_stm32h753,irq_names_stm32f765
 
 arg2tsType = {
     "a" : TSType.TSAbsolute,
@@ -81,9 +82,9 @@ if __name__ == "__main__":
     args = init_argparse()
     options = processOptions(args)
     print_sections(args.elf)
-    elf_bin = get_text_bin(args.elf)
+    elf_bin = list(get_text_bin(args.elf))
     #process_string_table(args.elf)
     #process_symbol_table(args.elf)
     #process_debug_string(args.elf)
-    print("Run Orbetto Tool ...")   
-    orbethon(options,elf_bin)
+    print("Run Orbetto Tool ...") 
+    orbethon(options,elf_bin,irq_names_stm32h753,irq_names_stm32f765)
