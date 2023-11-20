@@ -125,9 +125,7 @@ static perfetto::protos::Trace *perfetto_trace;
 
 static perfetto::protos::FtraceEventBundle *ftrace;
 
-// FIXME: detect this automatically
 static std::unordered_map<int32_t, const char*> *irq_names = nullptr;
-// static auto &irq_names = irq_names_stm32h753;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
@@ -911,14 +909,14 @@ int main()
     return 0;
 }
 
-void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_map<int32_t, const char*>* irq_names_stm32h753, std::unordered_map<int32_t, const char*>* irq_names_stm32f765){
+void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_map<int32_t, const char*>* irq_names_input){
     // set option struct from python
     options.cps = py_op.cps;
     options.tsType = py_op.tsType;
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
     options.elf_file = elfbin;
-    irq_names = irq_names_stm32f765;
+    irq_names = irq_names_input;
     // call main
     printf("Wrapping worked.\n");
     main();

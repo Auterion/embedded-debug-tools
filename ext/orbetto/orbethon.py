@@ -1,8 +1,8 @@
 import os
 
-os.system('rm -rf build')
-os.system('meson setup build')
-os.system('ninja -C build')
+#os.system('rm -rf build')
+#os.system('meson setup build')
+#os.system('ninja -C build')
 
 from build.orbethon import *
 import argparse
@@ -74,6 +74,11 @@ def init_argparse():
                         type=str,
                         default='../../../PX4-Autopilot/build/px4_fmu-v5x_default/px4_fmu-v5x_default.elf'
                         )
+    parser.add_argument('-d','--device',
+                        help="select stm32h753 or stm32f765",
+                        type=str,
+                        choices=['stm32h753','stm32f765'],
+                        default='stm32f765')
 
     return parser.parse_args()
 
@@ -81,10 +86,13 @@ def init_argparse():
 if __name__ == "__main__":
     args = init_argparse()
     options = processOptions(args)
-    print_sections(args.elf)
+    #print_sections(args.elf)
     elf_bin = list(get_text_bin(args.elf))
     #process_string_table(args.elf)
     #process_symbol_table(args.elf)
     #process_debug_string(args.elf)
-    print("Run Orbetto Tool ...") 
-    orbethon(options,elf_bin,irq_names_stm32h753,irq_names_stm32f765)
+    print("Run Orbetto Tool ...")
+    if (args.device == 'stm32h753'):
+        orbethon(options,elf_bin,irq_names_stm32h753)
+    elif (args.device == 'stm32f765'):
+        orbethon(options,elf_bin,irq_names_stm32f765)
