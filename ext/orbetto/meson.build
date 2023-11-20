@@ -20,6 +20,23 @@ orbuculum = subproject('orbuculum')
 liborb = orbuculum.get_variable('liborb')
 git_version_info_h = orbuculum.get_variable('git_version_info_h')
 
+perfetto = subproject('perfetto')
+libperfetto_protos = perfetto.get_variable('libperfetto_protos')
+
+pymod = import('python')
+py = pymod.find_installation('python3')
+py.extension_module('orbethon', 
+    sources : [
+        'orbethon.cpp', 
+        'loadelf.c',
+        git_version_info_h,
+    ],
+    include_directories: include_directories(['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external', 'subprojects/perfetto', 'pybind11/include']),
+    dependencies : [dependency('protobuf', 'python3')] + orbuculum.get_variable('dependencies'),link_with: [liborb, libperfetto_protos],
+    link_with: [liborb, libperfetto_protos],
+)
+
+
 # Compile and link everything together
 executable('orbetto',
     sources: ['orbetto.cpp', 'loadelf.c', git_version_info_h],

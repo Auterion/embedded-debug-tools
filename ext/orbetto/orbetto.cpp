@@ -1364,9 +1364,11 @@ static void _feedStream( struct Stream *stream )
 }
 
 // ====================================================================================================
-int main( int argc, char *argv[] )
+
+int main( int argc,  char *argv[])
 
 {
+    printf("Arguments Count: '%d' \n",argc);
     bool alreadyReported = false;
 
     if ( !_processOptions( argc, argv ) )
@@ -1441,5 +1443,16 @@ int main( int argc, char *argv[] )
     }
 
     return 0;
+}
+void main_pywrapper(int argc, std::vector<std::string> std_argv){
+    char** argv = new char*[std_argv.size() + 1]; // +1 for nullptr
+    // Copy the strings from std::vector to char*
+    for (size_t i = 0; i < std_argv.size(); ++i) {
+        // Allocate memory for each char* and copy the content
+        argv[i] = new char[std_argv[i].size() + 1]; // +1 for null-terminator
+        std::strcpy(argv[i], std_argv[i].c_str());
+    }
+    argv[std_argv.size()] = nullptr;
+    main(argc,argv);
 }
 // ====================================================================================================

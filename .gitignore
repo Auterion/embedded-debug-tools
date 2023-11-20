@@ -10,6 +10,5 @@ dist/
 /ext/orbetto/subprojects/packagecache
 /ext/orbetto/*.perf
 /ext/orbetto/*.debug
-
 .vscode/
 /ext/orbetto/pybind11/
