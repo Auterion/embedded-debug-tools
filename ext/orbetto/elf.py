@@ -22,6 +22,7 @@ from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import SymbolTableSection,StringTableSection
 
 import elftools.common.utils as ecu
+import cxxfilt
 
 def get_text_bin(filename):
     print("Get Text Bin ...")
@@ -72,6 +73,11 @@ def process_addresses(filename,addresses):
             except:
                 pass
 
+def demangle_cpp_function_name(func_name):
+    # remove everything after the first . in func_name
+    return cxxfilt.demangle(func_name)
+    
+
 def process_symbol_table(filename):
     functions = []
     names = []
@@ -98,10 +104,15 @@ def process_symbol_table(filename):
                 symbol_other = symbol['st_other']
                 # symbol_type == 'STT_NOTYPE' and symbol_info['bind']=='STB_LOCAL' and symbol_name == '$d' and symbol_other['local'] == 0 and symbol_other['visibility'] == "STV_DEFAULT" and symbol["st_name"] == 15
                 if symbol_type == 'STT_FUNC':
-                    print("  The name of the %s th symbol is %s and its address is: 0x%0x and its type is %s and its size is %s" % (int(i),symbol_name,symbol_address,symbol_type,symbol['st_size']))
+                    #print("  The name of the %s th symbol is %s and its address is: 0x%0x and its type is %s and its size is %s" % (int(i),symbol_name,symbol_address,symbol_type,symbol['st_size']))
                     if symbol_name not in names:
                         names.append(symbol_name)
-                        functions.append((symbol_address,symbol_name))
+                        if(symbol_name[:2] == "_Z"):
+                            demangled_name = demangle_cpp_function_name(symbol_name)
+                            print("  Demangled name: %s" % demangled_name)
+                            functions.append((symbol_address,demangled_name))
+                        else:
+                            functions.append((symbol_address,symbol_name))
     sorted_functions = sorted(functions, key=lambda x: x[0])
     return sorted_functions
 

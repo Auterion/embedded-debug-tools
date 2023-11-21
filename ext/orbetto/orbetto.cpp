@@ -52,6 +52,7 @@
 enum TSType { TSNone, TSAbsolute, TSRelative, TSDelta, TSStamp, TSStampDelta, TSNumTypes };
 const char *tsTypeString[TSNumTypes] = { "None", "Absolute", "Relative", "Delta", "System Timestamp", "System Timestamp Delta" };
 
+
 // Record for options, either defaults or from command line
 struct Options
 {
@@ -132,6 +133,7 @@ static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
 static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
+
 static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_state = -1)
 {
     if (begin)
@@ -347,7 +349,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         auto *sched_waking = event->mutable_sched_waking();
         sched_waking->set_pid(tid);
         sched_waking->set_success(1);
-    }
+    }/*
     else if (m->srcAddr == 15) // workqueue start
     {
         if (prev_tid == 0) return;
@@ -390,7 +392,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             workqueue_map.erase(prev_tid);
             // const uint8_t count = m->value;
         }
-    }
+    }*/
     else if (m->srcAddr == 17) // heap region
     {
         static uint32_t start = 0;
@@ -498,33 +500,51 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
     }
 }
 
+uint64_t last_function_index = -1;
+auto last_prev_tid = prev_tid;
+
 static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_PC_SAMPLE );
-    if(prev_tid == 0) return;
+    // check if pc is in idle task then skip
+    // if(prev_tid == 0) return;
+    // find the new function name
     auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
         [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
         {
             return get<0>(addr_func_tuple) < value;
         });
-    // print the function name
+    // begin the new function in ftrace
     if (pc_function == options.functions.end()) 
     {
         printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
     }else
     {
+        uint64_t index = get<0>(*pc_function);
         std::string function_name = get<1>(*pc_function);
         printf("Function: %s\n", function_name.c_str());
-        // print ftrace event
-        const uint64_t ns = (_r.timeStamp * 1e9) / options.cps;
+        if(index==last_function_index and prev_tid==last_prev_tid) return;
+        // end the last function in ftrace
+        if(last_function_index != (uint64_t)-1){
+            auto *event = ftrace->add_event();
+            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+            event->set_pid(last_prev_tid);
+            auto *exit = event->mutable_funcgraph_exit();
+            exit->set_depth(0);
+            exit->set_func(last_function_index);
+        }
+        // start ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
         event->set_pid(prev_tid);
-        auto *print = event->mutable_print();
-        char buffer[300];
-        snprintf(buffer, 300, "I|0|%s", function_name.c_str());
-        print->set_buf(buffer);
+        auto *entry = event->mutable_funcgraph_entry();
+        entry->set_depth(0);
+        entry->set_func(index);
+        // save last event
+        last_prev_tid = prev_tid;
+        last_function_index = index;
     }
+
 }
 
 // ====================================================================================================
@@ -776,6 +796,17 @@ static void _feedStream( struct Stream *stream )
     {
         auto *interned_data = ftrace_packet->mutable_interned_data();
         for (auto&& [func, name] : workqueue_names)
+        {
+            {
+                auto *interned_string = interned_data->add_kernel_symbols();
+                interned_string->set_iid(func);
+                interned_string->set_str(name.c_str());
+            }
+        }
+    }
+    {
+        auto *interned_data = ftrace_packet->mutable_interned_data();
+        for (auto&& [func, name] : options.functions)
         {
             {
                 auto *interned_string = interned_data->add_kernel_symbols();

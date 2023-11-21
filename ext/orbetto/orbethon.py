@@ -1,7 +1,7 @@
 import os
 
-os.system('rm -rf build')
-os.system('meson setup build')
+#os.system('rm -rf build')
+#os.system('meson setup build')
 os.system('ninja -C build')
 
 from build.orbethon import *
