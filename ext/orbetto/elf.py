@@ -73,7 +73,8 @@ def process_addresses(filename,addresses):
                 pass
 
 def process_symbol_table(filename):
-    addresses = []
+    functions = []
+    names = []
     print("Process elf file ...")
     with open(filename, 'rb') as f:
         elffile = ELFFile(f)
@@ -96,10 +97,13 @@ def process_symbol_table(filename):
                 symbol_address = symbol['st_value']
                 symbol_other = symbol['st_other']
                 # symbol_type == 'STT_NOTYPE' and symbol_info['bind']=='STB_LOCAL' and symbol_name == '$d' and symbol_other['local'] == 0 and symbol_other['visibility'] == "STV_DEFAULT" and symbol["st_name"] == 15
-                if symbol_type == 'STT_NOTYPE' and symbol_name == '$d':
+                if symbol_type == 'STT_FUNC':
                     print("  The name of the %s th symbol is %s and its address is: 0x%0x and its type is %s and its size is %s" % (int(i),symbol_name,symbol_address,symbol_type,symbol['st_size']))
-                    addresses.append(symbol_address)
-    process_addresses(filename,addresses)
+                    if symbol_name not in names:
+                        names.append(symbol_name)
+                        functions.append((symbol_address,symbol_name))
+    sorted_functions = sorted(functions, key=lambda x: x[0])
+    return sorted_functions
 
 def process_string_table(filename):
     print("Process elf file ...")

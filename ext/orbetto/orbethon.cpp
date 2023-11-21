@@ -28,6 +28,7 @@ PYBIND11_MODULE(orbethon,handle){
         .def_readwrite("file",&Options::std_file)
         .def_readwrite("endTerminate",&Options::endTerminate)
         //.def_readwrite("outputDebugFile",&Options::outputDebugFile)
+        .def_readwrite("functions",&Options::functions)
         ;
 
     py::enum_<TSType>(handle, "TSType")

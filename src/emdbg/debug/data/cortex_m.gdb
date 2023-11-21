@@ -78,10 +78,10 @@ define px4_configure_orbuculum
     dwtTraceException 1
     # Set POSTCNT source to CYCCNT[10] /1024
     dwtPostTap 1
-    # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 2
+    # Set POSTCNT init/reload value to /2 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
+    dwtPostReset 4
     # enable PC sampling
-    dwtSamplePC 0
+    dwtSamplePC 1
 
     # Set the ITM ID to 1
     ITMId 1

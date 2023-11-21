@@ -78,6 +78,7 @@ struct Options
 
     std::vector<uint8_t>* elf_file;
     bool outputDebugFile;
+    std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
 
 } options =
 {
@@ -500,6 +501,30 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
 static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_PC_SAMPLE );
+    if(prev_tid == 0) return;
+    auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
+        [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
+        {
+            return get<0>(addr_func_tuple) < value;
+        });
+    // print the function name
+    if (pc_function == options.functions.end()) 
+    {
+        printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
+    }else
+    {
+        std::string function_name = get<1>(*pc_function);
+        printf("Function: %s\n", function_name.c_str());
+        // print ftrace event
+        const uint64_t ns = (_r.timeStamp * 1e9) / options.cps;
+        auto *event = ftrace->add_event();
+        event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+        event->set_pid(prev_tid);
+        auto *print = event->mutable_print();
+        char buffer[300];
+        snprintf(buffer, 300, "I|0|%s", function_name.c_str());
+        print->set_buf(buffer);
+    }
 }
 
 // ====================================================================================================
@@ -651,54 +676,14 @@ static void _protocolPump( uint8_t c )
         _itmPumpProcess( c );
     }
 }
-// ====================================================================================================
-static void _printHelp( const char *const progName )
 
-{
-    fprintf( stdout, "Usage: %s [options]" EOL, progName );
-    fprintf( stdout, "    -c, --channel:      <Number>,<Format> of channel to add into output stream (repeat per channel)" EOL );
-    fprintf( stdout, "    -C, --cpufreq:      <Frequency in KHz> (Scaled) speed of the CPU" EOL
-             "                        generally /1, /4, /16 or /64 of the real CPU speed," EOL );
-    fprintf( stdout, "    -E, --eof:          Terminate when the file/socket ends/is closed, or wait for more/reconnect" EOL );
-    fprintf( stdout, "    -f, --input-file:   <filename> Take input from specified file" EOL );
-    fprintf( stdout, "    -g, --trigger:      <char> to use to trigger timestamp (default is newline)" EOL );
-    fprintf( stdout, "    -h, --help:         This help" EOL );
-    fprintf( stdout, "    -n, --itm-sync:     Enforce sync requirement for ITM (i.e. ITM needs to issue syncs)" EOL );
-    fprintf( stdout, "    -s, --server:       <Server>:<Port> to use" EOL );
-    fprintf( stdout, "    -e, --elf:          <file>: Use this ELF file for information" EOL );
-    fprintf( stdout, "    -d, --debug:        Output a human-readable protobuf file" EOL );
-    fprintf( stdout, "    -t, --tpiu:         <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
-    fprintf( stdout, "    -T, --timestamp:    <a|r|d|s|t>: Add absolute, relative (to session start)," EOL
-             "                        delta, system timestamp or system timestamp delta to output. Note" EOL
-             "                        a,r & d are host dependent and you may need to run orbuculum with -H." EOL );
-    fprintf( stdout, "    -v, --verbose:      <level> Verbose mode 0(errors)..3(debug)" EOL );
-    fprintf( stdout, "    -V, --version:      Print version and exit" EOL );
-}
 // ====================================================================================================
 static void _printVersion( void )
 
 {
     genericsPrintf( "orbcat version " GIT_DESCRIBE EOL );
 }
-// ====================================================================================================
-static struct option _longOptions[] =
-{
-    {"channel", required_argument, NULL, 'c'},
-    {"cpufreq", required_argument, NULL, 'C'},
-    {"eof", no_argument, NULL, 'E'},
-    {"input-file", required_argument, NULL, 'f'},
-    {"help", no_argument, NULL, 'h'},
-    {"trigger", required_argument, NULL, 'g' },
-    {"itm-sync", no_argument, NULL, 'n'},
-    {"server", required_argument, NULL, 's'},
-    {"tpiu", required_argument, NULL, 't'},
-    {"timestamp", required_argument, NULL, 'T'},
-    {"elf", required_argument, NULL, 'e'},
-    {"debug", no_argument, NULL, 'd'},
-    {"verbose", required_argument, NULL, 'v'},
-    {"version", no_argument, NULL, 'V'},
-    {NULL, no_argument, NULL, 0}
-};
+
 // ====================================================================================================
 static struct Stream *_tryOpenStream()
 {
@@ -916,6 +901,7 @@ void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
     options.elf_file = elfbin;
+    options.functions = py_op.functions;
     irq_names = irq_names_input;
     // call main
     printf("Wrapping worked.\n");
