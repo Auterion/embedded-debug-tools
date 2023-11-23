@@ -41,6 +41,7 @@ _ADDR_RANGES = [
     (0x3880_0000, 0x01000),
     (0xE004_2000, 4), # DEVID F7
     (0x5C00_1000, 4), # DEVID H7
+    (0x40C8_4800, 4), # DEVID i.MX
     (0xE000_E000, 0xFFF), # SCS
 ]
 
@@ -92,6 +93,8 @@ def convert(log: str) -> str:
     known_mems[0xE004_2000] = 0x10030451
     # FIXME: hardcoded for FMUv6x (STM32H753)
     known_mems[0x5C00_1000] = 0x10030450
+    # FIXME: hardcoded for FMUv6xRT (i.MXRT1176)
+    known_mems[0x40C8_4800] = 0x001170B0
 
     # CPUID
     known_mems[0xE000_ED00] = 0x411fc270

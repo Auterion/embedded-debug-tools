@@ -2,6 +2,7 @@
 
 ## 1.3.5
 
+- Add support for NXP i.MX RT1176 FMUv6xRT.
 - Search for bootloader ELF file and add as symbol file.
 - Reset device using RESET pin on J-Link.
 - Fix missing speed argument when using J-Link command line.

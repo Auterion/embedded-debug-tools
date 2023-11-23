@@ -55,8 +55,10 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
     - Visualization via [perfetto](https://perfetto.dev) (planned).
 - Serial Protocols.
     - NuttX NSH command prompt.
-- Hardware configuration.
-    - [FMUv5x and FMUv6x](https://docs.px4.io/main/en/flight_controller/autopilot_pixhawk_standard.html).
+- [Flight Computer Support](https://docs.px4.io/main/en/flight_controller/autopilot_pixhawk_standard.html).
+    - FMUv5x with STM32F765II.
+    - FMUv6x with STM32H753II.
+    - FMUv6xRT with i.MX RT1176.
 
 A number of GDB and NSH scripting examples for test automation can be found in
 the `scripts` folder.

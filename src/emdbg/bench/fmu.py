@@ -24,6 +24,8 @@ class Fmu:
         if "fmu-v5x" in target:
             return ["set *0xE0042008 = 0xffffffff",
                     "set *0xE004200C = 0xffffffff"] + common
+        if "fmu-v6xrt" in target:
+            return common
         if "fmu-v6x" in target:
             return ["set *0xE00E1034 = 0xffffffff",
                     "set *0xE00E103C = 0xffffffff",
@@ -148,6 +150,9 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     if "fmu-v5x" in target:
         device = "STM32F765II"
         config = "fmu_v5x"
+    elif "fmu-v6xrt" in target:
+        device = "MIMXRT1176xxxA_M7"
+        config = "fmu_v6xrt"
     elif "fmu-v6x" in target:
         device = "STM32H753II"
         config = "fmu_v6x"
@@ -158,8 +163,10 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     data_dir = Path(__file__).parent.resolve() / "data"
 
     if backend in ["stlink", "orbtrace"]:
-        config += f"_{backend}.cfg"
-        backend_obj = emdbg.debug.OpenOcdBackend(config=[data_dir / config])
+        config = data_dir / (config + f"_{backend}.cfg")
+        if not config.exists():
+            raise ValueError(f"OpenOCD config '{config}' does not exists!")
+        backend_obj = emdbg.debug.OpenOcdBackend(config=config, search=data_dir)
     elif backend == "jlink":
         rtos_so = px4_dir / f"platforms/nuttx/NuttX/nuttx/tools/jlink-nuttx.so"
         if not rtos_so.exists(): rtos_so = None

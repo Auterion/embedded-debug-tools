@@ -18,7 +18,6 @@ class Device(Base):
     Accessors for the state of ARM Cortex-M CPU, STM32 identifiers, uptime, and
     NuttX kernel internals.
     """
-    _HRT_CNT = 0x4001_0424
     _SCS_ICTR = 0xE000_E004
     _SCB_CPUID = 0xE000_ED00
     _SCB_VTOR = 0xE000_ED08
@@ -29,7 +28,8 @@ class Device(Base):
     _NVIC_IPR = 0xE000_E400
 
     # Try them all until one of them does not return zero
-    _DBG_IDCODE = [0xE004_2000, 0x5C00_1000]
+    _DBG_IDCODE_STM32 = [0xE004_2000, 0x5C00_1000]
+    _DBG_IDCODE_NXP = [0x40C8_4800]
 
     @cached_property
     def _IDCODE_REVISION(self):
@@ -40,6 +40,7 @@ class Device(Base):
             0x1007: "4",
             0x2001: "X",
             0x2003: "Y",
+            0x00B0: "B",
         }.get(self.rev, "")
 
     @cached_property
@@ -49,6 +50,7 @@ class Device(Base):
             0x0451: "STM32F76xx, STM32F77xx",
             0x0450: "STM32H742, STM32H743/753, STM32H750",
             0x0483: "STM32H723/733, STM32H725/735, STM32H730",
+            0x1170: "NXP i.MXRT117x",
         }.get(self.devid, "Unknown")
 
     @cached_property
@@ -59,6 +61,10 @@ class Device(Base):
             0x0451: list(range(0x4002_0000, 0x4002_2001, 0x400)),
             0x0450: list(range(0x5802_0000, 0x5802_2001, 0x400)),
             0x0483: list(range(0x5802_0000, 0x5802_2C01, 0x400)),
+            0x1170: [0x4012_C000, 0x4013_0000, 0x4013_4000, 0x4013_8000,
+                     0x4013_C000, 0x4014_0000, 0x40C5_C000, 0x40C6_0000,
+                     0x40C6_4000, 0x40C6_8000, 0x40C6_C000, 0x40C7_0000,
+                     0x40CA_0000],
         }.get(self.devid, [])
 
     @cached_property
@@ -113,6 +119,10 @@ class Device(Base):
                 (0x3880_0000, 0x01000), # Backup SRAM
                 (0x5C00_1000, 4),       # IDCODE
             ]),
+            0x1170: [
+                (0x2000_0000, 0x040000), # DTCM 256kB
+                (0x2020_0000, 0x200000), # All RAM configs together both cores
+            ]
         }.get(self.devid, [])
         mems += self._PERIPHERALS
         mems += self._SYSTEM_MEMORIES
@@ -121,10 +131,9 @@ class Device(Base):
     @cached_property
     def _SVD_FILE(self):
         return {
-            # 0x0415: Path(__file__).parents[1] / "data/STM32L4x6.svd",
             0x0451: Path(__file__).parents[1] / "data/STM32F765.svd",
             0x0450: Path(__file__).parents[1] / "data/STM32H753.svd",
-            # 0x0483: Path(__file__).parents[1] / "data/STM32H7x3.svd",
+            0x1170: Path(__file__).parents[1] / "data/MIMXRT1176_cm7.svd",
         }.get(self.devid)
 
     @dataclass
@@ -163,7 +172,10 @@ class Device(Base):
     def __init__(self, gdb):
         super().__init__(gdb)
         self.architecture = self._arch.name()
-        self._hrt_counter = self.addr_ptr(self._HRT_CNT, "uint16_t")
+        if self.platform == "stm32":
+            self._hrt_counter = self.addr_ptr(0x4001_0424, "uint16_t") # TIM8->CNT
+        else:
+            self._hrt_counter = self.addr_ptr(0x400F_C024, "uint32_t") # GPT5->CNT
 
     @cached_property
     def _hrt_base(self):
@@ -275,15 +287,16 @@ class Device(Base):
                 total_size += size
             except Exception as e:
                 print(f"Failed to read whole range [{addr:#x}, {addr+size:#x}]! {e}")
-                data = []
-                for offset in range(0, size, 4):
-                    try:
-                        data.append(self.read_memory(addr + offset, 4).cast("I")[0])
-                        total_size += 4
-                    except Exception as e:
-                        print(f"Failed to read uint32_t {addr+offset:#x}! {e}")
-                        data.append(0)
-                        continue
+                # data = []
+                # for offset in range(0, size, 4):
+                #     try:
+                #         data.append(self.read_memory(addr + offset, 4).cast("I")[0])
+                #         total_size += 4
+                #     except Exception as e:
+                #         print(f"Failed to read uint32_t {addr+offset:#x}! {e}")
+                #         data.append(0)
+                #         continue
+                continue
             for ii, values in enumerate(utils.chunks(data, 4, 0)):
                 values = (hex(v & 0xffffffff) for v in values)
                 lines.append(f"{hex(addr + ii * 16)}: {' '.join(values)}")
@@ -305,9 +318,16 @@ class Device(Base):
 
     @cached_property
     def idcode(self) -> int:
-        """The STM32-specific DBG->IDCODE value"""
-        for addr in self._DBG_IDCODE:
-            if idcode := (self.read_uint(addr, 4) & 0xffff0fff):
+        """
+        The device identifier code:
+        - STM32: DBG->IDCODE
+        - NXP i.MX: MISC->DIFPROG.
+        """
+        for addr in self._DBG_IDCODE_STM32:
+            if idcode := self.read_uint(addr, 4, 0) & 0xffff_0fff:
+                return idcode
+        for addr in self._DBG_IDCODE_NXP:
+            if idcode := self.read_uint(addr, 4, 0):
                 return idcode
         return 0
 
@@ -389,14 +409,32 @@ class Device(Base):
         return "?"
 
     @cached_property
+    def platform(self) -> str:
+        """Returns the detected platform: stm32 or nxp"""
+        if self.idcode & 0xff00 == 0x0400: return "stm32"
+        return "nxp"
+
+    @cached_property
     def devid(self) -> int:
-        """The STM32-specific device id part of DBG->IDCODE"""
-        return self.idcode & 0xfff
+        """
+        The device identifier:
+        - STM32: DBG->IDCODE & 0xfff.
+        - NXP i.MX: MISC->DIFPROG >> 8.
+        """
+        if self.platform == "stm32":
+            return self.idcode & 0xfff
+        return self.idcode >> 8
 
     @cached_property
     def rev(self) -> int:
-        """The STM32-specific revision part of DBG->IDCODE"""
-        return self.idcode >> 16
+        """
+        The device revision:
+        - STM32: DBG->IDCODE >> 16.
+        - NXP i.MX: MISC->DIFPROG & 0xff.
+        """
+        if self.platform == "stm32":
+            return self.idcode >> 16
+        return self.idcode & 0xff
 
 
 def discover(gdb) -> Table:

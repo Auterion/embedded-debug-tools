@@ -499,8 +499,8 @@ Visualize the bit fields of one or all registers of a peripheral using the
 CMSIS-SVD file of the device, which is defaulted for FMUv5x/v6x. For other
 devices, GDB must be launched with the correct `--svd` command line option.
 
-Note that this command loads the SVD using `arm loadfile st SVDFILE` and then
-acts as an alias for `arm inspect /hab st PERIPHERAL [REGISTER]`.
+Note that this command loads the SVD using `arm loadfile device SVDFILE` and
+then acts as an alias for `arm inspect /hab device PERIPHERAL [REGISTER]`.
 
 ```
 (gdb) px4_pshow DMA1 S7CR

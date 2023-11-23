@@ -314,11 +314,11 @@ class PX4_Show_Peripheral(gdb.Command):
         super().__init__("px4_pshow", gdb.COMMAND_USER)
         if filename is None:
             filename = px4.device.Device(gdb)._SVD_FILE
-        gdb.execute(f"arm loadfile st {filename}")
+        gdb.execute(f"arm loadfile device {filename}")
 
     @report_exception
     def invoke(self, argument, from_tty):
-        gdb.execute(f"arm inspect /hab st {argument}")
+        gdb.execute(f"arm inspect /hab device {argument}")
 
 
 # Instantiate all user commands
