@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 define px4_reset
-    monitor reset
+    monitor reset 2
     px4_enable_vector_catch
 end
 

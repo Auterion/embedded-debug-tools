@@ -2,6 +2,7 @@
 
 ## 1.3.5
 
+- Reset device using RESET pin on J-Link.
 - Fix missing speed argument when using J-Link command line.
 
 ## 1.3.4
