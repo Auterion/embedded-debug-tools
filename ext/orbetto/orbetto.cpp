@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <string.h>
+#include <string>
 #include <assert.h>
 #include <inttypes.h>
 #include <getopt.h>
@@ -15,6 +16,8 @@
 #include <set>
 #include <iostream>
 #include <fstream>
+
+using namespace std::string_literals;
 
 #include "nw.h"
 #include "git_version_info.h"
@@ -400,6 +403,7 @@ static auto &irq_names = irq_names_stm32f765;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
+static constexpr uint32_t PID_DMA{100000};
 static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
 static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_state = -1)
@@ -524,6 +528,7 @@ static void _writeFree(uint64_t ns, uint32_t address, uint32_t alignsize, uint32
 static std::unordered_map<uint16_t, uint32_t> workqueue_map;
 static std::unordered_map<uint32_t, std::string> workqueue_names;
 static std::set<uint16_t> stopped_threads;
+static std::unordered_map<uint32_t, std::string> dma_channel_config;
 static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_SOFTWARE );
@@ -706,6 +711,85 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             _writeFree(ns, m->value, alignsize, size);
         }
         else printf("Unknown size for free(0x%08x)!\n", m->value);
+    }
+    else if (m->srcAddr == 21) // dma config
+    {
+        static uint8_t instance{0}, channel{0};
+        static uint16_t size{0};
+        static uint32_t paddr{0}, maddr{0}, config{0}, tid{0};
+        static uint16_t mask{0x8000};
+        if (m->len == 2 and m->value & 0x8000 and mask & 0x8000) {
+            channel = m->value & 0x1f;
+            instance = (m->value >> 5) & 0x7;
+            tid = PID_DMA + instance * 100 + channel;
+            mask = m->value & 0x0f00;
+            // printf("%llu: DMA%u CH%u Config: Mask=%#04x\n", ns, instance, channel, mask);
+        }
+        else if (mask & 0x0100) {
+            size = m->value;
+            mask &= ~0x0100;
+            // printf("%llu: DMA%u CH%u Config: S=%u\n", ns, instance, channel, size);
+        }
+        else if (mask & 0x0200) {
+            paddr = m->value;
+            mask &= ~0x0200;
+            // printf("%llu: DMA%u CH%u Config: P=%#08x\n", ns, instance, channel, paddr);
+        }
+        else if (mask & 0x0400) {
+            maddr = m->value;
+            mask &= ~0x0400;
+            // printf("%llu: DMA%u CH%u Config: M=%#08x\n", ns, instance, channel, maddr);
+        }
+        else if (mask & 0x0800) {
+            config = m->value;
+            mask &= ~0x0800;
+            // printf("%llu: DMA%u CH%u Config: C=%#08x\n", ns, instance, channel, config);
+        }
+        if (mask == 0) {
+            uint32_t src = paddr, dst = maddr;
+            if ((config & 0xC0) == 0x40) std::swap(src, dst);
+            char buffer[1000];
+            snprintf(buffer, sizeof(buffer), "%uB: %#08x -> %#08x (%#08x:%s%s%s%s%s%s%s%s)\n",
+                     size, src, dst, config,
+                     config & 0x40000 ? " DBM" : "",
+                     (const char*[]){" L", " M", " H", " VH"}[(config & 0x30000) >> 16],
+                     (const char*[]){" P8", " P16", " P32", ""}[(config & 0x6000) >> 13],
+                     (const char*[]){" M8", " M16", " M32", ""}[(config & 0x1800) >> 11],
+                     config & 0x400 ? " MINC" : "",
+                     config & 0x200 ? " PINC" : "",
+                     config & 0x100 ? " CIRC" : "",
+                     config & 0x20 ? " PFCTRL" : "");
+            dma_channel_config.insert({tid, buffer});
+            mask = 0x8000;
+        }
+    }
+    else if (m->srcAddr == 22) // dma start
+    {
+        const uint8_t instance = m->value >> 5;
+        const uint8_t channel = m->value & 0x1f;
+        const uint32_t tid = PID_DMA + instance * 100 + channel;
+        // printf("%llu: DMA%u CH%u Start\n", ns, instance, channel);
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(ns);
+            event->set_pid(tid);
+            auto *print = event->mutable_print();
+            print->set_buf("B|0|"s + dma_channel_config[tid]);
+        }
+    }
+    else if (m->srcAddr == 23) // dma stop
+    {
+        const uint8_t instance = m->value >> 5;
+        const uint8_t channel = m->value & 0x1f;
+        const uint32_t tid = PID_DMA + instance * 100 + channel;
+        // printf("%llu: DMA%u CH%u Stop\n", ns, instance, channel);
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(ns);
+            event->set_pid(tid);
+            auto *print = event->mutable_print();
+            print->set_buf("E|0");
+        }
     }
 }
 // ====================================================================================================
@@ -1343,6 +1427,23 @@ static void _feedStream( struct Stream *stream )
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(tid);
                 thread->set_tgid(PID_STOP);
+            }
+        }
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_DMA);
+            process->add_cmdline("DMA Channels");
+            for (int ctrl=1; ctrl <= 2; ctrl++)
+            {
+                for (int chan=0; chan < 8; chan++)
+                {
+                    char buffer[100];
+                    snprintf(buffer, sizeof(buffer), "DMA%u CH%u", ctrl, chan);
+                    auto *thread = process_tree->add_threads();
+                    thread->set_tid(PID_DMA + ctrl * 100 + chan);
+                    thread->set_tgid(PID_DMA);
+                    thread->set_name(buffer);
+                }
             }
         }
     }

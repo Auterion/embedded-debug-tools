@@ -41,6 +41,11 @@ enum
     EMDBG_HEAP_MALLOC_ATTEMPT = 18,
     EMDBG_HEAP_MALLOC_RESULT = 19,
     EMDBG_HEAP_FREE = 20,
+
+    // DMA custom
+    EMDBG_DMA_CONFIG = 21,
+    EMDBG_DMA_START = 22,
+    EMDBG_DMA_STOP = 23,
 };
 
 #define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
@@ -90,6 +95,28 @@ enum
 #define EMDBG_HEAP_MEMALIGN(oldptr, size, newptr) \
     EMDBG_HEAP_REALLOC(oldptr, size, newptr)
 
+#define EMDBG_DMA_CONFIGURE(channel, config) \
+    { \
+        uint16_t mask = 0x8000; \
+        if (channel->cfg.ndata != config->ndata) mask |= 0x0100; \
+        if (channel->cfg.paddr != config->paddr) mask |= 0x0200; \
+        if (channel->cfg.maddr != config->maddr) mask |= 0x0400; \
+        if (channel->cfg.cfg1 != config->cfg1) mask |= 0x0800; \
+        if (mask & 0x0f00) { \
+            emdbg_itm16_block(EMDBG_DMA_CONFIG, (mask | ((uint16_t)channel->ctrl << 5) | (uint16_t)channel->chan)); \
+            if (mask & 0x0100) emdbg_itm_block(EMDBG_DMA_CONFIG, config->ndata); \
+            if (mask & 0x0200) emdbg_itm32_block(EMDBG_DMA_CONFIG, (uint32_t)config->paddr); \
+            if (mask & 0x0400) emdbg_itm32_block(EMDBG_DMA_CONFIG, (uint32_t)config->maddr); \
+            if (mask & 0x0800) emdbg_itm32_block(EMDBG_DMA_CONFIG, (uint32_t)config->cfg1); \
+            channel->cfg = *cfg; \
+        } \
+    }
+
+#define EMDBG_DMA_START(channel) \
+    { emdbg_itm8_block(EMDBG_DMA_START, ((uint8_t)channel->ctrl << 5) | (uint8_t)channel->chan); }
+
+#define EMDBG_DMA_STOP(channel) \
+    { emdbg_itm8_block(EMDBG_DMA_STOP, ((uint8_t)channel->ctrl << 5) | (uint8_t)channel->chan); }
 
 typedef struct
 {
