@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.5
+
+- Fix missing speed argument when using J-Link command line.
+
 ## 1.3.4
 
 - Update SVD files for FMUv5x and FMUv6x.

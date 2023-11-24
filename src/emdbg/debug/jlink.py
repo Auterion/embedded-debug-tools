@@ -203,7 +203,7 @@ def _add_subparser(subparser):
             type=int,
             default=12000,
             help="SWO baudrate in kHz.")
-    parser.set_defaults(backend=lambda args: JLinkBackend(args.device))
+    parser.set_defaults(backend=lambda args: JLinkBackend(args.device, args.speed))
     return parser
 
 
