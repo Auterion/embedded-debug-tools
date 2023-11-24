@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.6
+
+- Update SVD file for FMUv6x.
+
 ## 1.3.5
 
 - Search for bootloader ELF file and add as symbol file.
