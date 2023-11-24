@@ -383,3 +383,35 @@ index f097e905da..a059f5456d 100644
  
    /* Save the callback info.  This will be invoked when the DMA completes */
  
+@@ -1758,6 +1764,7 @@ static void stm32_bdma_disable(DMA_CHANNEL dmachan)
+ 
+   dmabase_putreg(dmachan, STM32_BDMA_IFCR_OFFSET,
+                    (BDMA_CHAN_MASK << dmachan->shift));
++  EMDBG_DMA_STOP(dmachan);
+ }
+ 
+ /****************************************************************************
+@@ -1787,6 +1794,7 @@ static int stm32_bdma_interrupt(int irq, void *context, void *arg)
+ 
+   dmabase_putreg(dmachan, STM32_BDMA_IFCR_OFFSET,
+                  (status << dmachan->shift));
++  EMDBG_DMA_STOP(dmachan);
+ 
+   /* Invoke the callback */
+ 
+@@ -1854,6 +1862,7 @@ static void stm32_bdma_setup(DMA_HANDLE handle, stm32_dmacfg_t *cfg)
+   dmainfo("paddr: %08" PRIx32 " maddr: %08" PRIx32 " ndata: %" PRIu32 " "
+           "scr: %08" PRIx32 "\n",
+           cfg->paddr, cfg->maddr, cfg->ndata, cfg->cfg1);
++  EMDBG_DMA_CONFIGURE(dmachan, cfg);
+ 
+ #ifdef CONFIG_STM32H7_DMACAPABLE
+   DEBUGASSERT(stm32_bdma_capable(cfg));
+@@ -1975,6 +1984,7 @@ static void stm32_bdma_start(DMA_HANDLE handle, dma_callback_t callback,
+ 
+   DEBUGASSERT(handle != NULL);
+   DEBUGASSERT(dmachan->ctrl == BDMA);
++  EMDBG_DMA_START(dmachan);
+ 
+   /* Save the callback info.  This will be invoked when the DMA completes */
+ 

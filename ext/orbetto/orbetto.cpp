@@ -1433,7 +1433,7 @@ static void _feedStream( struct Stream *stream )
             auto *process = process_tree->add_processes();
             process->set_pid(PID_DMA);
             process->add_cmdline("DMA Channels");
-            for (int ctrl=1; ctrl <= 2; ctrl++)
+            for (int ctrl=0; ctrl <= 3; ctrl++)
             {
                 for (int chan=0; chan < 8; chan++)
                 {
