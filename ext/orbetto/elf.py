@@ -109,7 +109,7 @@ def process_symbol_table(filename):
                         names.append(symbol_name)
                         if(symbol_name[:2] == "_Z"):
                             demangled_name = demangle_cpp_function_name(symbol_name)
-                            print("  Demangled name: %s" % demangled_name)
+                            # print("  Demangled name: %s" % demangled_name)
                             functions.append((symbol_address,demangled_name))
                         else:
                             functions.append((symbol_address,symbol_name))

@@ -80,6 +80,9 @@ struct Options
     std::vector<uint8_t>* elf_file;
     bool outputDebugFile;
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+    std::vector<std::tuple<uint64_t,float,float,float,float>> spi_analog; /* Parsed spi analog tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
 
 } options =
 {
@@ -522,7 +525,7 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
     {
         uint64_t index = get<0>(*pc_function);
         std::string function_name = get<1>(*pc_function);
-        printf("Function: %s\n", function_name.c_str());
+        // printf("Function: %s\n", function_name.c_str());
         if(index==last_function_index and prev_tid==last_prev_tid) return;
         // end the last function in ftrace
         if(last_function_index != (uint64_t)-1){
@@ -716,6 +719,127 @@ static struct Stream *_tryOpenStream()
         return streamCreateSocket( options.server, options.port );
     }
 }
+
+// ====================================================================================================
+static void _spi_analog()
+{
+    // Proccess SPI Analog intro perfetto trace
+    if (options.spi_analog.size() > 0)    {
+        // iterate over all samples of analog data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp, cs, mosi, miso, clk] : options.spi_analog)
+        {
+            // add print if cs is smaller than 1.0f
+            if(cs<3.0f)
+            {
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                uint32_t mosi_int = (uint32_t)(mosi*10);
+                snprintf(buffer, 100, "C|0|Analog MOSI|%u", mosi_int);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                uint32_t miso_int = (uint32_t)(miso*10);
+                snprintf(buffer, 100, "C|0|Analog MISO|%u", miso_int);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                uint32_t clk_int = (uint32_t)(clk*10);
+                snprintf(buffer, 100, "C|0|Analog Clk|%u", clk_int);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                uint32_t cs_int = (uint32_t)(cs*10);
+                snprintf(buffer, 100, "C|0|Analog CS|%u", cs_int);
+                print->set_buf(buffer);
+                }
+            }
+        }
+    }
+}
+
+static void _spi_decoded(){
+    // Proccess SPI Decoded intro perfetto trace
+    if (options.spi_decoded_mosi.size() > 0)    {
+        // iterate over all samples of analog data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_mosi)
+        {
+            std::string data_string = " ";
+            for (const auto i : data) {
+                data_string += "0x" + std::to_string(i) + ", ";
+            }
+            {
+            // only print cs if smaller than 30.0f
+            auto *event = ftrace->add_event();
+            event->set_timestamp(timestamp_start);
+            event->set_pid(0);
+            auto *print = event->mutable_print();
+            char buffer[300];
+            snprintf(buffer, 300, "B|0|Decoded MOSI|%s", data_string.c_str());
+            print->set_buf(buffer);
+            }
+            {
+            // only print cs if smaller than 30.0f
+            auto *event = ftrace->add_event();
+            event->set_timestamp(timestamp_end);
+            event->set_pid(0);
+            auto *print = event->mutable_print();
+            char buffer[300];
+            snprintf(buffer, 300, "E|0|Decoded MOSI|%s", data_string.c_str());
+            print->set_buf(buffer);
+            }
+        }
+    }
+    if (options.spi_decoded_miso.size() > 0)    {
+        // iterate over all samples of analog data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_miso)
+        {
+            std::string data_string = " ";
+            for (const auto i : data) {
+                data_string += "0x" + std::to_string(i) + ", ";
+            }
+            {
+            // only print cs if smaller than 30.0f
+            auto *event = ftrace->add_event();
+            event->set_timestamp(timestamp_start);
+            event->set_pid(0);
+            auto *print = event->mutable_print();
+            char buffer[100];
+            snprintf(buffer, 100, "B|0|Decoded MISO|%s", data_string.c_str());
+            print->set_buf(buffer);
+            }
+            {
+            // only print cs if smaller than 30.0f
+            auto *event = ftrace->add_event();
+            event->set_timestamp(timestamp_end);
+            event->set_pid(0);
+            auto *print = event->mutable_print();
+            char buffer[100];
+            snprintf(buffer, 100, "E|0|Decoded MISO|%s", data_string.c_str());
+            print->set_buf(buffer);
+            }
+        }
+    }
+}
+
 // ====================================================================================================
 static void _feedStream( struct Stream *stream )
 {
@@ -728,6 +852,9 @@ static void _feedStream( struct Stream *stream )
     ftrace_packet->set_sequence_flags(1);
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
+
+    _spi_analog();
+    _spi_decoded();
 
     if ( options.file != NULL )
     {
@@ -867,6 +994,8 @@ static void _feedStream( struct Stream *stream )
 
 int main()
 {
+    
+
     bool alreadyReported = false;
 
     /* Reset the TPIU handler before we start */
@@ -933,6 +1062,9 @@ void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_
     options.file = py_op.std_file.data();
     options.elf_file = elfbin;
     options.functions = py_op.functions;
+    options.spi_analog = py_op.spi_analog;
+    options.spi_decoded_mosi = py_op.spi_decoded_mosi;
+    options.spi_decoded_miso = py_op.spi_decoded_miso;
     irq_names = irq_names_input;
     // call main
     printf("Wrapping worked.\n");

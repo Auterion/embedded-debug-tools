@@ -8,6 +8,7 @@ from build.orbethon import *
 import argparse
 from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin
 from irq_names import irq_names_stm32h753,irq_names_stm32f765
+from spi_decode import analog_spi_csv,spi_decode_csv
 
 arg2tsType = {
     "a" : TSType.TSAbsolute,
@@ -18,7 +19,7 @@ arg2tsType = {
 }
 
 
-def processOptions(args,functions):
+def processOptions(args,functions,spi_analog,spi_decoded_mosi,spi_decoded_miso):
     """
     Takes the input arguments and creates a options struct which is needed as input for orbetto tool
     Input:
@@ -35,6 +36,9 @@ def processOptions(args,functions):
     options.endTerminate = args.eof
     options.file = args.input_file
     options.functions = functions
+    options.spi_analog = spi_analog
+    options.spi_decoded_mosi = spi_decoded_mosi
+    options.spi_decoded_miso = spi_decoded_miso
     return options
 
 
@@ -80,6 +84,10 @@ def init_argparse():
                         type=str,
                         choices=['stm32h753','stm32f765'],
                         default='stm32f765')
+    parser.add_argument('-sc','--spi_csv',
+                        help="select spi csv file to decode",
+                        type=str,
+                        default='../../../Logic2/analog.csv')
 
     return parser.parse_args()
 
@@ -87,11 +95,13 @@ def init_argparse():
 if __name__ == "__main__":
     args = init_argparse()
     #print_sections(args.elf)
+    spi_analog = analog_spi_csv(args.spi_csv)
+    spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(args.spi_csv)
     elf_bin = list(get_text_bin(args.elf))
     #process_string_table(args.elf)
     functions = process_symbol_table(args.elf)
     #process_debug_string(args.elf)
-    options = processOptions(args,functions)
+    options = processOptions(args,functions,spi_analog,spi_decoded_mosi,spi_decoded_miso)
     print("Run Orbetto Tool ...")
     if (args.device == 'stm32h753'):
         orbethon(options,elf_bin,irq_names_stm32h753)

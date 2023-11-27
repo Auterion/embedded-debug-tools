@@ -29,6 +29,9 @@ PYBIND11_MODULE(orbethon,handle){
         .def_readwrite("endTerminate",&Options::endTerminate)
         //.def_readwrite("outputDebugFile",&Options::outputDebugFile)
         .def_readwrite("functions",&Options::functions)
+        .def_readwrite("spi_analog",&Options::spi_analog)
+        .def_readwrite("spi_decoded_mosi",&Options::spi_decoded_mosi)
+        .def_readwrite("spi_decoded_miso",&Options::spi_decoded_miso)
         ;
 
     py::enum_<TSType>(handle, "TSType")
