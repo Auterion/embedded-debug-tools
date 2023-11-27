@@ -12,3 +12,4 @@ dist/
 /ext/orbetto/*.debug
 .vscode/
 /ext/orbetto/pybind11/
+/ext/orbetto/ripyl/
