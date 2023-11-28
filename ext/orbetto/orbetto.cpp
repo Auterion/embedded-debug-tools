@@ -99,7 +99,21 @@ struct Options
     .tsTrigger = DEFAULT_TS_TRIGGER,
     .port = NWCLIENT_SERVER_PORT,
     .server = (char *)"localhost"
-}; 
+};
+
+struct PyOptions
+{
+    uint64_t cps;
+    enum TSType tsType;
+    std::string std_file;
+    bool endTerminate; 
+    std::vector<uint8_t> elf_file;
+    std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+    std::vector<std::tuple<uint64_t,float,float,float,float>> spi_analog; /* Parsed spi analog tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
+    std::vector<std::tuple<uint64_t,uint32_t,uint32_t,uint32_t,uint32_t>> spi_digital; /* Parsed spi digital tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+};
 
 
 struct
@@ -1115,7 +1129,7 @@ int main()
     return 0;
 }
 
-void main_pywrapper(Options py_op, std::unordered_map<int32_t, const char*>* irq_names_input){
+void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* irq_names_input){
     // set option struct from python
     options.cps = py_op.cps;
     options.tsType = py_op.tsType;

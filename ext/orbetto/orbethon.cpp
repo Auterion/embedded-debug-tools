@@ -8,15 +8,15 @@ PYBIND11_MODULE(orbethon,handle){
     handle.doc()="Python rapper for orbetto tool.";
     handle.def("orbethon",&main_pywrapper);
 
-    py::class_<Options>(handle,"Options_Struct")
+    py::class_<PyOptions>(handle,"Options_Struct")
         /* Default class init for python */
         .def(py::init())
         /* Config information */
         //.def_readwrite("useTPIU",&Options::useTPIU)
         //.def_readwrite("tpiuChannel",&Options::tpiuChannel)
         //.def_readwrite("forceITMSync",&Options::forceITMSync)
-        .def_readwrite("cps",&Options::cps)
-        .def_readwrite("tsType",&Options::tsType)
+        .def_readwrite("cps",&PyOptions::cps)
+        .def_readwrite("tsType",&PyOptions::tsType)
         //.def_readwrite("tsLineFormat",&Options::tsLineFormat)
         //.def_readwrite("tsTrigger",&Options::tsTrigger)
         /* Sink information */
@@ -25,15 +25,15 @@ PYBIND11_MODULE(orbethon,handle){
         /* Source information */
         //.def_readwrite("port",&Options::port)
         //.def_readwrite("server",&Options::server)
-        .def_readwrite("std_file",&Options::std_file)
-        .def_readwrite("endTerminate",&Options::endTerminate)
-        .def_readwrite("elf_file",&Options::elf_file)
+        .def_readwrite("std_file",&PyOptions::std_file)
+        .def_readwrite("endTerminate",&PyOptions::endTerminate)
+        .def_readwrite("elf_file",&PyOptions::elf_file)
         //.def_readwrite("outputDebugFile",&Options::outputDebugFile)
-        .def_readwrite("functions",&Options::functions)
-        .def_readwrite("spi_analog",&Options::spi_analog)
-        .def_readwrite("spi_digital",&Options::spi_digital)
-        .def_readwrite("spi_decoded_mosi",&Options::spi_decoded_mosi)
-        .def_readwrite("spi_decoded_miso",&Options::spi_decoded_miso)
+        .def_readwrite("functions",&PyOptions::functions)
+        .def_readwrite("spi_analog",&PyOptions::spi_analog)
+        .def_readwrite("spi_digital",&PyOptions::spi_digital)
+        .def_readwrite("spi_decoded_mosi",&PyOptions::spi_decoded_mosi)
+        .def_readwrite("spi_decoded_miso",&PyOptions::spi_decoded_miso)
         ;
 
     py::enum_<TSType>(handle, "TSType")
