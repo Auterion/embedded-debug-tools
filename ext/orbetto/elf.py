@@ -33,7 +33,7 @@ def get_text_bin(filename):
         text_section = elffile.get_section_by_name('.text')
 
         if text_section is None:
-            print("No .text section found in the ELF file.")
+            print("  No .text section found in the ELF file.")
             return None
 
         # Read the binary content of the .text section
@@ -126,7 +126,7 @@ def process_string_table(filename):
                 string_table = section
                 break
         else:
-            print("No string table found in the ELF file.")
+            print("  No string table found in the ELF file.")
             return
 
         # Read the entire string table data
@@ -153,7 +153,7 @@ def process_debug_string(filename):
         debug_str_section = elffile.get_section_by_name('.debug_str')
 
         if debug_str_section is None:
-            print("No .debug_str section found in the ELF file.")
+            print("  No .debug_str section found in the ELF file.")
             return
 
         # Iterate through compilation units in .debug_info
@@ -163,7 +163,7 @@ def process_debug_string(filename):
                 # Iterate through all attributes in the DIE
                 if 'DW_AT_name' in die.attributes:
                     # Get the offset of the string in .debug_str
-                    print(die.attributes['DW_AT_name'].value)
+                    print("  " + die.attributes['DW_AT_name'].value)
 
 
 def print_sections(filename):

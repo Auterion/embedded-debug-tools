@@ -8,11 +8,25 @@ from ripyl.streaming import SampleChunk
 
 
 def analog_spi_csv(path):
-    df = pd.read_csv(path)
+    print("Parse analog SPI CSV ...")
+    df = pd.read_csv(path)[0:20000]
     # convert timestamps to ns
     df['Time [s]'] = df['Time [s]'] * 1000000
     # convert timestamp to integer
     df['Time [s]'] = df['Time [s]'].astype(int)
+    df = df.drop_duplicates(subset=['Time [s]'])
+    tuples = df.to_records(index=False).tolist()
+    return tuples
+
+def digital_spi_csv(path):
+    print("Parse digital SPI CSV ...")
+    df = pd.read_csv(path)[0:20000]
+    # convert timestamps to ns
+    df['Time [s]'] = df['Time [s]'] * 1000000
+    # convert every type to int
+    df['Time [s]'] = df['Time [s]'].astype(int)
+    # reduce df to unqiue timestamps
+    df = df.drop_duplicates(subset=['Time [s]'])
     tuples = df.to_records(index=False).tolist()
     return tuples
 
@@ -83,19 +97,20 @@ def spi_decode_csv(path, cpol=1, cpha=0, lsb_first=0, stream_type=streaming.Stre
         mosi_bin: array of MOSI samples with timestamps
         miso_bin: array of MISO samples with timestamps
     """
+    print("Decode SPI CSV ...")
     if (stream_type == streaming.StreamType.Samples):
         # get data from path
-        #clk,cs, miso, mosi, timestamps, sample_period = read_csv_file(path,signal_length=100000)
-        clk,cs, miso, mosi, timestamps, sample_period = read_csv_file(path)
+        clk,cs, miso, mosi, timestamps, sample_period = read_csv_file(path,signal_length=20000)
+        #clk,cs, miso, mosi, timestamps, sample_period = read_csv_file(path)
         # Convert data to iterable SampleChunk objects
         clk = convert_to_iterable_SampleChunk(clk,timestamps,sample_period)
         miso = convert_to_iterable_SampleChunk(miso,timestamps,sample_period)
         mosi = convert_to_iterable_SampleChunk(mosi,timestamps,sample_period)
         cs = convert_to_iterable_SampleChunk(cs,timestamps,sample_period)
     elif (stream_type==streaming.StreamType.Edges):
-        raise Exception("StreamType.Edges not implemented yet")
+        raise Exception("  StreamType.Edges not implemented yet")
     else:
-        raise Exception("Wrong StreamType. Choose between streaming.StreamType.Edges and streaming.StreamType.Samples")
+        raise Exception("  Wrong StreamType. Choose between streaming.StreamType.Edges and streaming.StreamType.Samples")
 
     # decode the SPI stream
     mosi_it = spi.spi_decode(clk, mosi, cs, cpol=cpol, cpha=cpha, lsb_first=lsb_first,logic_levels=voltage_levels, stream_type=stream_type)
@@ -103,8 +118,6 @@ def spi_decode_csv(path, cpol=1, cpha=0, lsb_first=0, stream_type=streaming.Stre
     # convert to list and display
     mosi_list = list(mosi_it)
     miso_list = list(miso_it)
-    #print('\nDecoded:', [str(r) for r in mosi_list])
-    #print(mosi_list[-1].start_time, mosi_list[-1].end_time)
     # extract every sample from the list which is a StreamSegment object
     mosi_bin = []
     for i in mosi_list:

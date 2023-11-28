@@ -81,6 +81,7 @@ struct Options
     bool outputDebugFile;
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
     std::vector<std::tuple<uint64_t,float,float,float,float>> spi_analog; /* Parsed spi analog tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
+    std::vector<std::tuple<uint64_t,uint32_t,uint32_t,uint32_t,uint32_t>> spi_digital; /* Parsed spi digital tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
 
@@ -776,6 +777,57 @@ static void _spi_analog()
     }
 }
 
+static void _spi_digital()
+{
+    // Proccess SPI Digital intro perfetto trace
+    if (options.spi_digital.size() > 0)    {
+        // iterate over all samples of digital data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp, cs, mosi, miso, clk] : options.spi_digital)
+        {
+            // add print if cs is smaller than 1.0f
+            if(cs<1)
+            {
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "C|0|Digital MOSI|%u", mosi);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "C|0|Digital MISO|%u", miso);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "C|0|Digital Clk|%u", clk);
+                print->set_buf(buffer);
+                }
+                {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(timestamp);
+                event->set_pid(0);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "C|0|Digital CS|%u", cs);
+                print->set_buf(buffer);
+                }
+            }
+        }
+    }
+}
+
 static void _spi_decoded(){
     // Proccess SPI Decoded intro perfetto trace
     if (options.spi_decoded_mosi.size() > 0)    {
@@ -854,6 +906,7 @@ static void _feedStream( struct Stream *stream )
     ftrace->set_cpu(0);
 
     _spi_analog();
+    _spi_digital();
     _spi_decoded();
 
     if ( options.file != NULL )
@@ -1063,6 +1116,7 @@ void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_
     options.elf_file = elfbin;
     options.functions = py_op.functions;
     options.spi_analog = py_op.spi_analog;
+    options.spi_digital = py_op.spi_digital;
     options.spi_decoded_mosi = py_op.spi_decoded_mosi;
     options.spi_decoded_miso = py_op.spi_decoded_miso;
     irq_names = irq_names_input;
