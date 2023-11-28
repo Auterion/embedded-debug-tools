@@ -25,7 +25,7 @@ PYBIND11_MODULE(orbethon,handle){
         /* Source information */
         //.def_readwrite("port",&Options::port)
         //.def_readwrite("server",&Options::server)
-        .def_readwrite("file",&Options::std_file)
+        .def_readwrite("std_file",&Options::std_file)
         .def_readwrite("endTerminate",&Options::endTerminate)
         .def_readwrite("elf_file",&Options::elf_file)
         //.def_readwrite("outputDebugFile",&Options::outputDebugFile)

@@ -30,13 +30,18 @@ def processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mo
     print("Process Options ...")
     # init Options class
     options = Options_Struct()
-    # set options based on args
+    # default options
     options.cps = args.cpufreq * 1000
     options.tsType = arg2tsType[args.timestamp]
+    # input file name
+    options.std_file = args.input_file
+    # parse options
     options.endTerminate = args.eof
+    # bin elf file
     options.elf_file = elf_file
-    options.file = args.input_file
+    #parsed functions
     options.functions = functions
+    # spi debug 
     options.spi_analog = spi_analog
     options.spi_digital = spi_digital
     options.spi_decoded_mosi = spi_decoded_mosi

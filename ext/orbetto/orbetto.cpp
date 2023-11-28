@@ -72,13 +72,21 @@ struct Options
     int port;
     char *server;
 
+    /* SWO File name */
     char *file;                              /* File host connection */
     std::string std_file;
+
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
+    /* Binary elf_file */
     std::vector<uint8_t> elf_file;
+
     bool outputDebugFile;
+
+    /* Parsed functions */
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+
+    /* SPI Debug */
     std::vector<std::tuple<uint64_t,float,float,float,float>> spi_analog; /* Parsed spi analog tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
     std::vector<std::tuple<uint64_t,uint32_t,uint32_t,uint32_t,uint32_t>> spi_digital; /* Parsed spi digital tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
@@ -91,7 +99,7 @@ struct Options
     .tsTrigger = DEFAULT_TS_TRIGGER,
     .port = NWCLIENT_SERVER_PORT,
     .server = (char *)"localhost"
-};
+}; 
 
 
 struct
