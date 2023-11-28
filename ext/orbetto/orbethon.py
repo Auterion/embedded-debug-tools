@@ -19,7 +19,7 @@ arg2tsType = {
 }
 
 
-def processOptions(args,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso):
+def processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso):
     """
     Takes the input arguments and creates a options struct which is needed as input for orbetto tool
     Input:
@@ -34,6 +34,7 @@ def processOptions(args,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_de
     options.cps = args.cpufreq * 1000
     options.tsType = arg2tsType[args.timestamp]
     options.endTerminate = args.eof
+    options.elf_file = elf_file
     options.file = args.input_file
     options.functions = functions
     options.spi_analog = spi_analog
@@ -102,11 +103,11 @@ if __name__ == "__main__":
     spi_analog = analog_spi_csv(args.spi_analog)
     spi_digital = digital_spi_csv(args.spi_digital)
     spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(args.spi_analog)
-    elf_bin = list(get_text_bin(args.elf))
+    elf_file = list(get_text_bin(args.elf))
     functions = process_symbol_table(args.elf)
-    options = processOptions(args,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso)
+    options = processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso)
     print("Run Orbetto Tool ...")
     if (args.device == 'stm32h753'):
-        orbethon(options,elf_bin,irq_names_stm32h753)
+        orbethon(options,irq_names_stm32h753)
     elif (args.device == 'stm32f765'):
-        orbethon(options,elf_bin,irq_names_stm32f765)
+        orbethon(options,irq_names_stm32f765)

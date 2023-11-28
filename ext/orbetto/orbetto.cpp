@@ -52,7 +52,6 @@
 enum TSType { TSNone, TSAbsolute, TSRelative, TSDelta, TSStamp, TSStampDelta, TSNumTypes };
 const char *tsTypeString[TSNumTypes] = { "None", "Absolute", "Relative", "Delta", "System Timestamp", "System Timestamp Delta" };
 
-
 // Record for options, either defaults or from command line
 struct Options
 {
@@ -77,7 +76,7 @@ struct Options
     std::string std_file;
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
-    std::vector<uint8_t>* elf_file;
+    std::vector<uint8_t> elf_file;
     bool outputDebugFile;
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
     std::vector<std::tuple<uint64_t,float,float,float,float>> spi_analog; /* Parsed spi analog tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
@@ -93,6 +92,7 @@ struct Options
     .port = NWCLIENT_SERVER_PORT,
     .server = (char *)"localhost"
 };
+
 
 struct
 {
@@ -1107,13 +1107,13 @@ int main()
     return 0;
 }
 
-void main_pywrapper(Options py_op, std::vector<uint8_t>* elfbin, std::unordered_map<int32_t, const char*>* irq_names_input){
+void main_pywrapper(Options py_op, std::unordered_map<int32_t, const char*>* irq_names_input){
     // set option struct from python
     options.cps = py_op.cps;
     options.tsType = py_op.tsType;
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
-    options.elf_file = elfbin;
+    options.elf_file = py_op.elf_file;
     options.functions = py_op.functions;
     options.spi_analog = py_op.spi_analog;
     options.spi_digital = py_op.spi_digital;
