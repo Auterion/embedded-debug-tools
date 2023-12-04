@@ -1,0 +1,32 @@
+diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
+index a38633bbfe..d7594d860c 100644
+--- a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
++++ b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
+@@ -32,6 +32,7 @@
+ 
+ #include <nuttx/arch.h>
+ #include <nuttx/mm/mm.h>
++#include <nuttx/itm/itm.h>
+ 
+ #include "mm_heap/mm.h"
+ #include "kasan/kasan.h"
+diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c
+index 6331465d34..c225edd2ec 100644
+--- a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c
++++ b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c
+@@ -134,6 +135,7 @@ FAR void *mm_realloc(FAR struct mm_heap_s *heap, FAR void *oldmem,
+       /* Then return the original address */
+ 
+       mm_givesemaphore(heap);
++      EMDBG_HEAP_REALLOC(oldmem, size, oldmem);
+       return oldmem;
+     }
+ 
+@@ -349,6 +351,7 @@ FAR void *mm_realloc(FAR struct mm_heap_s *heap, FAR void *oldmem,
+         }
+ 
+       mm_givesemaphore(heap);
++      EMDBG_HEAP_REALLOC(oldmem, size, newmem);
+       return newmem;
+     }
+ 

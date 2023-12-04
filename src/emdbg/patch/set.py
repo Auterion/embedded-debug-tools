@@ -16,7 +16,6 @@ def semaphore_boostlog(px4_root: Path) -> PatchManager:
     that is written from inside the kernel and read in the PX4 logger module,
     which logs it out to the NSH.
     """
-    px4_root = Path(px4_root)
     operations = [
         PatchOperation(px4_root, _data("semaphore_boostlog.patch")),
         CopyOperation(_data("sem_boostlog.c"),
@@ -31,19 +30,13 @@ def reduce_firmware_size_v5x(px4_root: Path) -> PatchManager:
     """
     Disables UAVCAN and a few drivers to make the binary size fit on the FMUv5x.
     """
-    px4_root = Path(px4_root)
     operations = [
         PatchOperation(px4_root, _data("disable_uavcan_v5x.patch")),
     ]
     return PatchManager("Make the Firmware fit on the FMUv5x Flash", operations)
 
 
-def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
-    """
-    Adds scheduler and heap instrumentation to NuttX via ITM.
-    Requires the `itm_logging` patch.
-    """
-    px4_root = Path(px4_root)
+def _nuttx_tracing_itm(px4_root: Path) -> list:
     operations = [
         CopyOperation(_data("itm.h"),
                       px4_root / "platforms/nuttx/NuttX/nuttx/include/nuttx/itm/itm.h"),
@@ -52,7 +45,25 @@ def nuttx_tracing_itm(px4_root: Path) -> PatchManager:
         PatchOperation(px4_root, _data("itm_nuttx_Makefile.patch")),
         PatchOperation(px4_root, _data("nuttx_tracing_itm.patch")),
     ]
-    return PatchManager("Add tracing support to NuttX via ITM", operations)
+    return operations
+
+def nuttx_tracing_itm_v10(px4_root: Path) -> PatchManager:
+    """
+    Adds scheduler and heap instrumentation to NuttX v10 via ITM.
+    """
+    operations = _nuttx_tracing_itm(px4_root) + [
+        PatchOperation(px4_root, _data("nuttx_tracing_itm_v10.patch")),
+    ]
+    return PatchManager("Add tracing support to NuttX v10 via ITM", operations)
+
+def nuttx_tracing_itm_v11(px4_root: Path) -> PatchManager:
+    """
+    Adds scheduler and heap instrumentation to NuttX v11 via ITM.
+    """
+    operations = _nuttx_tracing_itm(px4_root) + [
+        PatchOperation(px4_root, _data("nuttx_tracing_itm_v11.patch")),
+    ]
+    return PatchManager("Add tracing support to NuttX v11 via ITM", operations)
 
 
 def nuttx_sdmmc_reg_access(px4_root: Path) -> PatchManager:
@@ -60,7 +71,6 @@ def nuttx_sdmmc_reg_access(px4_root: Path) -> PatchManager:
     Un-inlines the `sdmmc_putreg32`, `sdmmc_getreg32`, and `sdmmc_modifyreg32`
     functions, so that breakpoints can be set on them.
     """
-    px4_root = Path(px4_root)
     operations = [
         PatchOperation(px4_root, _data("sdmmc_no_inline.patch")),
     ]
@@ -74,7 +84,6 @@ def malloc_return_null(px4_root: Path) -> PatchManager:
     You can use this to find code that doesn't check the malloc return value for
     NULL or see how the error handling performs.
     """
-    px4_root = Path(px4_root)
     operations = [
         PatchOperation(px4_root, _data("malloc_return_null.patch")),
     ]

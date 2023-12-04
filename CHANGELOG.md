@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.7
+
+- Split ITM tracing patch to work with NuttX v10 and v11.
+
 ## 1.3.6
 
 - Update SVD file for FMUv6x.
