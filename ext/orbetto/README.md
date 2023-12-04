@@ -13,6 +13,7 @@ The functionality currently instrumented with cycle accuracy:
 - IRQ entry/exit.
 - Workqueue start/stop with name.
 - Heap malloc/free with address and size.
+- DMA transfer start/stop with configuration.
 
 Perfetto is a FTrace visualizer that works really well for this use case:
 

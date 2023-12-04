@@ -398,8 +398,8 @@ static std::unordered_map<int32_t, const char*> irq_names_stm32h753 =
     {16+149, "WAKEUP_PIN"},         // Interrupt for all 6 wake-up pins
 };
 // FIXME: detect this automatically
-static auto &irq_names = irq_names_stm32f765;
-// static auto &irq_names = irq_names_stm32h753;
+// static auto &irq_names = irq_names_stm32f765;
+static auto &irq_names = irq_names_stm32h753;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
@@ -528,7 +528,15 @@ static void _writeFree(uint64_t ns, uint32_t address, uint32_t alignsize, uint32
 static std::unordered_map<uint16_t, uint32_t> workqueue_map;
 static std::unordered_map<uint32_t, std::string> workqueue_names;
 static std::set<uint16_t> stopped_threads;
-static std::unordered_map<uint32_t, std::string> dma_channel_config;
+struct dma_config_t
+{
+    uint32_t size;
+    uint32_t paddr;
+    uint32_t maddr;
+    uint32_t config;
+};
+static std::unordered_map<uint32_t, dma_config_t> dma_channel_config;
+static std::unordered_map<uint32_t, std::string> dma_channel_name;
 static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_SOFTWARE );
@@ -581,7 +589,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                         newtask->set_clone_flags(0x10000); // new thread, not new process!
                     }
                 }
-                active_threads.insert({tid, thread_name});
+                active_threads[tid] = thread_name;
             }
             thread_name.clear();
         }
@@ -638,13 +646,13 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         event->set_pid(prev_tid);
         auto *workqueue_start = event->mutable_workqueue_execute_start();
         workqueue_start->set_function(m->value);
-        workqueue_map.insert({prev_tid, m->value});
+        workqueue_map[prev_tid] = m->value;
         if (_r.symbols and not workqueue_names.contains(m->value))
         {
             if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
             {
                 printf("Found Name %s for 0x%08x\n", name, m->value);
-                workqueue_names.insert({m->value, name});
+                workqueue_names[m->value] = name;
             }
             else {
                 printf("No match found for 0x%08x\n", m->value);
@@ -673,7 +681,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         else if (start)
         {
             const uint32_t end = start + m->value;
-            heap_regions.insert({start, end});
+            heap_regions[start] = end;
             printf("Heap region added: [%08x, %08x] (%ukiB)\n", start, end, (end - start) / 1024);
             heap_size_remaining += end - start;
             start = 0;
@@ -697,7 +705,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             alignsize = ((size + 16) + 0xf) & ~0xf;
         }
         else {
-            if (m->value) heap_allocations.insert({m->value, {size, alignsize}});
+            if (m->value) heap_allocations[m->value] = std::pair{size, alignsize};
             else printf("malloc(%uB) failed!\n", size);
             _writeMalloc(ns, m->value, alignsize, size);
         }
@@ -715,78 +723,102 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
     else if (m->srcAddr == 21) // dma config
     {
         static uint8_t instance{0}, channel{0};
-        static uint16_t size{0};
-        static uint32_t paddr{0}, maddr{0}, config{0}, tid{0};
+        static uint32_t did{0};
         static uint16_t mask{0x8000};
+        bool update{false};
         if (m->len == 2 and m->value & 0x8000 and mask & 0x8000) {
             channel = m->value & 0x1f;
             instance = (m->value >> 5) & 0x7;
-            tid = PID_DMA + instance * 100 + channel;
+            did = PID_DMA + instance * 100 + channel;
             mask = m->value & 0x0f00;
             // printf("%llu: DMA%u CH%u Config: Mask=%#04x\n", ns, instance, channel, mask);
         }
         else if (mask & 0x0100) {
-            size = m->value;
+            dma_channel_config[did].size = m->value;
             mask &= ~0x0100;
-            // printf("%llu: DMA%u CH%u Config: S=%u\n", ns, instance, channel, size);
+            printf("%llu: DMA%u CH%u Config: S=%u\n", ns, instance, channel, m->value);
         }
         else if (mask & 0x0200) {
-            paddr = m->value;
+            dma_channel_config[did].paddr = m->value;
             mask &= ~0x0200;
-            // printf("%llu: DMA%u CH%u Config: P=%#08x\n", ns, instance, channel, paddr);
+            printf("%llu: DMA%u CH%u Config: P=%#08x\n", ns, instance, channel, m->value);
         }
         else if (mask & 0x0400) {
-            maddr = m->value;
+            dma_channel_config[did].maddr = m->value;
             mask &= ~0x0400;
-            // printf("%llu: DMA%u CH%u Config: M=%#08x\n", ns, instance, channel, maddr);
+            printf("%llu: DMA%u CH%u Config: M=%#08x\n", ns, instance, channel, m->value);
         }
         else if (mask & 0x0800) {
-            config = m->value;
+            dma_channel_config[did].config = m->value;
             mask &= ~0x0800;
-            // printf("%llu: DMA%u CH%u Config: C=%#08x\n", ns, instance, channel, config);
+            printf("%llu: DMA%u CH%u Config: C=%#08x\n", ns, instance, channel, m->value);
+        }
+        else {
+            mask = 0x8000;
         }
         if (mask == 0) {
-            uint32_t src = paddr, dst = maddr;
-            if ((config & 0xC0) == 0x40) std::swap(src, dst);
+            static std::unordered_map<uint32_t, std::string> addr2reg =
+            {
+                {0x40003820, "SPI2.TXDR"},
+                {0x40003830, "SPI2.RXDR"},
+                {0x40003c20, "SPI3.TXDR"},
+                {0x40003c30, "SPI3.RXDR"},
+                {0x40004824, "USART3.RDR"},
+                {0x40004828, "USART3.TDR"},
+                {0x40005024, "UART5.RDR"},
+                {0x40005028, "UART5.TDR"},
+                {0x40007824, "UART7.RDR"},
+                {0x40007828, "UART7.TDR"},
+                {0x40011424, "USART1.RDR"},
+                {0x40011428, "USART1.TDR"},
+                {0x40013020, "SPI1.TXDR"},
+                {0x40013030, "SPI1.RXDR"},
+            };
+            const auto &config = dma_channel_config[did];
+            uint32_t src = config.paddr, dst = config.maddr;
+            if ((config.config & 0xC0) == 0x40) std::swap(src, dst);
             char buffer[1000];
-            snprintf(buffer, sizeof(buffer), "%uB: %#08x -> %#08x (%#08x:%s%s%s%s%s%s%s%s)\n",
-                     size, src, dst, config,
-                     config & 0x40000 ? " DBM" : "",
-                     (const char*[]){" L", " M", " H", " VH"}[(config & 0x30000) >> 16],
-                     (const char*[]){" P8", " P16", " P32", ""}[(config & 0x6000) >> 13],
-                     (const char*[]){" M8", " M16", " M32", ""}[(config & 0x1800) >> 11],
-                     config & 0x400 ? " MINC" : "",
-                     config & 0x200 ? " PINC" : "",
-                     config & 0x100 ? " CIRC" : "",
-                     config & 0x20 ? " PFCTRL" : "");
-            dma_channel_config.insert({tid, buffer});
+            snprintf(buffer, sizeof(buffer), "%uB: %#08x%s -> %#08x%s (%#08x:%s%s%s%s%s%s%s%s)\n",
+                     config.size,
+                     src, addr2reg.contains(src) ? ("="s + addr2reg[src]).c_str() : "",
+                     dst, addr2reg.contains(dst) ? ("="s + addr2reg[dst]).c_str() : "",
+                     config.config,
+                     config.config & 0x40000 ? " DBM" : "",
+                     (const char*[]){" L", " M", " H", " VH"}[(config.config & 0x30000) >> 16],
+                     (const char*[]){" P8", " P16", " P32", ""}[(config.config & 0x6000) >> 13],
+                     (const char*[]){" M8", " M16", " M32", ""}[(config.config & 0x1800) >> 11],
+                     config.config & 0x400 ? " MINC" : "",
+                     config.config & 0x200 ? " PINC" : "",
+                     config.config & 0x100 ? " CIRC" : "",
+                     config.config & 0x20 ? " PFCTRL" : "");
+            dma_channel_name[did] = buffer;
             mask = 0x8000;
         }
     }
     else if (m->srcAddr == 22) // dma start
     {
-        const uint8_t instance = m->value >> 5;
-        const uint8_t channel = m->value & 0x1f;
-        const uint32_t tid = PID_DMA + instance * 100 + channel;
+        const uint32_t instance = m->value >> 5;
+        const uint32_t channel = m->value & 0x1f;
+        const uint32_t did = PID_DMA + instance * 100 + channel;
         // printf("%llu: DMA%u CH%u Start\n", ns, instance, channel);
         {
             auto *event = ftrace->add_event();
             event->set_timestamp(ns);
-            event->set_pid(tid);
+            event->set_pid(did);
             auto *print = event->mutable_print();
-            print->set_buf("B|0|"s + dma_channel_config[tid]);
+            print->set_buf("B|0|"s + dma_channel_name[did]);
         }
     }
     else if (m->srcAddr == 23) // dma stop
     {
-        const uint8_t instance = m->value >> 5;
-        const uint8_t channel = m->value & 0x1f;
-        const uint32_t tid = PID_DMA + instance * 100 + channel;
+        const uint32_t instance = m->value >> 5;
+        const uint32_t channel = m->value & 0x1f;
+        const uint32_t did = PID_DMA + instance * 100 + channel;
         // printf("%llu: DMA%u CH%u Stop\n", ns, instance, channel);
         {
             auto *event = ftrace->add_event();
             event->set_timestamp(ns);
-            event->set_pid(tid);
+            event->set_pid(did);
             auto *print = event->mutable_print();
             print->set_buf("E|0");
         }
@@ -814,7 +846,7 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
     if (irq_state.contains(irq) and
         not irq_state[irq] and not begin)
         return;
-    irq_state.insert({irq, begin});
+    irq_state[irq] = begin;
 
     static uint32_t last_irq{0};
     static bool last_begin{false};
