@@ -48,6 +48,12 @@ class CopyOperation:
         self._store = self.PATCH_STORE / str(self._hash)
         self._dstrestore = self._store / self._dst.name
 
+    def test_do(self) -> bool:
+        return True
+
+    def test_undo(self) -> bool:
+        return True
+
     def do(self) -> bool:
         """
         Copies the `source` file to the `destination` location.
@@ -109,6 +115,20 @@ class PatchOperation:
         self._cmd_rev = self._cmd + " --reverse"
         self._cmd_check = " --dry-run"
 
+    def test_do(self) -> bool:
+        cmd_check = self._cmd + self._cmd_check
+        if subprocess.run(cmd_check, shell=True).returncode:
+            LOGGER.debug(cmd_check)
+            return False
+        return True
+
+    def test_undo(self) -> bool:
+        cmd_check = self._cmd_rev + self._cmd_check
+        if subprocess.run(cmd_check, shell=True).returncode:
+            LOGGER.debug(cmd_check)
+            return False
+        return True
+
     def do(self) -> bool:
         """
         Applies the patch to the directory.
@@ -116,10 +136,7 @@ class PatchOperation:
         :return: `True` if applied successfully.
         """
         LOGGER.debug(f"Applying patch {self._patch}")
-        cmd_check = self._cmd + self._cmd_check
-        if subprocess.run(cmd_check, shell=True).returncode:
-            LOGGER.debug(cmd_check)
-            return False
+        if not self.test_do(): return False
         LOGGER.debug(self._cmd)
         return not subprocess.run(self._cmd, shell=True).returncode
 
@@ -130,10 +147,7 @@ class PatchOperation:
         :return: `True` if restored successfully.
         """
         LOGGER.debug(f"Reverting patch {self._patch}")
-        cmd_check = self._cmd_rev + self._cmd_check
-        if subprocess.run(cmd_check, shell=True).returncode:
-            LOGGER.debug(cmd_check)
-            return False
+        if not self.test_undo(): return False
         LOGGER.debug(self._cmd_rev)
         return not subprocess.run(self._cmd_rev, shell=True).returncode
 
@@ -164,6 +178,9 @@ class PatchManager:
         """
         LOGGER.info(f"Applying '{self.name}'")
         for op in self._ops:
+            if not op.test_do():
+                raise OperationError(f"Patching failed: {op}")
+        for op in self._ops:
             if not op.do():
                 raise OperationError(f"Patching failed: {op}")
 
@@ -175,6 +192,9 @@ class PatchManager:
         :raises `OperationError`: if any of the operations failed.
         """
         LOGGER.info(f"Restoring '{self.name}'")
+        for op in self._ops:
+            if not op.test_undo():
+                raise OperationError(f"Reverting failed: {op}")
         for op in self._ops:
             if not op.undo():
                 raise OperationError(f"Reverting failed: {op}")

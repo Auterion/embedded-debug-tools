@@ -2,6 +2,7 @@
 
 ## 1.3.7
 
+- Test all patches first to prevent partial patch application.
 - Split ITM tracing patch to work with NuttX v10 and v11.
 
 ## 1.3.6
