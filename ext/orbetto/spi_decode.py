@@ -11,7 +11,7 @@ def analog_spi_csv(path):
     print("Parse analog SPI CSV ...")
     df = pd.read_csv(path)[0:20000]
     # convert timestamps to ns
-    df['Time [s]'] = df['Time [s]'] * 1000000
+    df['Time [s]'] = df['Time [s]'] * 1e9
     # convert timestamp to integer
     df['Time [s]'] = df['Time [s]'].astype(int)
     df = df.drop_duplicates(subset=['Time [s]'])
@@ -22,7 +22,7 @@ def digital_spi_csv(path):
     print("Parse digital SPI CSV ...")
     df = pd.read_csv(path)[0:20000]
     # convert timestamps to ns
-    df['Time [s]'] = df['Time [s]'] * 1000000
+    df['Time [s]'] = df['Time [s]'] * 1e9
     # convert every type to int
     df['Time [s]'] = df['Time [s]'].astype(int)
     # reduce df to unqiue timestamps

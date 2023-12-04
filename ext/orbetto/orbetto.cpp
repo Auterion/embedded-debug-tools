@@ -79,7 +79,7 @@ struct Options
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
     /* Binary elf_file */
-    std::vector<uint8_t> elf_file;
+    std::vector<uint8_t>* elf_file;
 
     bool outputDebugFile;
 
@@ -91,6 +91,12 @@ struct Options
     std::vector<std::tuple<uint64_t,uint32_t,uint32_t,uint32_t,uint32_t>> spi_digital; /* Parsed spi digital tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<uint64_t> workqueue_intervals_spi;
+    uint64_t timestamp_spi;
+
+    /* SPI Sync */
+    std::vector<std::tuple<uint64_t,uint64_t>> workqueue_intervals_swo;
+    uint64_t workqueue_last_switch_swo;
 
 } options =
 {
@@ -98,7 +104,8 @@ struct Options
     .forceITMSync = true,
     .tsTrigger = DEFAULT_TS_TRIGGER,
     .port = NWCLIENT_SERVER_PORT,
-    .server = (char *)"localhost"
+    .server = (char *)"localhost",
+    .workqueue_last_switch_swo = 0,
 };
 
 struct PyOptions
@@ -113,6 +120,8 @@ struct PyOptions
     std::vector<std::tuple<uint64_t,uint32_t,uint32_t,uint32_t,uint32_t>> spi_digital; /* Parsed spi digital tuple from csv file (shape: #samples * [timestamp,CS,MOSI,MISO,CLK])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<uint64_t> workqueue_intervals_spi;
+    uint64_t timestamp_spi;
 };
 
 
@@ -375,7 +384,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         auto *sched_waking = event->mutable_sched_waking();
         sched_waking->set_pid(tid);
         sched_waking->set_success(1);
-    }/*
+    }
     else if (m->srcAddr == 15) // workqueue start
     {
         if (prev_tid == 0) return;
@@ -418,7 +427,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             workqueue_map.erase(prev_tid);
             // const uint8_t count = m->value;
         }
-    }*/
+    }
     else if (m->srcAddr == 17) // heap region
     {
         static uint32_t start = 0;
@@ -535,41 +544,41 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
     // check if pc is in idle task then skip
     // if(prev_tid == 0) return;
     // find the new function name
-    auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
-        [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
-        {
-            return get<0>(addr_func_tuple) < value;
-        });
-    // begin the new function in ftrace
-    if (pc_function == options.functions.end()) 
-    {
-        printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
-    }else
-    {
-        uint64_t index = get<0>(*pc_function);
-        std::string function_name = get<1>(*pc_function);
-        // printf("Function: %s\n", function_name.c_str());
-        if(index==last_function_index and prev_tid==last_prev_tid) return;
-        // end the last function in ftrace
-        if(last_function_index != (uint64_t)-1){
-            auto *event = ftrace->add_event();
-            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
-            event->set_pid(last_prev_tid);
-            auto *exit = event->mutable_funcgraph_exit();
-            exit->set_depth(0);
-            exit->set_func(last_function_index);
-        }
-        // start ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
-        event->set_pid(prev_tid);
-        auto *entry = event->mutable_funcgraph_entry();
-        entry->set_depth(0);
-        entry->set_func(index);
-        // save last event
-        last_prev_tid = prev_tid;
-        last_function_index = index;
-    }
+    // auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
+    //     [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
+    //     {
+    //         return get<0>(addr_func_tuple) < value;
+    //     });
+    // // begin the new function in ftrace
+    // if (pc_function == options.functions.end()) 
+    // {
+    //     printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
+    // }else
+    // {
+    //     uint64_t index = get<0>(*pc_function);
+    //     std::string function_name = get<1>(*pc_function);
+    //     // printf("Function: %s\n", function_name.c_str());
+    //     if(index==last_function_index and prev_tid==last_prev_tid) return;
+    //     // end the last function in ftrace
+    //     if(last_function_index != (uint64_t)-1){
+    //         auto *event = ftrace->add_event();
+    //         event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+    //         event->set_pid(last_prev_tid);
+    //         auto *exit = event->mutable_funcgraph_exit();
+    //         exit->set_depth(0);
+    //         exit->set_func(last_function_index);
+    //     }
+    //     // start ftrace event
+    //     auto *event = ftrace->add_event();
+    //     event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+    //     event->set_pid(prev_tid);
+    //     auto *entry = event->mutable_funcgraph_entry();
+    //     entry->set_depth(0);
+    //     entry->set_func(index);
+    //     // save last event
+    //     last_prev_tid = prev_tid;
+    //     last_function_index = index;
+    // }
 
 }
 
@@ -591,6 +600,23 @@ static void _itmPumpProcessPre( char c )
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
                 }
+                else if (m->srcAddr == 15) // workqueue start
+                {
+                    const uint64_t ns = (_r.timeStamp * 1e9) / options.cps;
+                    if(options.workqueue_last_switch_swo == 0)
+                    {
+                        options.workqueue_last_switch_swo = ns;
+                    }else
+                    {
+                        options.workqueue_intervals_swo.push_back(std::make_tuple(ns, ns-options.workqueue_last_switch_swo));
+                        options.workqueue_last_switch_swo = ns;
+                    }
+                }
+            }
+            else if(p.genericMsg.msgtype == MSG_TS)
+            {
+                struct TSMsg *m = (struct TSMsg *)&p;
+                _r.timeStamp += m->timeInc;
             }
         }
     }
@@ -914,6 +940,45 @@ static void _spi_decoded(){
     }
 }
 
+static uint64_t find_matching_pattern(){
+    printf("Synchronise SWO and SPI ...\n");
+    int window_length = options.workqueue_intervals_spi.size();
+    printf("\t Window length: %d\n", window_length);
+    // loop over options.workqueue_intervals_swo and compute abs sum of intervals
+    uint64_t min_sum = (uint64_t)-1;
+    int min_sum_index = -1;
+    uint64_t second_min_sum = (uint64_t)-1;
+    uint64_t min_total_sum = 0;
+    for(int i = 0;i<options.workqueue_intervals_swo.size()-window_length;i++){
+        uint64_t sum = 0;
+        uint64_t total_sum = 0;
+        for(int j = 0;j<window_length;j++){
+            int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-options.workqueue_intervals_spi[j];
+            sum += abs(diff);
+            total_sum += std::get<1>(options.workqueue_intervals_swo[i+j]);
+        }
+        if(sum < min_sum)
+        {
+            second_min_sum = min_sum;
+            min_sum = sum;
+            min_sum_index = i;
+            min_total_sum = total_sum;
+        }
+    }
+    printf("\t Min Offset: %llu\n", min_sum);
+    printf("\t Second Min Offset: %llu\n", second_min_sum);
+    printf("\t Min Offset Index: %d\n", min_sum_index);
+    if(min_total_sum !=0)
+    {
+        printf("\t Min Offset Ratio: %f'%%'\n", (float)min_sum/min_total_sum*100);
+    }
+    // print overlapping intervals
+    for(int i = 0;i<window_length;i++){
+        printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]), options.workqueue_intervals_spi[i], (int)std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-options.workqueue_intervals_spi[i]);
+    }
+    return (std::get<0>(options.workqueue_intervals_swo[min_sum_index])-options.timestamp_spi);
+}
+
 // ====================================================================================================
 static void _feedStream( struct Stream *stream )
 {
@@ -927,9 +992,6 @@ static void _feedStream( struct Stream *stream )
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
 
-    _spi_analog();
-    _spi_digital();
-    _spi_decoded();
 
     if ( options.file != NULL )
     {
@@ -965,6 +1027,15 @@ static void _feedStream( struct Stream *stream )
         stream->close(stream);
         stream = streamCreateFile( options.file );
     }
+
+    // reset timestamp for second swo parsing
+    _r.timeStamp = 0;
+    uint64_t offset = find_matching_pattern();
+    printf("Offset: %llu\n", offset);
+    //_spi_analog();
+    //_spi_digital();
+    //_spi_decoded();
+
 
     while ( true )
     {
@@ -1069,8 +1140,6 @@ static void _feedStream( struct Stream *stream )
 
 int main()
 {
-    
-
     bool alreadyReported = false;
 
     /* Reset the TPIU handler before we start */
@@ -1135,12 +1204,15 @@ void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* i
     options.tsType = py_op.tsType;
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
-    options.elf_file = py_op.elf_file;
+    options.elf_file = &py_op.elf_file;
     options.functions = py_op.functions;
     options.spi_analog = py_op.spi_analog;
     options.spi_digital = py_op.spi_digital;
     options.spi_decoded_mosi = py_op.spi_decoded_mosi;
     options.spi_decoded_miso = py_op.spi_decoded_miso;
+    options.workqueue_intervals_spi = py_op.workqueue_intervals_spi;
+    options.timestamp_spi = py_op.timestamp_spi;
+
     irq_names = irq_names_input;
     // call main
     printf("Wrapping worked.\n");

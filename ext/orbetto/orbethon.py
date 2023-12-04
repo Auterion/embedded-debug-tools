@@ -9,6 +9,7 @@ import argparse
 from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin
 from irq_names import irq_names_stm32h753,irq_names_stm32f765
 from spi_decode import analog_spi_csv,spi_decode_csv,digital_spi_csv
+from protocol_synchronize import getWorkQueuePattern
 
 arg2tsType = {
     "a" : TSType.TSAbsolute,
@@ -19,7 +20,7 @@ arg2tsType = {
 }
 
 
-def processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso):
+def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso):
     """
     Takes the input arguments and creates a options struct which is needed as input for orbetto tool
     Input:
@@ -46,6 +47,9 @@ def processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mo
     options.spi_digital = spi_digital
     options.spi_decoded_mosi = spi_decoded_mosi
     options.spi_decoded_miso = spi_decoded_miso
+    # Sync
+    options.workqueue_intervals_spi = work_queue_pattern
+    options.timestamp_spi = timestamp
     return options
 
 
@@ -94,25 +98,26 @@ def init_argparse():
     parser.add_argument('-sa','--spi_analog',
                         help="select spi analog csv file to decode",
                         type=str,
-                        default='../../../Logic2/analog.csv')
+                        default='../../../Logic2/analog1.csv')
     parser.add_argument('-sd','--spi_digital',
                         help="select spi digital csv file to decode",
                         type=str,
-                        default='../../../Logic2/digital.csv')
+                        default='../../../Logic2/digital1.csv')
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = init_argparse()
+    work_queue_pattern,timestamp = getWorkQueuePattern('../../../Logic2/analog.csv')
     spi_analog = analog_spi_csv(args.spi_analog)
     spi_digital = digital_spi_csv(args.spi_digital)
     spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(args.spi_analog)
     elf_file = list(get_text_bin(args.elf))
     functions = process_symbol_table(args.elf)
-    options = processOptions(args,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso)
+    options = processOptions(args,work_queue_pattern,timestamp,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso)
     print("Run Orbetto Tool ...")
-    if (args.device == 'stm32h753'):
+    if args.device == 'stm32h753':
         orbethon(options,irq_names_stm32h753)
-    elif (args.device == 'stm32f765'):
+    elif args.device == 'stm32f765':
         orbethon(options,irq_names_stm32f765)
