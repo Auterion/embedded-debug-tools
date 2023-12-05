@@ -3,7 +3,7 @@ import numpy as np
 from ripyl.decode import find_edges
 from ripyl.streaming import SampleChunk
 
-def getWorkQueuePattern(path,length=20,logic_levels=(0,3.3),hyst=0.4):
+def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.4):
     """
     Read csv file of analog SPI and generate pattern for Sync data
     Inputs:
@@ -15,14 +15,19 @@ def getWorkQueuePattern(path,length=20,logic_levels=(0,3.3),hyst=0.4):
     """
     print("Parse SPI SYNC data ...")
     # read csv file with pandas
-    df = pd.read_csv(path)
     try:
         sample_period = df["Time [s]"][1]-df["Time [s]"][0]
     except:
         # print Error message
         raise Exception("  CSV File seems empty")
     try:
-        sync_analog = [SampleChunk(df["Sync"][0:100000000].tolist(),df["Time [s]"][0],sample_period)]
+        sync_list = df["Sync"][0:100000000].tolist()
+    except:
+        # print Error message
+        # only valid for Salea Sampling Rate of 10 [MS/s]
+        raise Exception("  You need at least 100000000 samples to build a valid pattern")
+    try:
+        sync_analog = [SampleChunk(sync_list,df["Time [s]"][0],sample_period)]
     except:
         # print Error message
         raise Exception("  CSV File does not contain Sync information")

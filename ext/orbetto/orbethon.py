@@ -1,4 +1,6 @@
 import os
+import time
+import pandas as pd
 
 #os.system('rm -rf build')
 #os.system('meson setup build')
@@ -8,7 +10,7 @@ from build.orbethon import *
 import argparse
 from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin
 from irq_names import irq_names_stm32h753,irq_names_stm32f765
-from spi_decode import analog_spi_csv,spi_decode_csv,digital_spi_csv
+from spi_decode import spi_decode_csv,digital_spi_csv
 from protocol_synchronize import getWorkQueuePattern
 
 arg2tsType = {
@@ -20,7 +22,7 @@ arg2tsType = {
 }
 
 
-def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso):
+def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso):
     """
     Takes the input arguments and creates a options struct which is needed as input for orbetto tool
     Input:
@@ -43,8 +45,10 @@ def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,spi_anal
     #parsed functions
     options.functions = functions
     # spi debug 
-    options.spi_analog = spi_analog
-    options.spi_digital = spi_digital
+    options.miso_digital = list(miso_edges)
+    options.mosi_digital = list(mosi_edges)
+    options.clk_digital = list(clk_edges)
+    options.cs_digital = list(cs_edges)
     options.spi_decoded_mosi = spi_decoded_mosi
     options.spi_decoded_miso = spi_decoded_miso
     # Sync
@@ -98,24 +102,22 @@ def init_argparse():
     parser.add_argument('-sa','--spi_analog',
                         help="select spi analog csv file to decode",
                         type=str,
-                        default='../../../Logic2/analog1.csv')
-    parser.add_argument('-sd','--spi_digital',
-                        help="select spi digital csv file to decode",
-                        type=str,
-                        default='../../../Logic2/digital1.csv')
+                        default='../../../Logic2/analog.csv')
 
     return parser.parse_args()
 
 
 if __name__ == "__main__":
+    start_time = time.time()
     args = init_argparse()
-    work_queue_pattern,timestamp = getWorkQueuePattern('../../../Logic2/analog.csv')
-    spi_analog = analog_spi_csv(args.spi_analog)
-    spi_digital = digital_spi_csv(args.spi_digital)
-    spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(args.spi_analog)
+    df = pd.read_csv(args.spi_analog)
+    work_queue_pattern,timestamp = getWorkQueuePattern(df)
+    miso_edges, mosi_edges, clk_edges, cs_edges = digital_spi_csv(df)
+    spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(miso_edges, mosi_edges, clk_edges, cs_edges)
     elf_file = list(get_text_bin(args.elf))
     functions = process_symbol_table(args.elf)
-    options = processOptions(args,work_queue_pattern,timestamp,elf_file,functions,spi_analog,spi_digital,spi_decoded_mosi,spi_decoded_miso)
+    options = processOptions(args,work_queue_pattern,timestamp,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso)
+    print("Orbethon Tool took %s minutes %s seconds to run in python" % (int((time.time() - start_time)/60),int((time.time() - start_time)%60)))
     print("Run Orbetto Tool ...")
     if args.device == 'stm32h753':
         orbethon(options,irq_names_stm32h753)
