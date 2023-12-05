@@ -12,47 +12,31 @@ extern "C"
 
 enum
 {
-    // CONFIG_SCHED_INSTRUMENTATION
+    // Tasks
     EMDBG_TASK_START = 0,
     EMDBG_TASK_STOP = 1,
-    EMDBG_TASK_SUSPEND = 2,
-    EMDBG_TASK_RESUME = 3,
-    EMDBG_TASK_RUNNABLE = 4, // custom
-    // Semaphores custom
+    EMDBG_TASK_RESUME = 2,
+    EMDBG_TASK_RUNNABLE = 3, // custom
+    // Workqueues
+    EMDBG_WORKQUEUE = 4,
+    // Semaphores
     EMDBG_SEMAPHORE_WAIT = 5,
     EMDBG_SEMAPHORE_POST = 6,
-    // CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
-    EMDBG_PREEMPTION_LOCK = 7,
-    EMDBG_PREEMPTION_UNLOCK = 8,
-    // CONFIG_SCHED_INSTRUMENTATION_CSECTION
-    EMDBG_CSECTION_ENTER = 9,
-    EMDBG_CSECTION_LEAVE = 10,
-    // CONFIG_SCHED_INSTRUMENTATION_SPINLOCKS
-    EMDBG_SPINLOCK_LOCK = 11,
-    EMDBG_SPINLOCK_LOCKED = 12,
-    EMDBG_SPINLOCK_UNLOCK = 13,
-    EMDBG_SPINLOCK_ABORT = 14,
 
-    // Workqueue custom
-    EMDBG_WORKQUEUE_START = 15,
-    EMDBG_WORKQUEUE_STOP = 16,
-    // Heap custom
-    EMDBG_HEAP_REGIONS = 17,
-    EMDBG_HEAP_MALLOC_ATTEMPT = 18,
-    EMDBG_HEAP_MALLOC_RESULT = 19,
-    EMDBG_HEAP_FREE = 20,
+    // Heap
+    EMDBG_HEAP_REGIONS = 8,
+    EMDBG_HEAP_MALLOC_ATTEMPT = 9,
+    EMDBG_HEAP_MALLOC_RESULT = 10,
+    EMDBG_HEAP_FREE = 11,
 
-    // DMA custom
-    EMDBG_DMA_CONFIG = 21,
-    EMDBG_DMA_START = 22,
-    EMDBG_DMA_STOP = 23,
+    // DMA
+    EMDBG_DMA_CONFIG = 12,
+    EMDBG_DMA_START = 13,
+    EMDBG_DMA_STOP = 14,
+
+    // the rest are optional user channels
+    EMDBG_UART4 = 31,
 };
-
-#define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
-    emdbg_itm16_block(EMDBG_SEMAPHORE_WAIT, (uint32_t)sem >> 3)
-
-#define EMDBG_LOG_SEMAPHORE_POST(sem) \
-    emdbg_itm16_block(EMDBG_SEMAPHORE_POST, (uint32_t)sem >> 3)
 
 #define EMDBG_LOG_TASK_START(tcb) \
     for (const char *name = tcb->name, \
@@ -63,39 +47,51 @@ enum
         memcpy(&value, name, 4); \
         emdbg_itm32_block(EMDBG_TASK_START, value); \
     } \
-    emdbg_itm16_block(EMDBG_TASK_START, tcb->pid)
+    emdbg_itm_block(EMDBG_TASK_START, tcb->pid)
+
+#define EMDBG_LOG_TASK_STOP(tcb) \
+    emdbg_itm_block(EMDBG_TASK_STOP, tcb->pid)
 
 #define EMDBG_LOG_TASK_RESUME(tcb, prev_state) \
     emdbg_itm32_block(EMDBG_TASK_RESUME, (prev_state << 24) | (tcb->sched_priority << 16) | tcb->pid)
 
-
-#define EMDBG_WORKQUEUE_START(item) \
-    { emdbg_itm32_block(EMDBG_WORKQUEUE_START, (uint32_t)(item->ItemName())); }
-
-#define EMDBG_WORKQUEUE_STOP(item) \
-    { emdbg_itm8_block(EMDBG_WORKQUEUE_STOP, item->_run_count); }
+#define EMDBG_LOG_TASK_RUNNABLE(tcb) \
+    emdbg_itm_block(EMDBG_TASK_RUNNABLE, tcb->pid)
 
 
-#define EMDBG_HEAP_ADDREGION(start, size) \
+#define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
+    emdbg_itm16_block(EMDBG_SEMAPHORE_WAIT, (uint32_t)sem >> 3)
+
+#define EMDBG_LOG_SEMAPHORE_POST(sem) \
+    emdbg_itm16_block(EMDBG_SEMAPHORE_POST, (uint32_t)sem >> 3)
+
+#define EMDBG_LOG_WORKQUEUE_START(item) \
+    emdbg_itm32_block(EMDBG_WORKQUEUE, (uint32_t)(item->ItemName()));
+
+#define EMDBG_LOG_WORKQUEUE_STOP(item) \
+    emdbg_itm8_block(EMDBG_WORKQUEUE, 0);
+
+
+#define EMDBG_LOG_HEAP_ADDREGION(start, size) \
     { emdbg_itm32_block(EMDBG_HEAP_REGIONS, (uint32_t)start | 0x80000000); \
       emdbg_itm_block(EMDBG_HEAP_REGIONS, (uint32_t)size); }
 
-#define EMDBG_HEAP_MALLOC(size) \
+#define EMDBG_LOG_HEAP_MALLOC(size) \
     emdbg_itm_block(EMDBG_HEAP_MALLOC_ATTEMPT, (uint32_t)size)
 
-#define EMDBG_HEAP_MALLOC_RESULT(ptr) \
+#define EMDBG_LOG_HEAP_MALLOC_RESULT(ptr) \
     emdbg_itm_block(EMDBG_HEAP_MALLOC_RESULT, (uint32_t)ptr)
 
-#define EMDBG_HEAP_FREE(ptr) \
+#define EMDBG_LOG_HEAP_FREE(ptr) \
     emdbg_itm32_block(EMDBG_HEAP_FREE, (uint32_t)ptr)
 
-#define EMDBG_HEAP_REALLOC(oldptr, size, newptr) \
-    { EMDBG_HEAP_FREE(oldptr); EMDBG_HEAP_MALLOC(size); EMDBG_HEAP_MALLOC_RESULT(newptr); }
+#define EMDBG_LOG_HEAP_REALLOC(oldptr, size, newptr) \
+    { EMDBG_LOG_HEAP_FREE(oldptr); EMDBG_LOG_HEAP_MALLOC(size); EMDBG_LOG_HEAP_MALLOC_RESULT(newptr); }
 
-#define EMDBG_HEAP_MEMALIGN(oldptr, size, newptr) \
-    EMDBG_HEAP_REALLOC(oldptr, size, newptr)
+#define EMDBG_LOG_HEAP_MEMALIGN(oldptr, size, newptr) \
+    EMDBG_LOG_HEAP_REALLOC(oldptr, size, newptr)
 
-#define EMDBG_DMA_CONFIGURE(channel, config) \
+#define EMDBG_LOG_DMA_CONFIGURE(channel, config) \
     { \
         uint16_t mask = 0x8000; \
         if (channel->cfg.ndata != config->ndata) mask |= 0x0100; \
@@ -112,10 +108,10 @@ enum
         } \
     }
 
-#define EMDBG_DMA_START(channel) \
+#define EMDBG_LOG_DMA_START(channel) \
     { emdbg_itm8_block(EMDBG_DMA_START, ((uint8_t)channel->ctrl << 5) | (uint8_t)channel->chan); }
 
-#define EMDBG_DMA_STOP(channel) \
+#define EMDBG_LOG_DMA_STOP(channel) \
     { emdbg_itm8_block(EMDBG_DMA_STOP, ((uint8_t)channel->ctrl << 5) | (uint8_t)channel->chan); }
 
 typedef struct

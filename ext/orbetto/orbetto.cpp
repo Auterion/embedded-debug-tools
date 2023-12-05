@@ -29,6 +29,9 @@ using namespace std::string_literals;
 #include "stream.h"
 #include "loadelf.h"
 
+// To get the ITM channel list
+#include "../../src/emdbg/patch/data/itm.h"
+
 #include <protos/perfetto/trace/trace.pb.h>
 
 #define NUM_CHANNELS  32
@@ -548,14 +551,14 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
     if (stopped_threads.contains(tid)) tid += PID_STOP;
     else if (tid != 0) tid += PID_TSK;
 
-    if (m->srcAddr == 0) // start
+    if (m->srcAddr == EMDBG_TASK_START) // start
     {
         if (m->len == 4) {
             char name[5]{0,0,0,0,0};
             memcpy(name, &m->value, 4);
             thread_name += name;
         }
-        if (m->len == 2) {
+        if (m->len <= 2) {
             if (tid_tl) {
                 thread_name.clear();
                 return;
@@ -594,7 +597,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             thread_name.clear();
         }
     }
-    else if (m->srcAddr == 1) // stop
+    else if (m->srcAddr == EMDBG_TASK_STOP) // stop
     {
         if (tid_tl or not active_threads.contains(tid)) return;
         active_threads.erase(tid);
@@ -607,13 +610,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             workqueue_map.erase(tid);
         }
     }
-    else if (m->srcAddr == 2) // suspend
-    {
-        if (tid_tl) return;
-        if (not active_threads.contains(tid)) return;
-        _switchTo(0, true);
-    }
-    else if (m->srcAddr == 3) // resume
+    else if (m->srcAddr == EMDBG_TASK_RESUME) // resume
     {
         if (tid_tl) return;
         if (not active_threads.contains(tid)) return;
@@ -621,7 +618,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         const uint8_t prev_state = m->value >> 24;
         _switchTo(tid, true, priority, prev_state);
     }
-    else if (m->srcAddr == 4) // ready
+    else if (m->srcAddr == EMDBG_TASK_RUNNABLE) // ready
     {
         if (tid_tl) return;
         auto *event = ftrace->add_event();
@@ -631,48 +628,49 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         sched_waking->set_pid(tid);
         sched_waking->set_success(1);
     }
-    else if (m->srcAddr == 15) // workqueue start
+    else if (m->srcAddr == EMDBG_WORKQUEUE) // workqueue start/stop
     {
         if (prev_tid == 0) return;
-        if (workqueue_map.contains(prev_tid))
+        if (m->value) // workqueue start
         {
-            auto *event = ftrace->add_event();
-            event->set_timestamp(ns);
-            event->set_pid(prev_tid);
-            event->mutable_workqueue_execute_end();
-        }
-        auto *event = ftrace->add_event();
-        event->set_timestamp(ns);
-        event->set_pid(prev_tid);
-        auto *workqueue_start = event->mutable_workqueue_execute_start();
-        workqueue_start->set_function(m->value);
-        workqueue_map[prev_tid] = m->value;
-        if (_r.symbols and not workqueue_names.contains(m->value))
-        {
-            if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+            if (workqueue_map.contains(prev_tid))
             {
-                printf("Found Name %s for 0x%08x\n", name, m->value);
-                workqueue_names[m->value] = name;
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(prev_tid);
+                event->mutable_workqueue_execute_end();
             }
-            else {
-                printf("No match found for 0x%08x\n", m->value);
-            }
-        }
-    }
-    else if (m->srcAddr == 16) // workqueue stop
-    {
-        if (prev_tid == 0) return;
-        if (workqueue_map.contains(prev_tid))
-        {
             auto *event = ftrace->add_event();
             event->set_timestamp(ns);
             event->set_pid(prev_tid);
-            event->mutable_workqueue_execute_end();
-            workqueue_map.erase(prev_tid);
-            // const uint8_t count = m->value;
+            auto *workqueue_start = event->mutable_workqueue_execute_start();
+            workqueue_start->set_function(m->value);
+            workqueue_map[prev_tid] = m->value;
+            if (_r.symbols and not workqueue_names.contains(m->value))
+            {
+                if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+                {
+                    printf("Found Name %s for 0x%08x\n", name, m->value);
+                    workqueue_names[m->value] = name;
+                }
+                else {
+                    printf("No match found for 0x%08x\n", m->value);
+                }
+            }
+        }
+        else // workqueue stop
+        {
+            if (workqueue_map.contains(prev_tid))
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(prev_tid);
+                event->mutable_workqueue_execute_end();
+                workqueue_map.erase(prev_tid);
+            }
         }
     }
-    else if (m->srcAddr == 17) // heap region
+    else if (m->srcAddr == EMDBG_HEAP_REGIONS) // heap region
     {
         static uint32_t start = 0;
         if (m->value & 0x80000000) {
@@ -696,11 +694,11 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             }
         }
     }
-    else if (m->srcAddr == 18 || m->srcAddr == 19) // malloc attempt and result
+    else if (m->srcAddr == EMDBG_HEAP_MALLOC_ATTEMPT || m->srcAddr == EMDBG_HEAP_MALLOC_RESULT) // malloc attempt and result
     {
         static uint32_t size = 0;
         static uint32_t alignsize = 0;
-        if (m->srcAddr == 18) {
+        if (m->srcAddr == EMDBG_HEAP_MALLOC_ATTEMPT) {
             size = m->value;
             alignsize = ((size + 16) + 0xf) & ~0xf;
         }
@@ -710,7 +708,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             _writeMalloc(ns, m->value, alignsize, size);
         }
     }
-    else if (m->srcAddr == 20) // free
+    else if (m->srcAddr == EMDBG_HEAP_FREE) // free
     {
         if (heap_allocations.contains(m->value))
         {
@@ -720,7 +718,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
         }
         else printf("Unknown size for free(0x%08x)!\n", m->value);
     }
-    else if (m->srcAddr == 21) // dma config
+    else if (m->srcAddr == EMDBG_DMA_CONFIG) // dma config
     {
         static uint8_t instance{0}, channel{0};
         static uint32_t did{0};
@@ -778,7 +776,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             uint32_t src = config.paddr, dst = config.maddr;
             if ((config.config & 0xC0) == 0x40) std::swap(src, dst);
             char buffer[1000];
-            snprintf(buffer, sizeof(buffer), "%uB: %#08x%s -> %#08x%s (%#08x:%s%s%s%s%s%s%s%s)\n",
+            snprintf(buffer, sizeof(buffer), "%uB: %#08x%s -> %#08x%s (%#08x:%s%s%s%s%s%s%s%s)",
                      config.size,
                      src, addr2reg.contains(src) ? ("="s + addr2reg[src]).c_str() : "",
                      dst, addr2reg.contains(dst) ? ("="s + addr2reg[dst]).c_str() : "",
@@ -795,7 +793,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             mask = 0x8000;
         }
     }
-    else if (m->srcAddr == 22) // dma start
+    else if (m->srcAddr == EMDBG_DMA_START) // dma start
     {
         const uint32_t instance = m->value >> 5;
         const uint32_t channel = m->value & 0x1f;
@@ -809,7 +807,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             print->set_buf("B|0|"s + dma_channel_name[did]);
         }
     }
-    else if (m->srcAddr == 23) // dma stop
+    else if (m->srcAddr == EMDBG_DMA_STOP) // dma stop
     {
         const uint32_t instance = m->value >> 5;
         const uint32_t channel = m->value & 0x1f;

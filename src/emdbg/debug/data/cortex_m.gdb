@@ -97,12 +97,23 @@ define px4_configure_orbuculum
     ITMTXEna 1
     # Sync packets are transmitted
     ITMSYNCEna 1
-    # Enable tasks, workqueues, heap
-    # ITMTER 0 0x001F801B
-    # Enable tasks, workqueues, DMA
-    ITMTER 0 0x0E1801B
-    # Enable tasks and workqueues
-    # ITMTER 0 0x0001801B
+
+    # Enable ITM ports
+    # We always need the task information
+    set $TER = 0x0000000F
+    # Enable workqueue scheduling
+    set $TER |= 0x00000010
+
+    # Enable heap profiling
+    # set $TER |= 0x00000F00
+    # Enable DMA profiling
+    # set $TER |= 0x00007000
+
+    # Enable all optional user channels
+    set $TER |= 0xFFFF0000
+
+    # Write the TER to the device
+    ITMTER 0 $TER
     # Enable the ITM
     ITMEna 1
 end

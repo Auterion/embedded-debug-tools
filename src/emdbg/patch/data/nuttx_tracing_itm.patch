@@ -1,50 +1,10 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
-diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
-index e9f69dfe1a..af427937e4 100644
---- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
-+++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
-@@ -33,6 +33,7 @@
-
- #include "sched/sched.h"
- #include "semaphore/semaphore.h"
-+#include <nuttx/itm/itm.h>
-
- /****************************************************************************
-  * Public Functions
-@@ -69,6 +70,7 @@
-
- int nxsem_post(FAR sem_t *sem)
- {
-+  EMDBG_LOG_SEMAPHORE_POST(sem);
-   FAR struct tcb_s *stcb = NULL;
-   irqstate_t flags;
-   int ret = -EINVAL;
-diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
-index eec67723d7..fea433e2f5 100644
---- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
-+++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
-@@ -34,6 +34,7 @@
-
- #include "sched/sched.h"
- #include "semaphore/semaphore.h"
-+#include <nuttx/itm/itm.h>
-
- /****************************************************************************
-  * Public Functions
-@@ -69,6 +70,7 @@
-
- int nxsem_wait(FAR sem_t *sem)
- {
-+  EMDBG_LOG_SEMAPHORE_WAIT(sem);
-   FAR struct tcb_s *rtcb = this_task();
-   irqstate_t flags;
-   int ret = -EINVAL;
-diff --git a/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c b/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/sched/sched_addreadytorun.c b/platforms/nuttx/NuttX/nuttx/sched/sched/sched_addreadytorun.c
 index 1b2abd47a3..7551b92366 100644
---- a/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
-+++ b/platforms/nuttx/NuttX/nuttx//sched/sched/sched_addreadytorun.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/sched/sched_addreadytorun.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/sched/sched_addreadytorun.c
 @@ -27,6 +27,7 @@
  #include <stdbool.h>
  #include <queue.h>
@@ -57,7 +17,7 @@ index 1b2abd47a3..7551b92366 100644
        ret = false;
      }
 
-+  if (!ret) emdbg_itm16_block(EMDBG_TASK_RUNNABLE, btcb->pid);
++  if (!ret) EMDBG_LOG_TASK_RUNNABLE(btcb);
    return ret;
  }
  #endif /* !CONFIG_SMP */
@@ -105,11 +65,11 @@ index 62c5c6205d..2c22732b32 100644
  
  void sched_note_stop(FAR struct tcb_s *tcb)
  {
-+  emdbg_itm16_block(EMDBG_TASK_STOP, tcb->pid);
++  EMDBG_LOG_TASK_STOP(tcb);
    if (system_load.initialized) {
       for (auto &task : system_load.tasks) {
          if (task.tcb && task.tcb->pid == tcb->pid) {
-@@ -143,8 +146,11 @@ void sched_note_stop(FAR struct tcb_s *tcb)
+@@ -143,8 +146,10 @@ void sched_note_stop(FAR struct tcb_s *tcb)
    }
  }
  
@@ -117,11 +77,10 @@ index 62c5c6205d..2c22732b32 100644
  void sched_note_suspend(FAR struct tcb_s *tcb)
  {
 +  emdbg_prev_state = tcb->task_state;
-+  emdbg_itm16_block(EMDBG_TASK_SUSPEND, tcb->pid);
    if (system_load.initialized) {
       if (tcb->pid == 0) {
          system_load.tasks[0].total_runtime += hrt_elapsed_time(&system_load.tasks[0].curr_start_time);
-@@ -170,6 +176,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
+@@ -170,6 +175,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
  
  void sched_note_resume(FAR struct tcb_s *tcb)
  {
@@ -129,57 +88,46 @@ index 62c5c6205d..2c22732b32 100644
    if (system_load.initialized) {
       if (tcb->pid == 0) {
          hrt_store_absolute_time(&system_load.tasks[0].curr_start_time);
-@@ -191,5 +198,49 @@ void sched_note_resume(FAR struct tcb_s *tcb)
-      }
-   }
- }
-+
-+#ifdef CONFIG_SCHED_INSTRUMENTATION_PREEMPTION
-+void sched_note_premption(FAR struct tcb_s *tcb, bool locked)
-+{
-+  const uint8_t channel = locked ? EMDBG_PREEMPTION_LOCK : EMDBG_PREEMPTION_UNLOCK;
-+  emdbg_itm8(channel, tcb->lockcount);
-+}
-+#endif
-+
-+#ifdef CONFIG_SCHED_INSTRUMENTATION_CSECTION
-+void sched_note_csection(FAR struct tcb_s *tcb, bool enter)
-+{
-+  const uint8_t channel = enter ? EMDBG_CSECTION_ENTER : EMDBG_CSECTION_LEAVE;
-+  emdbg_itm8(channel, tcb->irqcount);
-+}
-+#endif
-+
-+#ifdef CONFIG_SCHED_INSTRUMENTATION_SPINLOCKS
-+static inline void note_spincommon(FAR volatile void *spinlock, int type)
-+{
-+  emdbg_itm16(type, (uint32_t)spinlock >> 3);
-+}
-+
-+void sched_note_spinlock(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
-+{
-+  note_spincommon(spinlock, EMDBG_SPINLOCK_LOCK);
-+}
-+
-+void sched_note_spinlocked(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
-+{
-+  note_spincommon(spinlock, EMDBG_SPINLOCK_LOCKED);
-+}
-+
-+void sched_note_spinunlock(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
-+{
-+  note_spincommon(spinlock, EMDBG_SPINLOCK_UNLOCK);
-+}
-+
-+void sched_note_spinabort(FAR struct tcb_s *tcb, FAR volatile void *spinlock)
-+{
-+  note_spincommon(spinlock, EMDBG_SPINLOCK_ABORT);
-+}
-+#endif
-+
- __END_DECLS
- #endif // PX4_NUTTX && CONFIG_SCHED_INSTRUMENTATION
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
+index e9f69dfe1a..af427937e4 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
+@@ -33,6 +33,7 @@
 
+ #include "sched/sched.h"
+ #include "semaphore/semaphore.h"
++#include <nuttx/itm/itm.h>
+
+ /****************************************************************************
+  * Public Functions
+@@ -69,6 +70,7 @@
+
+ int nxsem_post(FAR sem_t *sem)
+ {
++  EMDBG_LOG_SEMAPHORE_POST(sem);
+   FAR struct tcb_s *stcb = NULL;
+   irqstate_t flags;
+   int ret = -EINVAL;
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
+index eec67723d7..fea433e2f5 100644
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
+@@ -34,6 +34,7 @@
+
+ #include "sched/sched.h"
+ #include "semaphore/semaphore.h"
++#include <nuttx/itm/itm.h>
+
+ /****************************************************************************
+  * Public Functions
+@@ -69,6 +70,7 @@
+
+ int nxsem_wait(FAR sem_t *sem)
+ {
++  EMDBG_LOG_SEMAPHORE_WAIT(sem);
+   FAR struct tcb_s *rtcb = this_task();
+   irqstate_t flags;
+   int ret = -EINVAL;
 diff --git a/platforms/common/px4_work_queue/WorkQueue.cpp b/platforms/common/px4_work_queue/WorkQueue.cpp
 index fa32017912..1b2aa522b1 100644
 --- a/platforms/common/px4_work_queue/WorkQueue.cpp
@@ -196,10 +144,10 @@ index fa32017912..1b2aa522b1 100644
                         WorkItem *work = _q.pop();
 
                         work_unlock(); // unlock work queue to run (item may requeue itself)
-+                       EMDBG_WORKQUEUE_START(work);
++                       EMDBG_LOG_WORKQUEUE_START(work);
                         work->RunPreamble();
                         work->Run();
-+                       EMDBG_WORKQUEUE_STOP(work);
++                       EMDBG_LOG_WORKQUEUE_STOP(work);
                         // Note: after Run() we cannot access work anymore, as it might have been deleted
                         work_lock(); // re-lock
                 }
@@ -219,7 +167,7 @@ index 5513ba1772..8cf297e747 100644
        mm_add_delaylist(heap, mem);
        return;
      }
-+  EMDBG_HEAP_FREE(mem);
++  EMDBG_LOG_HEAP_FREE(mem);
  
    kasan_poison(mem, mm_malloc_size(mem));
  
@@ -239,7 +187,7 @@ index 3b5ac7ed8a..f65319bafb 100644
    mm_addfreechunk(heap, node);
  
    mm_givesemaphore(heap);
-+  EMDBG_HEAP_ADDREGION(heapbase, heapend - heapbase);
++  EMDBG_LOG_HEAP_ADDREGION(heapbase, heapend - heapbase);
  }
  
  /****************************************************************************
@@ -251,7 +199,7 @@ index a38633bbfe..d7594d860c 100644
  
    if (size < 1)
      {
-+      EMDBG_HEAP_MALLOC_RESULT(0);
++      EMDBG_LOG_HEAP_MALLOC_RESULT(0);
        return NULL;
      }
  
@@ -259,12 +207,12 @@ index a38633bbfe..d7594d860c 100644
     */
  
    alignsize = MM_ALIGN_UP(size + SIZEOF_MM_ALLOCNODE);
-+  EMDBG_HEAP_MALLOC(size);
++  EMDBG_LOG_HEAP_MALLOC(size);
    if (alignsize < size)
      {
        /* There must have been an integer overflow */
  
-+      EMDBG_HEAP_MALLOC_RESULT(0);
++      EMDBG_LOG_HEAP_MALLOC_RESULT(0);
        return NULL;
      }
  
@@ -272,7 +220,7 @@ index a38633bbfe..d7594d860c 100644
  
    DEBUGASSERT(ret == NULL || mm_heapmember(heap, ret));
    mm_givesemaphore(heap);
-+  EMDBG_HEAP_MALLOC_RESULT(ret);
++  EMDBG_LOG_HEAP_MALLOC_RESULT(ret);
  
    if (ret)
      {
@@ -292,7 +240,7 @@ index 47c27d61ba..ad4cad92f0 100644
    kasan_unpoison((FAR void *)alignedchunk,
                   mm_malloc_size((FAR void *)alignedchunk));
  
-+  EMDBG_HEAP_MEMALIGN(rawchunk, size, alignedchunk);
++  EMDBG_LOG_HEAP_MEMALIGN(rawchunk, size, alignedchunk);
    return (FAR void *)alignedchunk;
  }
 diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_realloc.c
@@ -331,7 +279,7 @@ index f097e905da..a059f5456d 100644
      }
  
    dmabase_putreg(dmachan, regoffset, (DMA_STREAM_MASK << dmachan->shift));
-+  EMDBG_DMA_STOP(dmachan);
++  EMDBG_LOG_DMA_STOP(dmachan);
  }
  
  /****************************************************************************
@@ -339,7 +287,7 @@ index f097e905da..a059f5456d 100644
      }
  
    dmabase_putreg(dmachan, regoffset, (status << dmachan->shift));
-+  EMDBG_DMA_STOP(dmachan);
++  EMDBG_LOG_DMA_STOP(dmachan);
  
    /* Invoke the callback */
  
@@ -347,7 +295,7 @@ index f097e905da..a059f5456d 100644
    dmainfo("paddr: %08" PRIx32 " maddr: %08" PRIx32 " ndata: %" PRIu32 " "
            "scr: %08" PRIx32 "\n",
            cfg->paddr, cfg->maddr, cfg->ndata, cfg->cfg1);
-+  EMDBG_DMA_CONFIGURE(dmachan, cfg);
++  EMDBG_LOG_DMA_CONFIGURE(dmachan, cfg);
  
  #ifdef CONFIG_STM32H7_DMACAPABLE
    DEBUGASSERT(stm32_sdma_capable(cfg));
@@ -355,7 +303,7 @@ index f097e905da..a059f5456d 100644
  
    DEBUGASSERT(handle != NULL);
    DEBUGASSERT(dmachan->ctrl == DMA1 || dmachan->ctrl == DMA2);
-+  EMDBG_DMA_START(dmachan);
++  EMDBG_LOG_DMA_START(dmachan);
  
    /* Save the callback info.  This will be invoked when the DMA completes */
  
@@ -363,7 +311,7 @@ index f097e905da..a059f5456d 100644
  
    dmabase_putreg(dmachan, STM32_BDMA_IFCR_OFFSET,
                     (BDMA_CHAN_MASK << dmachan->shift));
-+  EMDBG_DMA_STOP(dmachan);
++  EMDBG_LOG_DMA_STOP(dmachan);
  }
  
  /****************************************************************************
@@ -371,7 +319,7 @@ index f097e905da..a059f5456d 100644
  
    dmabase_putreg(dmachan, STM32_BDMA_IFCR_OFFSET,
                   (status << dmachan->shift));
-+  EMDBG_DMA_STOP(dmachan);
++  EMDBG_LOG_DMA_STOP(dmachan);
  
    /* Invoke the callback */
  
@@ -379,7 +327,7 @@ index f097e905da..a059f5456d 100644
    dmainfo("paddr: %08" PRIx32 " maddr: %08" PRIx32 " ndata: %" PRIu32 " "
            "scr: %08" PRIx32 "\n",
            cfg->paddr, cfg->maddr, cfg->ndata, cfg->cfg1);
-+  EMDBG_DMA_CONFIGURE(dmachan, cfg);
++  EMDBG_LOG_DMA_CONFIGURE(dmachan, cfg);
  
  #ifdef CONFIG_STM32H7_DMACAPABLE
    DEBUGASSERT(stm32_bdma_capable(cfg));
@@ -387,7 +335,7 @@ index f097e905da..a059f5456d 100644
  
    DEBUGASSERT(handle != NULL);
    DEBUGASSERT(dmachan->ctrl == BDMA);
-+  EMDBG_DMA_START(dmachan);
++  EMDBG_LOG_DMA_START(dmachan);
  
    /* Save the callback info.  This will be invoked when the DMA completes */
  

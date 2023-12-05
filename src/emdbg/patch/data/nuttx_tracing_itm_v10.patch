@@ -1,3 +1,6 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
 diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
 index a38633bbfe..d7594d860c 100644
 --- a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_malloc.c
@@ -18,7 +21,7 @@ index 6331465d34..c225edd2ec 100644
        /* Then return the original address */
  
        mm_givesemaphore(heap);
-+      EMDBG_HEAP_REALLOC(oldmem, size, oldmem);
++      EMDBG_LOG_HEAP_REALLOC(oldmem, size, oldmem);
        return oldmem;
      }
  
@@ -26,7 +29,7 @@ index 6331465d34..c225edd2ec 100644
          }
  
        mm_givesemaphore(heap);
-+      EMDBG_HEAP_REALLOC(oldmem, size, newmem);
++      EMDBG_LOG_HEAP_REALLOC(oldmem, size, newmem);
        return newmem;
      }
  
