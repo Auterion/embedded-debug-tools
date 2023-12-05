@@ -21,11 +21,17 @@ define px4_trace_swo_stm32f7
     enableSTM32SWO 7
 end
 
-define px4_trace_stm32f7
+define px4_trace_tpiu_swo_stm32f7
     px4_reset
 
     # Enable the ETM output
     enableSTM32TRACE 4 3
 
     px4_configure_orbuculum
+
+    shell rm -f trace.swo
+    shell orbuculum -t1 &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
+
 end

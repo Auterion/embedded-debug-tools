@@ -36,7 +36,7 @@ def digital_spi_csv(df_input):
     clk_sc = [SampleChunk(df["CLK"].tolist(),df["Time [s]"][0],period)]
     cs_sc = [SampleChunk(df["CS"].tolist(),df["Time [s]"][0],period)]
     # Perform edge detection
-    miso_edges = list(find_edges(miso_sc, (0,4.8),hysteresis=0.4))
+    miso_edges = list(find_edges(miso_sc, (0,5),hysteresis=0.4))
     mosi_edges = list(find_edges(mosi_sc, (0,3.3),hysteresis=0.4))
     clk_edges = list(find_edges(clk_sc, (0,3.3),hysteresis=0.4))
     cs_edges = list(find_edges(cs_sc, (0,3.3),hysteresis=0.4))

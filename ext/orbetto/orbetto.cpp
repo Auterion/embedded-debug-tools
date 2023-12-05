@@ -95,10 +95,11 @@ struct Options
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<uint64_t> workqueue_intervals_spi;
     uint64_t timestamp_spi;
-
+    uint64_t timestamp_end_spi; 
     /* SPI Sync */
     std::vector<std::tuple<uint64_t,uint64_t>> workqueue_intervals_swo;
     uint64_t workqueue_last_switch_swo;
+    std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
 
 } options =
 {
@@ -126,6 +127,8 @@ struct PyOptions
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<uint64_t> workqueue_intervals_spi;
     uint64_t timestamp_spi;
+    uint64_t timestamp_end_spi;
+    std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
 };
 
 
@@ -306,6 +309,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
     if (stopped_threads.contains(tid)) tid += PID_STOP;
     else if (tid != 0) tid += PID_TSK;
 
+    
     if (m->srcAddr == 0) // start
     {
         if (m->len == 4) {
@@ -610,9 +614,10 @@ static void _itmPumpProcessPre( char c )
                     if(options.workqueue_last_switch_swo == 0)
                     {
                         options.workqueue_last_switch_swo = ns;
+                        printf("First workqueue start at %llu\n", ns);
                     }else
                     {
-                        options.workqueue_intervals_swo.push_back(std::make_tuple(ns, ns-options.workqueue_last_switch_swo));
+                        options.workqueue_intervals_swo.push_back(std::make_tuple(options.workqueue_last_switch_swo, ns-options.workqueue_last_switch_swo));
                         options.workqueue_last_switch_swo = ns;
                     }
                 }
@@ -775,7 +780,24 @@ static struct Stream *_tryOpenStream()
 
 // ====================================================================================================
 
-static void _spi_digital(uint64_t offset)
+static void _sync_digital(int64_t offset)
+{
+    for(const auto& [timestamp, sync] : options.sync_digital)
+    {
+        // apply offset
+        uint64_t timestamp_offset = timestamp + offset;
+        // create Ftrace event
+        auto *event = ftrace->add_event();
+        event->set_timestamp(timestamp_offset);
+        event->set_pid(0);
+        auto *print = event->mutable_print();
+        char buffer[100];
+        snprintf(buffer, 100, "C|0|Sync|%u", sync);
+        print->set_buf(buffer);
+    }
+}
+
+static void _spi_digital(int64_t offset)
 {
     // Proccess SPI Digital intro perfetto trace
     // iterate over all samples of digital data array and generate a perfetto trace count event for each
@@ -833,7 +855,7 @@ static void _spi_digital(uint64_t offset)
     }
 }
 
-static void _spi_decoded(uint64_t offset)
+static void _spi_decoded(int64_t offset)
 {
     // Proccess SPI Decoded intro perfetto trace
     if (options.spi_decoded_mosi.size() > 0)    {
@@ -929,6 +951,7 @@ static uint64_t find_matching_pattern(){
             min_total_sum = total_sum;
         }
     }
+
     printf("\t Min Offset: %llu\n", min_sum);
     printf("\t Second Min Offset: %llu\n", second_min_sum);
     printf("\t Min Offset Index: %d\n", min_sum_index);
@@ -938,9 +961,13 @@ static uint64_t find_matching_pattern(){
     }
     // print overlapping intervals
     for(int i = 0;i<window_length;i++){
-        printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]), options.workqueue_intervals_spi[i], (int)std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-options.workqueue_intervals_spi[i]);
+        int diff = std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-options.workqueue_intervals_spi[i];
+        double rel_diff = (double)diff/((options.workqueue_intervals_spi[i]+std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]))/2);
+        printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i, REL DIFF: %f\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]), options.workqueue_intervals_spi[i], diff,rel_diff);
     }
-    return (std::get<0>(options.workqueue_intervals_swo[min_sum_index])-options.timestamp_spi);
+    // print both start timestamps
+    printf("\t SWO: %llu, SPI: %llu\n", std::get<0>(options.workqueue_intervals_swo[min_sum_index]), options.timestamp_spi);
+    return (options.timestamp_spi-std::get<0>(options.workqueue_intervals_swo[min_sum_index]));
 }
 
 // ====================================================================================================
@@ -994,12 +1021,41 @@ static void _feedStream( struct Stream *stream )
 
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
-    uint64_t offset = find_matching_pattern();
+    int64_t offset = find_matching_pattern();
     printf("Offset: %llu\n", offset);
-   //_spi_analog(offset);
-    _spi_digital(offset);
-    _spi_decoded(offset);
+    if(offset > 0)
+    {
+        _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
+        //_spi_digital(0);
+        _spi_decoded(0);
+        _sync_digital(0);
+    }else
+    {
+        offset=-offset;
+        _spi_digital(offset);
+        _spi_decoded(offset);
+        _sync_digital(offset);
+    }
 
+    {
+    auto *event = ftrace->add_event();
+    event->set_timestamp(options.timestamp_spi);
+    event->set_pid(0);
+    auto *print = event->mutable_print();
+    char buffer[300];
+    snprintf(buffer, 300, "B|0|Begin Sync Interval");
+    print->set_buf(buffer);
+    }
+    {
+    // only print cs if smaller than 30.0f
+    auto *event = ftrace->add_event();
+    event->set_timestamp(options.timestamp_end_spi);
+    event->set_pid(0);
+    auto *print = event->mutable_print();
+    char buffer[300];
+    snprintf(buffer, 300, "E|0|End Sync Interval");
+    print->set_buf(buffer);
+    }
 
     while ( true )
     {
@@ -1178,6 +1234,8 @@ void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* i
     options.spi_decoded_miso = py_op.spi_decoded_miso;
     options.workqueue_intervals_spi = py_op.workqueue_intervals_spi;
     options.timestamp_spi = py_op.timestamp_spi;
+    options.timestamp_end_spi = py_op.timestamp_end_spi;
+    options.sync_digital = py_op.sync_digital;
 
     irq_names = irq_names_input;
     // call main

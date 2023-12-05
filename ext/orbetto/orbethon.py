@@ -22,7 +22,7 @@ arg2tsType = {
 }
 
 
-def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso):
+def processOptions(args,work_queue_pattern,timestamp_start,timestamp_end,sync_edges,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso):
     """
     Takes the input arguments and creates a options struct which is needed as input for orbetto tool
     Input:
@@ -45,15 +45,17 @@ def processOptions(args,work_queue_pattern,timestamp,elf_file,functions,miso_edg
     #parsed functions
     options.functions = functions
     # spi debug 
-    options.miso_digital = list(miso_edges)
-    options.mosi_digital = list(mosi_edges)
-    options.clk_digital = list(clk_edges)
-    options.cs_digital = list(cs_edges)
+    options.miso_digital = miso_edges
+    options.mosi_digital = mosi_edges
+    options.clk_digital = clk_edges
+    options.cs_digital = cs_edges
     options.spi_decoded_mosi = spi_decoded_mosi
     options.spi_decoded_miso = spi_decoded_miso
     # Sync
     options.workqueue_intervals_spi = work_queue_pattern
-    options.timestamp_spi = timestamp
+    options.timestamp_spi = timestamp_start
+    options.timestamp_end_spi = timestamp_end
+    options.sync_digital = sync_edges
     return options
 
 
@@ -111,12 +113,12 @@ if __name__ == "__main__":
     start_time = time.time()
     args = init_argparse()
     df = pd.read_csv(args.spi_analog)
-    work_queue_pattern,timestamp = getWorkQueuePattern(df)
+    work_queue_pattern,timestamp_start,timestamp_end,sync_edges = getWorkQueuePattern(df)
     miso_edges, mosi_edges, clk_edges, cs_edges = digital_spi_csv(df)
     spi_decoded_mosi, spi_decoded_miso = spi_decode_csv(miso_edges, mosi_edges, clk_edges, cs_edges)
     elf_file = list(get_text_bin(args.elf))
     functions = process_symbol_table(args.elf)
-    options = processOptions(args,work_queue_pattern,timestamp,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso)
+    options = processOptions(args,work_queue_pattern,timestamp_start,timestamp_end,sync_edges,elf_file,functions,miso_edges, mosi_edges, clk_edges, cs_edges,spi_decoded_mosi,spi_decoded_miso)
     print("Orbethon Tool took %s minutes %s seconds to run in python" % (int((time.time() - start_time)/60),int((time.time() - start_time)%60)))
     print("Run Orbetto Tool ...")
     if args.device == 'stm32h753':

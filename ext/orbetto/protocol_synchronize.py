@@ -3,7 +3,7 @@ import numpy as np
 from ripyl.decode import find_edges
 from ripyl.streaming import SampleChunk
 
-def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.4):
+def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.05):
     """
     Read csv file of analog SPI and generate pattern for Sync data
     Inputs:
@@ -21,7 +21,7 @@ def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.4):
         # print Error message
         raise Exception("  CSV File seems empty")
     try:
-        sync_list = df["Sync"][0:100000000].tolist()
+        sync_list = df["Sync"].tolist()
     except:
         # print Error message
         # only valid for Salea Sampling Rate of 10 [MS/s]
@@ -38,9 +38,17 @@ def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.4):
         print("  Warning: Number of sampled work queue switches is less than the specified pattern length")
         length = len(edges)
     work_queue_pattern = []
-    for i in range(50,50+length):
+    for i in range(16000,16000+length):
         work_queue_pattern.append(int((edges[i+1][0]-edges[i][0])*1e9))
-    return work_queue_pattern, int(edges[0][0]*1e9)
+    # convert list of tuples to df
+    df_edges = pd.DataFrame(edges,columns=['Time [s]','Value'])
+    # change time to ns
+    df_edges['Time [s]'] = df_edges['Time [s]']*1e9
+    # convert time to int
+    df_edges['Time [s]'] = df_edges['Time [s]'].astype(int)
+    # convert back to list of tuples
+    edges_return = list(df_edges.itertuples(index=False, name=None))
+    return work_queue_pattern, int(edges[16000][0]*1e9),int(edges[16000+length][0]*1e9),edges_return
 
 
 

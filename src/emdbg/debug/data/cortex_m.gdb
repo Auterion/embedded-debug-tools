@@ -98,9 +98,9 @@ define px4_configure_orbuculum
     # Sync packets are transmitted
     ITMSYNCEna 1
     # Enable tasks, workqueues, heap
-    ITMTER 0 0x001F801B
+    # ITMTER 0 0x001F801B
     # Enable tasks and workqueues
-    # ITMTER 0 0x0001801B
+    ITMTER 0 0x0001801B
     # Enable the ITM
     ITMEna 1
 end
