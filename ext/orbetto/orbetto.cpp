@@ -407,6 +407,8 @@ static auto &irq_names = irq_names_stm32h753;
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
 static constexpr uint32_t PID_DMA{100000};
+static constexpr uint32_t PID_UART{200000};
+static constexpr uint32_t PID_SEMAPHORE{1000000};
 static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
 static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_state = -1)
@@ -531,6 +533,7 @@ static void _writeFree(uint64_t ns, uint32_t address, uint32_t alignsize, uint32
 static std::unordered_map<uint16_t, uint32_t> workqueue_map;
 static std::unordered_map<uint32_t, std::string> workqueue_names;
 static std::set<uint16_t> stopped_threads;
+static std::unordered_map<uint32_t, int16_t> semaphores;
 struct dma_config_t
 {
     uint32_t size;
@@ -540,6 +543,7 @@ struct dma_config_t
 };
 static std::unordered_map<uint32_t, dma_config_t> dma_channel_config;
 static std::unordered_map<uint32_t, std::string> dma_channel_name;
+static std::unordered_map<uint32_t, bool> dma_channel_state;
 static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_SOFTWARE );
@@ -551,274 +555,428 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
     if (stopped_threads.contains(tid)) tid += PID_STOP;
     else if (tid != 0) tid += PID_TSK;
 
-    if (m->srcAddr == EMDBG_TASK_START) // start
+    switch (m->srcAddr)
     {
-        if (m->len == 4) {
-            char name[5]{0,0,0,0,0};
-            memcpy(name, &m->value, 4);
-            thread_name += name;
-        }
-        if (m->len <= 2) {
-            if (tid_tl) {
+        case EMDBG_TASK_START: // start
+        {
+            if (m->len == 4) {
+                char name[5]{0,0,0,0,0};
+                memcpy(name, &m->value, 4);
+                thread_name += name;
+            }
+            if (m->len <= 2) {
+                if (tid_tl) {
+                    thread_name.clear();
+                    return;
+                }
+                if (not thread_name.empty())
+                {
+                    if (active_threads.contains(tid))
+                    {
+                        if (active_threads[tid] != thread_name and tid != 0)
+                        {
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
+                    }
+                    else if (tid != 0)
+                    {
+                        static std::set<uint32_t> seen_tids;
+                        if (not seen_tids.contains(tid))
+                        {
+                            seen_tids.insert(tid);
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(prev_tid);
+                            auto *newtask = event->mutable_task_newtask();
+                            newtask->set_pid(tid);
+                            newtask->set_comm(thread_name.c_str());
+                            newtask->set_clone_flags(0x10000); // new thread, not new process!
+                        }
+                    }
+                    active_threads[tid] = thread_name;
+                }
                 thread_name.clear();
-                return;
             }
-            if (not thread_name.empty())
-            {
-                if (active_threads.contains(tid))
-                {
-                    if (active_threads[tid] != thread_name and tid != 0)
-                    {
-                        auto *event = ftrace->add_event();
-                        event->set_timestamp(ns);
-                        event->set_pid(tid);
-                        auto *renametask = event->mutable_task_rename();
-                        renametask->set_pid(tid);
-                        renametask->set_newcomm(thread_name.c_str());
-                    }
-                }
-                else if (tid != 0)
-                {
-                    static std::set<uint32_t> seen_tids;
-                    if (not seen_tids.contains(tid))
-                    {
-                        seen_tids.insert(tid);
-                        auto *event = ftrace->add_event();
-                        event->set_timestamp(ns);
-                        event->set_pid(prev_tid);
-                        auto *newtask = event->mutable_task_newtask();
-                        newtask->set_pid(tid);
-                        newtask->set_comm(thread_name.c_str());
-                        newtask->set_clone_flags(0x10000); // new thread, not new process!
-                    }
-                }
-                active_threads[tid] = thread_name;
-            }
-            thread_name.clear();
+            break;
         }
-    }
-    else if (m->srcAddr == EMDBG_TASK_STOP) // stop
-    {
-        if (tid_tl or not active_threads.contains(tid)) return;
-        active_threads.erase(tid);
-        if (workqueue_map.contains(tid))
+        case EMDBG_TASK_STOP: // stop
         {
-            auto *event = ftrace->add_event();
-            event->set_timestamp(ns);
-            event->set_pid(tid);
-            event->mutable_workqueue_execute_end();
-            workqueue_map.erase(tid);
-        }
-    }
-    else if (m->srcAddr == EMDBG_TASK_RESUME) // resume
-    {
-        if (tid_tl) return;
-        if (not active_threads.contains(tid)) return;
-        const uint8_t priority = m->value >> 16;
-        const uint8_t prev_state = m->value >> 24;
-        _switchTo(tid, true, priority, prev_state);
-    }
-    else if (m->srcAddr == EMDBG_TASK_RUNNABLE) // ready
-    {
-        if (tid_tl) return;
-        auto *event = ftrace->add_event();
-        event->set_timestamp(ns);
-        event->set_pid(prev_tid);
-        auto *sched_waking = event->mutable_sched_waking();
-        sched_waking->set_pid(tid);
-        sched_waking->set_success(1);
-    }
-    else if (m->srcAddr == EMDBG_WORKQUEUE) // workqueue start/stop
-    {
-        if (prev_tid == 0) return;
-        if (m->value) // workqueue start
-        {
-            if (workqueue_map.contains(prev_tid))
+            if (tid_tl or not active_threads.contains(tid)) return;
+            active_threads.erase(tid);
+            if (workqueue_map.contains(tid))
             {
                 auto *event = ftrace->add_event();
                 event->set_timestamp(ns);
-                event->set_pid(prev_tid);
+                event->set_pid(tid);
                 event->mutable_workqueue_execute_end();
+                workqueue_map.erase(tid);
             }
+            break;
+        }
+        case EMDBG_TASK_RESUME: // resume
+        {
+            if (tid_tl) return;
+            if (not active_threads.contains(tid)) return;
+            const uint8_t priority = m->value >> 16;
+            const uint8_t prev_state = m->value >> 24;
+            _switchTo(tid, true, priority, prev_state);
+            break;
+        }
+        case EMDBG_TASK_RUNNABLE: // ready
+        {
+            if (tid_tl) return;
             auto *event = ftrace->add_event();
             event->set_timestamp(ns);
             event->set_pid(prev_tid);
-            auto *workqueue_start = event->mutable_workqueue_execute_start();
-            workqueue_start->set_function(m->value);
-            workqueue_map[prev_tid] = m->value;
-            if (_r.symbols and not workqueue_names.contains(m->value))
+            auto *sched_waking = event->mutable_sched_waking();
+            sched_waking->set_pid(tid);
+            sched_waking->set_success(1);
+            break;
+        }
+        case EMDBG_WORKQUEUE: // workqueue start/stop
+        {
+            if (prev_tid == 0) return;
+            if (m->value) // workqueue start
             {
-                if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+                if (workqueue_map.contains(prev_tid))
                 {
-                    printf("Found Name %s for 0x%08x\n", name, m->value);
-                    workqueue_names[m->value] = name;
+                    auto *event = ftrace->add_event();
+                    event->set_timestamp(ns);
+                    event->set_pid(prev_tid);
+                    event->mutable_workqueue_execute_end();
                 }
-                else {
-                    printf("No match found for 0x%08x\n", m->value);
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(prev_tid);
+                auto *workqueue_start = event->mutable_workqueue_execute_start();
+                workqueue_start->set_function(m->value);
+                workqueue_map[prev_tid] = m->value;
+                if (_r.symbols and not workqueue_names.contains(m->value))
+                {
+                    if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+                    {
+                        printf("Found Name %s for 0x%08x\n", name, m->value);
+                        workqueue_names[m->value] = name;
+                    }
+                    else {
+                        printf("No match found for 0x%08x\n", m->value);
+                    }
                 }
             }
+            else // workqueue stop
+            {
+                if (workqueue_map.contains(prev_tid))
+                {
+                    auto *event = ftrace->add_event();
+                    event->set_timestamp(ns);
+                    event->set_pid(prev_tid);
+                    event->mutable_workqueue_execute_end();
+                    workqueue_map.erase(prev_tid);
+                }
+            }
+            break;
         }
-        else // workqueue stop
+        case EMDBG_SEMAPHORE_INIT:
         {
-            if (workqueue_map.contains(prev_tid))
+            static uint32_t addr{0};
+            if (m->len == 4) addr = m->value;
+            else if (m->len == 2) {
+                semaphores[addr] = m->value == uint16_t(-1) ? 0 : m->value;
+            }
+            break;
+        }
+        case EMDBG_SEMAPHORE_DECR:
+        case EMDBG_SEMAPHORE_INCR:
+        {
+            const bool increment = (m->srcAddr == EMDBG_SEMAPHORE_INCR);
+            increment ? semaphores[m->value]++ : semaphores[m->value]--;
+
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(PID_SEMAPHORE + m->value);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "C|%u|Semaphore %#08x|%d", PID_SEMAPHORE, m->value, semaphores[m->value]);
+                print->set_buf(buffer);
+            }
             {
                 auto *event = ftrace->add_event();
                 event->set_timestamp(ns);
                 event->set_pid(prev_tid);
-                event->mutable_workqueue_execute_end();
-                workqueue_map.erase(prev_tid);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "I|0|%s semaphore %#08x", increment ? "Post" : "Wait on", m->value);
+                print->set_buf(buffer);
             }
+            break;
         }
-    }
-    else if (m->srcAddr == EMDBG_HEAP_REGIONS) // heap region
-    {
-        static uint32_t start = 0;
-        if (m->value & 0x80000000) {
-            start = m->value & ~0x80000000;
-        }
-        else if (start)
+        case EMDBG_HEAP_REGIONS: // heap region
         {
-            const uint32_t end = start + m->value;
-            heap_regions[start] = end;
-            printf("Heap region added: [%08x, %08x] (%ukiB)\n", start, end, (end - start) / 1024);
-            heap_size_remaining += end - start;
-            start = 0;
+            static uint32_t start = 0;
+            if (m->value & 0x80000000) {
+                start = m->value & ~0x80000000;
+            }
+            else if (start)
+            {
+                const uint32_t end = start + m->value;
+                heap_regions[start] = end;
+                printf("Heap region added: [%08x, %08x] (%ukiB)\n", start, end, (end - start) / 1024);
+                heap_size_remaining += end - start;
+                start = 0;
+                {
+                    auto *event = ftrace->add_event();
+                    event->set_timestamp(ns);
+                    event->set_pid(0);
+                    auto *print = event->mutable_print();
+                    char buffer[100];
+                    snprintf(buffer, 100, "C|0|Heap Available|%u", heap_size_remaining);
+                    print->set_buf(buffer);
+                }
+            }
+            break;
+        }
+        case EMDBG_HEAP_MALLOC_ATTEMPT:  // malloc attempt
+        case EMDBG_HEAP_MALLOC_RESULT:   // and malloc result
+        {
+            static uint32_t size = 0;
+            static uint32_t alignsize = 0;
+            if (m->srcAddr == EMDBG_HEAP_MALLOC_ATTEMPT) {
+                size = m->value;
+                alignsize = ((size + 16) + 0xf) & ~0xf;
+            }
+            else {
+                if (m->value) heap_allocations[m->value] = std::pair{size, alignsize};
+                else printf("malloc(%uB) failed!\n", size);
+                _writeMalloc(ns, m->value, alignsize, size);
+            }
+            break;
+        }
+        case EMDBG_HEAP_FREE: // free
+        {
+            if (heap_allocations.contains(m->value))
+            {
+                const auto [size, alignsize] = heap_allocations[m->value];
+                heap_allocations.erase(m->value);
+                _writeFree(ns, m->value, alignsize, size);
+            }
+            else printf("Unknown size for free(0x%08x)!\n", m->value);
+            break;
+        }
+        case EMDBG_DMA_CONFIG: // dma config
+        {
+            static uint8_t instance{0}, channel{0};
+            static uint32_t did{0};
+            static uint16_t mask{0x8000};
+            if (m->len == 2 and m->value & 0x8000 and mask & 0x8000) {
+                channel = m->value & 0x1f;
+                instance = (m->value >> 5) & 0x7;
+                did = PID_DMA + instance * 100 + channel;
+                mask = m->value & 0x0f00;
+                // printf("%llu: DMA%u CH%u Config: Mask=%#04x\n", ns, instance, channel, mask);
+            }
+            else if (mask & 0x0100) {
+                dma_channel_config[did].size = m->value;
+                mask &= ~0x0100;
+                printf("%llu: DMA%u CH%u Config: S=%u\n", ns, instance, channel, m->value);
+            }
+            else if (mask & 0x0200) {
+                dma_channel_config[did].paddr = m->value;
+                mask &= ~0x0200;
+                printf("%llu: DMA%u CH%u Config: P=%#08x\n", ns, instance, channel, m->value);
+            }
+            else if (mask & 0x0400) {
+                dma_channel_config[did].maddr = m->value;
+                mask &= ~0x0400;
+                printf("%llu: DMA%u CH%u Config: M=%#08x\n", ns, instance, channel, m->value);
+            }
+            else if (mask & 0x0800) {
+                dma_channel_config[did].config = m->value;
+                mask &= ~0x0800;
+                printf("%llu: DMA%u CH%u Config: C=%#08x\n", ns, instance, channel, m->value);
+            }
+            else {
+                mask = 0x8000;
+            }
+            if (mask == 0) {
+                static std::unordered_map<uint32_t, std::string> addr2reg =
+                {
+                    {0x40003820, "SPI2.TXDR"},
+                    {0x40003830, "SPI2.RXDR"},
+                    {0x40003c20, "SPI3.TXDR"},
+                    {0x40003c30, "SPI3.RXDR"},
+                    {0x40004824, "USART3.RDR"},
+                    {0x40004828, "USART3.TDR"},
+                    {0x40005024, "UART5.RDR"},
+                    {0x40005028, "UART5.TDR"},
+                    {0x40007824, "UART7.RDR"},
+                    {0x40007828, "UART7.TDR"},
+                    {0x40011424, "USART1.RDR"},
+                    {0x40011428, "USART1.TDR"},
+                    {0x40013020, "SPI1.TXDR"},
+                    {0x40013030, "SPI1.RXDR"},
+                };
+                const auto &config = dma_channel_config[did];
+                uint32_t src = config.paddr, dst = config.maddr;
+                if ((config.config & 0xC0) == 0x40) std::swap(src, dst);
+                char buffer[1000];
+                snprintf(buffer, sizeof(buffer), "%uB: %#08x%s -> %#08x%s (%#08x:%s%s%s%s%s%s%s%s)",
+                         config.size,
+                         src, addr2reg.contains(src) ? ("="s + addr2reg[src]).c_str() : "",
+                         dst, addr2reg.contains(dst) ? ("="s + addr2reg[dst]).c_str() : "",
+                         config.config,
+                         config.config & 0x40000 ? " DBM" : "",
+                         (const char*[]){" L", " M", " H", " VH"}[(config.config & 0x30000) >> 16],
+                         (const char*[]){" P8", " P16", " P32", ""}[(config.config & 0x6000) >> 13],
+                         (const char*[]){" M8", " M16", " M32", ""}[(config.config & 0x1800) >> 11],
+                         config.config & 0x400 ? " MINC" : "",
+                         config.config & 0x200 ? " PINC" : "",
+                         config.config & 0x100 ? " CIRC" : "",
+                         config.config & 0x20 ? " PFCTRL" : "");
+                dma_channel_name[did] = buffer;
+                mask = 0x8000;
+            }
+            break;
+        }
+        case EMDBG_DMA_START: // dma start
+        {
+            const uint32_t instance = m->value >> 5;
+            const uint32_t channel = m->value & 0x1f;
+            const uint32_t did = PID_DMA + instance * 100 + channel;
+            // printf("%llu: DMA%u CH%u Start\n", ns, instance, channel);
+            if (dma_channel_state[did])
             {
                 auto *event = ftrace->add_event();
                 event->set_timestamp(ns);
-                event->set_pid(0);
+                event->set_pid(did);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(did);
+                auto *print = event->mutable_print();
+                print->set_buf("B|0|"s + dma_channel_name[did]);
+            }
+            dma_channel_state[did] = true;
+            break;
+        }
+        case EMDBG_DMA_STOP: // dma stop
+        {
+            const uint32_t instance = m->value >> 5;
+            const uint32_t channel = m->value & 0x1f;
+            const uint32_t did = PID_DMA + instance * 100 + channel;
+            // printf("%llu: DMA%u CH%u Stop\n", ns, instance, channel);
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(did);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            dma_channel_state[did] = false;
+            break;
+        }
+        case EMDBG_UART4_TX: // uart transmit
+        {
+            const uint32_t tid = PID_UART+2*4+0;
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
                 auto *print = event->mutable_print();
                 char buffer[100];
-                snprintf(buffer, 100, "C|0|Heap Available|%u", heap_size_remaining);
+                snprintf(buffer, sizeof(buffer), "B|0|%#02x", m->value);
                 print->set_buf(buffer);
             }
-        }
-    }
-    else if (m->srcAddr == EMDBG_HEAP_MALLOC_ATTEMPT || m->srcAddr == EMDBG_HEAP_MALLOC_RESULT) // malloc attempt and result
-    {
-        static uint32_t size = 0;
-        static uint32_t alignsize = 0;
-        if (m->srcAddr == EMDBG_HEAP_MALLOC_ATTEMPT) {
-            size = m->value;
-            alignsize = ((size + 16) + 0xf) & ~0xf;
-        }
-        else {
-            if (m->value) heap_allocations[m->value] = std::pair{size, alignsize};
-            else printf("malloc(%uB) failed!\n", size);
-            _writeMalloc(ns, m->value, alignsize, size);
-        }
-    }
-    else if (m->srcAddr == EMDBG_HEAP_FREE) // free
-    {
-        if (heap_allocations.contains(m->value))
-        {
-            const auto [size, alignsize] = heap_allocations[m->value];
-            heap_allocations.erase(m->value);
-            _writeFree(ns, m->value, alignsize, size);
-        }
-        else printf("Unknown size for free(0x%08x)!\n", m->value);
-    }
-    else if (m->srcAddr == EMDBG_DMA_CONFIG) // dma config
-    {
-        static uint8_t instance{0}, channel{0};
-        static uint32_t did{0};
-        static uint16_t mask{0x8000};
-        bool update{false};
-        if (m->len == 2 and m->value & 0x8000 and mask & 0x8000) {
-            channel = m->value & 0x1f;
-            instance = (m->value >> 5) & 0x7;
-            did = PID_DMA + instance * 100 + channel;
-            mask = m->value & 0x0f00;
-            // printf("%llu: DMA%u CH%u Config: Mask=%#04x\n", ns, instance, channel, mask);
-        }
-        else if (mask & 0x0100) {
-            dma_channel_config[did].size = m->value;
-            mask &= ~0x0100;
-            printf("%llu: DMA%u CH%u Config: S=%u\n", ns, instance, channel, m->value);
-        }
-        else if (mask & 0x0200) {
-            dma_channel_config[did].paddr = m->value;
-            mask &= ~0x0200;
-            printf("%llu: DMA%u CH%u Config: P=%#08x\n", ns, instance, channel, m->value);
-        }
-        else if (mask & 0x0400) {
-            dma_channel_config[did].maddr = m->value;
-            mask &= ~0x0400;
-            printf("%llu: DMA%u CH%u Config: M=%#08x\n", ns, instance, channel, m->value);
-        }
-        else if (mask & 0x0800) {
-            dma_channel_config[did].config = m->value;
-            mask &= ~0x0800;
-            printf("%llu: DMA%u CH%u Config: C=%#08x\n", ns, instance, channel, m->value);
-        }
-        else {
-            mask = 0x8000;
-        }
-        if (mask == 0) {
-            static std::unordered_map<uint32_t, std::string> addr2reg =
             {
-                {0x40003820, "SPI2.TXDR"},
-                {0x40003830, "SPI2.RXDR"},
-                {0x40003c20, "SPI3.TXDR"},
-                {0x40003c30, "SPI3.RXDR"},
-                {0x40004824, "USART3.RDR"},
-                {0x40004828, "USART3.TDR"},
-                {0x40005024, "UART5.RDR"},
-                {0x40005028, "UART5.TDR"},
-                {0x40007824, "UART7.RDR"},
-                {0x40007828, "UART7.TDR"},
-                {0x40011424, "USART1.RDR"},
-                {0x40011428, "USART1.TDR"},
-                {0x40013020, "SPI1.TXDR"},
-                {0x40013030, "SPI1.RXDR"},
-            };
-            const auto &config = dma_channel_config[did];
-            uint32_t src = config.paddr, dst = config.maddr;
-            if ((config.config & 0xC0) == 0x40) std::swap(src, dst);
-            char buffer[1000];
-            snprintf(buffer, sizeof(buffer), "%uB: %#08x%s -> %#08x%s (%#08x:%s%s%s%s%s%s%s%s)",
-                     config.size,
-                     src, addr2reg.contains(src) ? ("="s + addr2reg[src]).c_str() : "",
-                     dst, addr2reg.contains(dst) ? ("="s + addr2reg[dst]).c_str() : "",
-                     config.config,
-                     config.config & 0x40000 ? " DBM" : "",
-                     (const char*[]){" L", " M", " H", " VH"}[(config.config & 0x30000) >> 16],
-                     (const char*[]){" P8", " P16", " P32", ""}[(config.config & 0x6000) >> 13],
-                     (const char*[]){" M8", " M16", " M32", ""}[(config.config & 0x1800) >> 11],
-                     config.config & 0x400 ? " MINC" : "",
-                     config.config & 0x200 ? " PINC" : "",
-                     config.config & 0x100 ? " CIRC" : "",
-                     config.config & 0x20 ? " PFCTRL" : "");
-            dma_channel_name[did] = buffer;
-            mask = 0x8000;
+                auto *event = ftrace->add_event();
+                // event->set_timestamp(ns+10000); // ~921600bps
+                event->set_timestamp(ns+40000); // ~230400bps
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            {
+                static uint64_t total{0};
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                char buffer[1000];
+                snprintf(buffer, sizeof(buffer), "C|%u|UART4 Transmitted|%llu", PID_UART, ++total);
+                print->set_buf(buffer);
+            }
+            break;
         }
-    }
-    else if (m->srcAddr == EMDBG_DMA_START) // dma start
-    {
-        const uint32_t instance = m->value >> 5;
-        const uint32_t channel = m->value & 0x1f;
-        const uint32_t did = PID_DMA + instance * 100 + channel;
-        // printf("%llu: DMA%u CH%u Start\n", ns, instance, channel);
+        case EMDBG_UART4_RX: // uart receive
         {
-            auto *event = ftrace->add_event();
-            event->set_timestamp(ns);
-            event->set_pid(did);
-            auto *print = event->mutable_print();
-            print->set_buf("B|0|"s + dma_channel_name[did]);
-        }
-    }
-    else if (m->srcAddr == EMDBG_DMA_STOP) // dma stop
-    {
-        const uint32_t instance = m->value >> 5;
-        const uint32_t channel = m->value & 0x1f;
-        const uint32_t did = PID_DMA + instance * 100 + channel;
-        // printf("%llu: DMA%u CH%u Stop\n", ns, instance, channel);
-        {
-            auto *event = ftrace->add_event();
-            event->set_timestamp(ns);
-            event->set_pid(did);
-            auto *print = event->mutable_print();
-            print->set_buf("E|0");
+            const uint32_t tid = PID_UART+2*4+1;
+            const uint8_t data = m->value & 0xff;
+            const uint8_t status = m->value >> 8;
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns-40000);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns-40000); // ~230400bps
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                if (status & 0x08) {
+                    snprintf(buffer, sizeof(buffer), "B|0|OVERFLOW %#02x", data);
+                } else {
+                    snprintf(buffer, sizeof(buffer), "B|0|%#02x", data);
+                }
+                print->set_buf(buffer);
+            }
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+            if (status & 0x0f) printf("%llu: UART4 ERR=%#02x\n", ns, status);
+            if (status & 0x08)
+            {
+                static uint64_t overflows{0};
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                char buffer[1000];
+                snprintf(buffer, sizeof(buffer), "C|%u|UART4 Overflows|%llu", PID_UART, ++overflows);
+                print->set_buf(buffer);
+            }
+            {
+                static uint64_t total{0};
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(tid);
+                auto *print = event->mutable_print();
+                char buffer[1000];
+                snprintf(buffer, sizeof(buffer), "C|%u|UART4 Received|%llu", PID_UART, ++total);
+                print->set_buf(buffer);
+            }
+            break;
         }
     }
 }
@@ -898,7 +1056,7 @@ static void _itmPumpProcessPre( char c )
             if ( p.genericMsg.msgtype == MSG_SOFTWARE )
             {
                 struct swMsg *m = (struct swMsg *)&p;
-                if (m->srcAddr == 1) // stop
+                if (m->srcAddr == EMDBG_TASK_STOP) // stop
                 {
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
@@ -1475,6 +1633,34 @@ static void _feedStream( struct Stream *stream )
                     thread->set_name(buffer);
                 }
             }
+        }
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_UART);
+            process->add_cmdline("UARTs");
+            for (int chan=0; chan < 10; chan++)
+            {
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_UART + chan);
+                thread->set_tgid(PID_UART);
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "UART%u %sX", chan/2, (chan & 0b1) ? "R" : "T");
+                thread->set_name(buffer);
+            }
+        }
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_SEMAPHORE);
+            process->add_cmdline("Semaphores");
+            // for (auto&& [addr, count] : semaphores)
+            // {
+            //     auto *thread = process_tree->add_threads();
+            //     thread->set_tid(PID_SEMAPHORE + addr);
+            //     thread->set_tgid(PID_SEMAPHORE);
+            //     char buffer[100];
+            //     snprintf(buffer, sizeof(buffer), "Semaphore %#08x", addr);
+            //     thread->set_name(buffer);
+            // }
         }
     }
 

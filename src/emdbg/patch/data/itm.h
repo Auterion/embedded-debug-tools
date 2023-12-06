@@ -20,8 +20,9 @@ enum
     // Workqueues
     EMDBG_WORKQUEUE = 4,
     // Semaphores
-    EMDBG_SEMAPHORE_WAIT = 5,
-    EMDBG_SEMAPHORE_POST = 6,
+    EMDBG_SEMAPHORE_INIT = 5,
+    EMDBG_SEMAPHORE_DECR = 6,
+    EMDBG_SEMAPHORE_INCR = 7,
 
     // Heap
     EMDBG_HEAP_REGIONS = 8,
@@ -35,7 +36,8 @@ enum
     EMDBG_DMA_STOP = 14,
 
     // the rest are optional user channels
-    EMDBG_UART4 = 31,
+    EMDBG_UART4_TX = 30,
+    EMDBG_UART4_RX = 31,
 };
 
 #define EMDBG_LOG_TASK_START(tcb) \
@@ -59,11 +61,16 @@ enum
     emdbg_itm_block(EMDBG_TASK_RUNNABLE, tcb->pid)
 
 
-#define EMDBG_LOG_SEMAPHORE_WAIT(sem) \
-    emdbg_itm16_block(EMDBG_SEMAPHORE_WAIT, (uint32_t)sem >> 3)
+#define EMDBG_LOG_SEMAPHORE_INIT(sem, count) \
+    { emdbg_itm32_block(EMDBG_SEMAPHORE_INIT, (uint32_t)sem); \
+      emdbg_itm16_block(EMDBG_SEMAPHORE_INIT, count); }
 
-#define EMDBG_LOG_SEMAPHORE_POST(sem) \
-    emdbg_itm16_block(EMDBG_SEMAPHORE_POST, (uint32_t)sem >> 3)
+#define EMDBG_LOG_SEMAPHORE_DECR(sem) \
+    emdbg_itm32_block(EMDBG_SEMAPHORE_DECR, (uint32_t)sem)
+
+#define EMDBG_LOG_SEMAPHORE_INCR(sem) \
+    emdbg_itm32_block(EMDBG_SEMAPHORE_INCR, (uint32_t)sem)
+
 
 #define EMDBG_LOG_WORKQUEUE_START(item) \
     emdbg_itm32_block(EMDBG_WORKQUEUE, (uint32_t)(item->ItemName()));

@@ -14,6 +14,7 @@ The functionality currently instrumented with cycle accuracy:
 - Workqueue start/stop with name.
 - Heap malloc/free with address and size.
 - DMA transfer start/stop with configuration.
+- Semaphore init/wait/post with count.
 
 Perfetto is a FTrace visualizer that works really well for this use case:
 
@@ -25,10 +26,13 @@ Perfetto is a FTrace visualizer that works really well for this use case:
 
 ![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto5.png)
 
+![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto6.png)
+
 [Here is an example trace of only the scheduler](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perf),
 [here is one with the scheduler and workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_wq.perf),
 [another one with heap tracking](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_heap.perf),
-and [one with DMA transfer profiling](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perfetto_trace.gz) 
+[one with DMA transfer profiling](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perfetto_trace.gz),
+and [one with semaphore count tracing](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_semaphores.perfetto_trace.gz), 
 that you can download and drag into the [the Perfetto UI](https://ui.perfetto.dev)
 to test it yourself.
 
@@ -59,7 +63,7 @@ You need to apply one patches to your PX4 source tree:
 
 ```sh
 # cd PX4-Autopilot
-python3 -m emdbg.patch nuttx_tracing_itm --apply -v
+python3 -m emdbg.patch nuttx_tracing_itm_v11 --apply -v
 ```
 
 Then recompile and upload your PX4 firmware to your FMU:

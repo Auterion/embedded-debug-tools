@@ -104,6 +104,8 @@ define px4_configure_orbuculum
     # Enable workqueue scheduling
     set $TER |= 0x00000010
 
+    # Enable semaphore profiling
+    # set $TER |= 0x000000E0
     # Enable heap profiling
     # set $TER |= 0x00000F00
     # Enable DMA profiling

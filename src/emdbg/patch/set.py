@@ -66,6 +66,16 @@ def nuttx_tracing_itm_v11(px4_root: Path) -> PatchManager:
     return PatchManager("Add tracing support to NuttX v11 via ITM", operations)
 
 
+def nuttx_tracing_itm_uart4(px4_root: Path) -> PatchManager:
+    """
+    Trace data reception errors on UART4.
+    """
+    operations = [
+        PatchOperation(px4_root, _data("nuttx_tracing_itm_uart4.patch")),
+    ]
+    return PatchManager("Trace data transmit/receive errors on UART4", operations)
+
+
 def nuttx_sdmmc_reg_access(px4_root: Path) -> PatchManager:
     """
     Un-inlines the `sdmmc_putreg32`, `sdmmc_getreg32`, and `sdmmc_modifyreg32`

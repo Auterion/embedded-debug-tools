@@ -1,0 +1,35 @@
+# Copyright (c) 2023, Auterion AG
+# SPDX-License-Identifier: BSD-3-Clause
+
+diff --git a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_serial.c b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_serial.c
+index 6b02a86a9b..81790f8f6a 100644
+--- a/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_serial.c
++++ b/platforms/nuttx/NuttX/nuttx/arch/arm/src/stm32f7/stm32_serial.c
+@@ -38,6 +38,7 @@
+ #include <nuttx/fs/ioctl.h>
+ #include <nuttx/serial/serial.h>
+ #include <nuttx/power/pm.h>
++#include <nuttx/itm/itm.h>
+
+ #ifdef CONFIG_SERIAL_TERMIOS
+ #  include <termios.h>
+@@ -2759,6 +2760,9 @@ static int up_receive(struct uart_dev_s *dev, unsigned int *status)
+   /* Get the Rx byte plux error information.  Return those in status */
+
+   *status  = priv->sr << 16 | rdr;
++  if (priv->usartbase == STM32_UART4_BASE) {
++    emdbg_itm16_block(EMDBG_UART4_RX, priv->sr << 8 | (rdr & 0xff));
++  }
+   priv->sr = 0;
+
+   /* Then return the actual received byte */
+@@ -3258,7 +3262,9 @@ static void up_send(struct uart_dev_s *dev, int ch)
+       stm32_gpiowrite(priv->rs485_dir_gpio, priv->rs485_dir_polarity);
+     }
+ #endif
+-
++  if (priv->usartbase == STM32_UART4_BASE) {
++    emdbg_itm8_block(EMDBG_UART4_TX, ch);
++  }
+   up_serialout(priv, STM32_USART_TDR_OFFSET, (uint32_t)ch);
+ }
