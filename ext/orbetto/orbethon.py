@@ -105,6 +105,10 @@ def init_argparse():
                         help="select spi analog csv file to decode",
                         type=str,
                         default='../../../Logic2/analog.csv')
+    parser.add_argument('-dd','--dynamic_decoding',
+                        help="enable dynamic decoding, which improves computation time if the same analog spi data is used multiple times",
+                        action='store_true',
+                        default=False)
 
     return parser.parse_args()
 
@@ -112,6 +116,10 @@ def init_argparse():
 if __name__ == "__main__":
     start_time = time.time()
     args = init_argparse()
+    if not args.dynamic_decoding:
+        # check if buffer dir exists if yes delete it
+        if os.path.exists("buffer"):
+            os.system('rm -rf buffer')
     df = pd.read_csv(args.spi_analog)
     work_queue_pattern,timestamp_start,timestamp_end,sync_edges = getWorkQueuePattern(df)
     miso_edges, mosi_edges, clk_edges, cs_edges = digital_spi_csv(df)

@@ -1189,8 +1189,6 @@ static void _feedStream( struct Stream *stream )
             process->add_cmdline("SPI");
             for(int channels = 6;channels>0;channels--)
             {
-                // print channels
-                printf("Channel: %i\n", channels);
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(PID_SPI + channels);
                 thread->set_tgid(PID_SPI);

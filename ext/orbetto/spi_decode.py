@@ -5,7 +5,9 @@ import time
 import ripyl.protocol.spi as spi
 import ripyl.streaming as streaming
 from ripyl.streaming import SampleChunk
-from ripyl.decode import find_edges
+
+from signal_processor import find_edges_dynamic
+
 
 def _get_protocol_information_only(df_input):
     """
@@ -36,10 +38,10 @@ def digital_spi_csv(df_input):
     clk_sc = [SampleChunk(df["CLK"].tolist(),df["Time [s]"][0],period)]
     cs_sc = [SampleChunk(df["CS"].tolist(),df["Time [s]"][0],period)]
     # Perform edge detection
-    miso_edges = list(find_edges(miso_sc, (0,5),hysteresis=0.4))
-    mosi_edges = list(find_edges(mosi_sc, (0,3.3),hysteresis=0.4))
-    clk_edges = list(find_edges(clk_sc, (0,3.3),hysteresis=0.4))
-    cs_edges = list(find_edges(cs_sc, (0,3.3),hysteresis=0.4))
+    miso_edges = find_edges_dynamic(miso_sc,"miso", (0,5),hysteresis=0.4)
+    mosi_edges = find_edges_dynamic(mosi_sc,"mosi", (0,3.3),hysteresis=0.4)
+    clk_edges = find_edges_dynamic(clk_sc,"clk", (0,3.3),hysteresis=0.4)
+    cs_edges = find_edges_dynamic(cs_sc,"cs", (0,3.3),hysteresis=0.4)
     return miso_edges, mosi_edges, clk_edges, cs_edges
 
 def read_csv_file(path, signal_length=None):

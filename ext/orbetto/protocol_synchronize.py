@@ -3,6 +3,8 @@ import numpy as np
 from ripyl.decode import find_edges
 from ripyl.streaming import SampleChunk
 
+from signal_processor import find_edges_dynamic
+
 def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.05):
     """
     Read csv file of analog SPI and generate pattern for Sync data
@@ -32,7 +34,7 @@ def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.05):
         # print Error message
         raise Exception("  CSV File does not contain Sync information")
     # get edges
-    edges = list(find_edges(sync_analog, logic_levels,hysteresis=hyst))
+    edges = find_edges_dynamic(sync_analog,"sync", logic_levels,hysteresis=hyst)
     # get first 20 intervals
     if (length > (len(edges))):
         print("  Warning: Number of sampled work queue switches is less than the specified pattern length")

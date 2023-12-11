@@ -13,3 +13,4 @@ dist/
 .vscode/
 /ext/orbetto/pybind11/
 /ext/orbetto/ripyl/
+/ext/orbetto/buffer/
