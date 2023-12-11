@@ -173,6 +173,8 @@ static std::unordered_map<int32_t, const char*> *irq_names = nullptr;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
+static constexpr uint32_t PID_PC{200000};
+static constexpr uint32_t PID_SPI{300000};
 static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
 
@@ -328,12 +330,23 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 {
                     if (active_threads[tid] != thread_name and tid != 0)
                     {
-                        auto *event = ftrace->add_event();
-                        event->set_timestamp(ns);
-                        event->set_pid(tid);
-                        auto *renametask = event->mutable_task_rename();
-                        renametask->set_pid(tid);
-                        renametask->set_newcomm(thread_name.c_str());
+                        {
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
+                        // Do the same for PC Thread
+                        {
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(PID_PC + tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(PID_PC + tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
                     }
                 }
                 else if (tid != 0)
@@ -341,14 +354,25 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                     static std::set<uint32_t> seen_tids;
                     if (not seen_tids.contains(tid))
                     {
-                        seen_tids.insert(tid);
-                        auto *event = ftrace->add_event();
-                        event->set_timestamp(ns);
-                        event->set_pid(prev_tid);
-                        auto *newtask = event->mutable_task_newtask();
-                        newtask->set_pid(tid);
-                        newtask->set_comm(thread_name.c_str());
-                        newtask->set_clone_flags(0x10000); // new thread, not new process!
+                        {
+                            seen_tids.insert(tid);
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(prev_tid);
+                            auto *newtask = event->mutable_task_newtask();
+                            newtask->set_pid(tid);
+                            newtask->set_comm(thread_name.c_str());
+                            newtask->set_clone_flags(0x10000); // new thread, not new process!
+                        }
+                        {
+                            // Do the same for PC Thread
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(prev_tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(PID_PC + tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
                     }
                 }
                 active_threads.insert({tid, thread_name});
@@ -550,43 +574,45 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
     assert( m->msgtype == MSG_PC_SAMPLE );
     // check if pc is in idle task then skip
-    // if(prev_tid == 0) return;
+    if(prev_tid == 0) return;
     // find the new function name
-    // auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
-    //     [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
-    //     {
-    //         return get<0>(addr_func_tuple) < value;
-    //     });
-    // // begin the new function in ftrace
-    // if (pc_function == options.functions.end()) 
-    // {
-    //     printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
-    // }else
-    // {
-    //     uint64_t index = get<0>(*pc_function);
-    //     std::string function_name = get<1>(*pc_function);
-    //     // printf("Function: %s\n", function_name.c_str());
-    //     if(index==last_function_index and prev_tid==last_prev_tid) return;
-    //     // end the last function in ftrace
-    //     if(last_function_index != (uint64_t)-1){
-    //         auto *event = ftrace->add_event();
-    //         event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
-    //         event->set_pid(last_prev_tid);
-    //         auto *exit = event->mutable_funcgraph_exit();
-    //         exit->set_depth(0);
-    //         exit->set_func(last_function_index);
-    //     }
-    //     // start ftrace event
-    //     auto *event = ftrace->add_event();
-    //     event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
-    //     event->set_pid(prev_tid);
-    //     auto *entry = event->mutable_funcgraph_entry();
-    //     entry->set_depth(0);
-    //     entry->set_func(index);
-    //     // save last event
-    //     last_prev_tid = prev_tid;
-    //     last_function_index = index;
-    // }
+    auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
+        [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
+        {
+            return get<0>(addr_func_tuple) < value;
+        });
+    // begin the new function in ftrace
+    if (pc_function == options.functions.end()) 
+    {
+        printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
+    }else
+    {
+        uint64_t index = get<0>(*pc_function);
+        std::string function_name = get<1>(*pc_function);
+        // printf("Function: %s\n", function_name.c_str());
+        if(index==last_function_index and prev_tid==last_prev_tid) return;
+        // end the last function in ftrace
+        if(last_function_index != (uint64_t)-1){
+            auto *event = ftrace->add_event();
+            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+            event->set_pid(PID_PC + last_prev_tid);
+            auto *exit = event->mutable_funcgraph_exit();
+            exit->set_depth(0);
+            exit->set_func(last_function_index);
+        }
+        // start ftrace event
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+            event->set_pid(PID_PC + prev_tid);
+            auto *entry = event->mutable_funcgraph_entry();
+            entry->set_depth(0);
+            entry->set_func(index);
+            // save last event
+            last_prev_tid = prev_tid;
+            last_function_index = index;
+        }
+    }
 
 }
 
@@ -789,10 +815,10 @@ static void _sync_digital(int64_t offset)
         // create Ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp(timestamp_offset);
-        event->set_pid(0);
+        event->set_pid(PID_SPI + 2);
         auto *print = event->mutable_print();
         char buffer[100];
-        snprintf(buffer, 100, "C|0|Sync|%u", sync);
+        snprintf(buffer, 100, "C|%u|Sync|%u", PID_SPI,sync);
         print->set_buf(buffer);
     }
 }
@@ -808,10 +834,10 @@ static void _spi_digital(int64_t offset)
         // create Ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp(timestamp_offset);
-        event->set_pid(0);
+        event->set_pid(PID_SPI + 6);
         auto *print = event->mutable_print();
         char buffer[100];
-        snprintf(buffer, 100, "C|0|Digital MOSI|%u", mosi);
+        snprintf(buffer, 100, "C|%u|Digital MOSI|%u",PID_SPI, mosi);
         print->set_buf(buffer);
     }
     for (const auto& [timestamp, miso] : options.miso_digital)
@@ -821,10 +847,10 @@ static void _spi_digital(int64_t offset)
         // create Ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp(timestamp_offset);
-        event->set_pid(0);
+        event->set_pid(PID_SPI + 5);
         auto *print = event->mutable_print();
         char buffer[100];
-        snprintf(buffer, 100, "C|0|Digital MISO|%u", miso);
+        snprintf(buffer, 100, "C|%u|Digital MISO|%u",PID_SPI, miso);
         print->set_buf(buffer);
     }
     for (const auto& [timestamp, clk] : options.clk_digital)
@@ -834,10 +860,10 @@ static void _spi_digital(int64_t offset)
         // create Ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp(timestamp_offset);
-        event->set_pid(0);
+        event->set_pid(PID_SPI + 4);
         auto *print = event->mutable_print();
         char buffer[100];
-        snprintf(buffer, 100, "C|0|Digital Clk|%u", clk);
+        snprintf(buffer, 100, "C|%u|Digital Clk|%u",PID_SPI,clk);
         print->set_buf(buffer);
     }
     for (const auto& [timestamp, cs] : options.cs_digital)
@@ -847,10 +873,10 @@ static void _spi_digital(int64_t offset)
         // create Ftrace event
         auto *event = ftrace->add_event();
         event->set_timestamp(timestamp_offset);
-        event->set_pid(0);
+        event->set_pid(PID_SPI + 3);
         auto *print = event->mutable_print();
         char buffer[100];
-        snprintf(buffer, 100, "C|0|Digital CS|%u", cs);
+        snprintf(buffer, 100, "C|%u|Digital CS|%u",PID_SPI, cs);
         print->set_buf(buffer);
     }
 }
@@ -873,7 +899,7 @@ static void _spi_decoded(int64_t offset)
             // only print cs if smaller than 30.0f
             auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_start);
-            event->set_pid(0);
+            event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
             char buffer[300];
             snprintf(buffer, 300, "B|0|Decoded MOSI|%s", data_string.c_str());
@@ -883,7 +909,7 @@ static void _spi_decoded(int64_t offset)
             // only print cs if smaller than 30.0f
             auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_end);
-            event->set_pid(0);
+            event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
             char buffer[300];
             snprintf(buffer, 300, "E|0|Decoded MOSI|%s", data_string.c_str());
@@ -906,7 +932,7 @@ static void _spi_decoded(int64_t offset)
             // only print cs if smaller than 30.0f
             auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_start);
-            event->set_pid(0);
+            event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
             char buffer[100];
             snprintf(buffer, 100, "B|0|Decoded MISO|%s", data_string.c_str());
@@ -916,7 +942,7 @@ static void _spi_decoded(int64_t offset)
             // only print cs if smaller than 30.0f
             auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_end);
-            event->set_pid(0);
+            event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
             char buffer[100];
             snprintf(buffer, 100, "E|0|Decoded MISO|%s", data_string.c_str());
@@ -1026,7 +1052,7 @@ static void _feedStream( struct Stream *stream )
     if(offset > 0)
     {
         _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
-        //_spi_digital(0);
+        _spi_digital(0);
         _spi_decoded(0);
         _sync_digital(0);
     }else
@@ -1136,6 +1162,61 @@ static void _feedStream( struct Stream *stream )
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(tid);
                 thread->set_tgid(PID_STOP);
+            }
+        }
+        // Init Programm Counter Process with threads
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC);
+            process->add_cmdline("PC");
+            for (auto&& [tid, name] : active_threads)
+            {
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + tid);
+                thread->set_tgid(PID_PC);
+            }
+            for (auto&& tid : stopped_threads)
+            {
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + PID_STOP + tid);
+                thread->set_tgid(PID_PC);
+            }
+        }
+        // Init SPI Protocol Process with Channels as Threads
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_SPI);
+            process->add_cmdline("SPI");
+            for(int channels = 6;channels>0;channels--)
+            {
+                // print channels
+                printf("Channel: %i\n", channels);
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_SPI + channels);
+                thread->set_tgid(PID_SPI);
+                char buffer[100];
+                switch(channels)
+                {
+                    case 6:
+                        snprintf(buffer, sizeof(buffer), "SPI MOSI");
+                        break;
+                    case 5:
+                        snprintf(buffer, sizeof(buffer), "SPI MISO");
+                        break;
+                    case 4:
+                        snprintf(buffer, sizeof(buffer), "SPI CLK");
+                        break;
+                    case 3:
+                        snprintf(buffer, sizeof(buffer), "SPI CS");
+                        break;
+                    case 2:
+                        snprintf(buffer, sizeof(buffer), "SPI Sync");
+                        break;
+                    case 1:
+                        snprintf(buffer, sizeof(buffer), "SPI Decoded");
+                        break;
+                }
+                thread->set_name(buffer);
             }
         }
     }
