@@ -359,10 +359,9 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                             auto *event = ftrace->add_event();
                             event->set_timestamp(ns);
                             event->set_pid(prev_tid);
-                            auto *newtask = event->mutable_task_newtask();
-                            newtask->set_pid(tid);
-                            newtask->set_comm(thread_name.c_str());
-                            newtask->set_clone_flags(0x10000); // new thread, not new process!
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(tid);
+                            renametask->set_newcomm(thread_name.c_str());
                         }
                         {
                             // Do the same for PC Thread
@@ -1143,12 +1142,12 @@ static void _feedStream( struct Stream *stream )
         {
             auto *process = process_tree->add_processes();
             process->set_pid(PID_STOP);
-            process->add_cmdline("Threads (stopped)");
+            process->add_cmdline("Threads (Stopped)");
             for (auto&& tid : stopped_threads)
             {
                 if (tid == 0) continue;
                 auto *thread = process_tree->add_threads();
-                thread->set_tid(tid);
+                thread->set_tid(PID_STOP + tid);
                 thread->set_tgid(PID_STOP);
             }
         }
@@ -1159,15 +1158,22 @@ static void _feedStream( struct Stream *stream )
             process->add_cmdline("PC");
             for (auto&& [tid, name] : active_threads)
             {
+                if (tid == 0) continue;
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(PID_PC + tid);
                 thread->set_tgid(PID_PC);
             }
+        }
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC+PID_STOP);
+            process->add_cmdline("PC (stopped)");
             for (auto&& tid : stopped_threads)
             {
+                if (tid == 0) continue;
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(PID_PC + PID_STOP + tid);
-                thread->set_tgid(PID_PC);
+                thread->set_tgid(PID_PC+PID_STOP);
             }
         }
         // Init SPI Protocol Process with Channels as Threads
