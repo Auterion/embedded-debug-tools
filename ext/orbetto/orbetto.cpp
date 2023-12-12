@@ -825,7 +825,7 @@ static void counter_to_print(bool data,uint32_t pid,uint64_t timestamp)
         event->set_pid(pid);
         auto *print = event->mutable_print();
         char buffer[20];
-        snprintf(buffer, sizeof(buffer), "B|0|1");
+        snprintf(buffer, sizeof(buffer), "B|0| ");
         print->set_buf(buffer);
     }else
     {
@@ -835,7 +835,7 @@ static void counter_to_print(bool data,uint32_t pid,uint64_t timestamp)
         event->set_pid(pid);
         auto *print = event->mutable_print();
         char buffer[20];
-        snprintf(buffer, sizeof(buffer), "E|0|1");
+        snprintf(buffer, sizeof(buffer), "E|0");
         print->set_buf(buffer);
     }
 }
@@ -1046,9 +1046,7 @@ static void _feedStream( struct Stream *stream )
     auto pattern_stats = find_matching_pattern();
     offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
     double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
-    printf("Nominator = %llu - %llu + %llu = %f\n", std::get<1>(pattern_stats[1]),std::get<0>(pattern_stats[1]),offset,nominator);
     double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
-    printf("Denominator = %llu - %llu = %f\n", std::get<0>(pattern_stats[1]),std::get<0>(pattern_stats[0]),denominator);
     drift = nominator /denominator;
     printf("SPI and SWO Clock drift %f per nano second.\n", drift);
     sync_point = std::get<1>(pattern_stats[0]);
