@@ -839,76 +839,12 @@ static void counter_to_print(bool data,uint32_t pid,uint64_t timestamp)
         print->set_buf(buffer);
     }
 }
-static void _sync_digital()
-{
-    for(const auto& [timestamp, sync] : options.sync_digital)
-    {
-        // create Ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp(_apply_offset_and_drift(timestamp));
-        event->set_pid(PID_SPI + 2);
-        auto *print = event->mutable_print();
-        char buffer[100];
-        snprintf(buffer, 100, "C|%u|Sync|%u", PID_SPI,sync);
-        print->set_buf(buffer);
-    }
-}
 
 static void _sync_digital_prints()
 {
     for(const auto& [timestamp, sync] : options.sync_digital)
     {
         counter_to_print((bool)sync, PID_SPI + 2, timestamp);
-    }
-}
-
-static void _spi_digital()
-{
-    // Proccess SPI Digital intro perfetto trace
-    // iterate over all samples of digital data array and generate a perfetto trace count event for each
-    for(const auto& [timestamp, mosi] : options.mosi_digital)
-    {
-        // create Ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp(_apply_offset_and_drift(timestamp));
-        event->set_pid(PID_SPI + 6);
-        auto *print = event->mutable_print();
-        char buffer[100];
-        snprintf(buffer, 100, "C|%u|Digital MOSI|%u",PID_SPI, mosi);
-        print->set_buf(buffer);
-    }
-    for (const auto& [timestamp, miso] : options.miso_digital)
-    {
-        // create Ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp(_apply_offset_and_drift(timestamp));
-        event->set_pid(PID_SPI + 5);
-        auto *print = event->mutable_print();
-        char buffer[100];
-        snprintf(buffer, 100, "C|%u|Digital MISO|%u",PID_SPI, miso);
-        print->set_buf(buffer);
-    }
-    for (const auto& [timestamp, clk] : options.clk_digital)
-    {
-        // create Ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp(_apply_offset_and_drift(timestamp));
-        event->set_pid(PID_SPI + 4);
-        auto *print = event->mutable_print();
-        char buffer[100];
-        snprintf(buffer, 100, "C|%u|Digital Clk|%u",PID_SPI,clk);
-        print->set_buf(buffer);
-    }
-    for (const auto& [timestamp, cs] : options.cs_digital)
-    {
-        // create Ftrace event
-        auto *event = ftrace->add_event();
-        event->set_timestamp(_apply_offset_and_drift(timestamp));
-        event->set_pid(PID_SPI + 3);
-        auto *print = event->mutable_print();
-        char buffer[100];
-        snprintf(buffer, 100, "C|%u|Digital CS|%u",PID_SPI, cs);
-        print->set_buf(buffer);
     }
 }
 
