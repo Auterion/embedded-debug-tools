@@ -42,6 +42,8 @@ def processOptions(args,work_queue_pattern,timestamp_start,timestamp_end,sync_ed
     options.endTerminate = args.eof
     # bin elf file
     options.elf_file = elf_file
+    # enable debug
+    options.outputDebugFile = args.debug
     #parsed functions
     options.functions = functions
     # spi debug 
@@ -107,6 +109,10 @@ def init_argparse():
                         default='../../../Logic2/analog.csv')
     parser.add_argument('-dd','--dynamic_decoding',
                         help="enable dynamic decoding, which improves computation time if the same analog spi data is used multiple times",
+                        action='store_true',
+                        default=False)
+    parser.add_argument('-db','--debug',
+                        help="enable debug output",
                         action='store_true',
                         default=False)
 

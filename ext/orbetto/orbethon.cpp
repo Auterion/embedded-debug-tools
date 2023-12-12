@@ -28,7 +28,7 @@ PYBIND11_MODULE(orbethon,handle){
         .def_readwrite("std_file",&PyOptions::std_file)
         .def_readwrite("endTerminate",&PyOptions::endTerminate)
         .def_readwrite("elf_file",&PyOptions::elf_file)
-        //.def_readwrite("outputDebugFile",&Options::outputDebugFile)
+        .def_readwrite("outputDebugFile",&PyOptions::outputDebugFile)
         .def_readwrite("functions",&PyOptions::functions)
         .def_readwrite("miso_digital",&PyOptions::miso_digital)
         .def_readwrite("mosi_digital",&PyOptions::mosi_digital)

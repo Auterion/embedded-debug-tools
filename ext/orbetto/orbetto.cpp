@@ -27,6 +27,8 @@
 #include "loadelf.h"
 
 #include <protos/perfetto/trace/trace.pb.h>
+#include <protos/perfetto/trace/trace_packet.pb.h>
+#include <protos/perfetto/trace/trace_packet_defaults.pb.h>
 
 #define NUM_CHANNELS  32
 #define HW_CHANNEL    (NUM_CHANNELS)      /* Make the hardware fifo on the end of the software ones */
@@ -93,7 +95,7 @@ struct Options
     std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
-    std::vector<uint64_t> workqueue_intervals_spi;
+    std::vector<std::vector<uint64_t,uint64_t>> workqueue_intervals_spi;
     uint64_t timestamp_spi;
     uint64_t timestamp_end_spi; 
     /* SPI Sync */
@@ -118,6 +120,7 @@ struct PyOptions
     std::string std_file;
     bool endTerminate; 
     std::vector<uint8_t> elf_file;
+    bool outputDebugFile;
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
     std::vector<std::tuple<uint64_t,uint32_t>> mosi_digital;
     std::vector<std::tuple<uint64_t,uint32_t>> miso_digital;
@@ -125,7 +128,7 @@ struct PyOptions
     std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
-    std::vector<uint64_t> workqueue_intervals_spi;
+    std::vector<std::vector<uint64_t,uint64_t>> workqueue_intervals_spi;
     uint64_t timestamp_spi;
     uint64_t timestamp_end_spi;
     std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
@@ -168,6 +171,9 @@ int64_t _timestamp( void )
 static perfetto::protos::Trace *perfetto_trace;
 
 static perfetto::protos::FtraceEventBundle *ftrace;
+static perfetto::protos::TracePacket *ftrace_packet;
+static perfetto::protos::FtraceEventBundle *ftrace_2;
+static perfetto::protos::TracePacket *ftrace_packet_2;
 
 static std::unordered_map<int32_t, const char*> *irq_names = nullptr;
 
@@ -897,7 +903,7 @@ static void _spi_decoded(int64_t offset)
             }
             {
             // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
+            auto *event = ftrace_2->add_event();
             event->set_timestamp(timestamp_offset_start);
             event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
@@ -907,7 +913,7 @@ static void _spi_decoded(int64_t offset)
             }
             {
             // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
+            auto *event = ftrace_2->add_event();
             event->set_timestamp(timestamp_offset_end);
             event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
@@ -952,9 +958,9 @@ static void _spi_decoded(int64_t offset)
     }
 }
 
-static uint64_t find_matching_pattern(){
+static uint64_t find_matching_pattern(std::vector<uint64_t,uint64_t> spi_pattern){
     printf("Synchronise SWO and SPI ...\n");
-    int window_length = options.workqueue_intervals_spi.size();
+    int window_length = spi_pattern.size();
     printf("\t Window length: %d\n", window_length);
     // loop over options.workqueue_intervals_swo and compute abs sum of intervals
     uint64_t min_sum = (uint64_t)-1;
@@ -965,7 +971,7 @@ static uint64_t find_matching_pattern(){
         uint64_t sum = 0;
         uint64_t total_sum = 0;
         for(int j = 0;j<window_length;j++){
-            int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-options.workqueue_intervals_spi[j];
+            int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-std::get<1>(spi_pattern[j]);
             sum += abs(diff);
             total_sum += std::get<1>(options.workqueue_intervals_swo[i+j]);
         }
@@ -992,8 +998,41 @@ static uint64_t find_matching_pattern(){
         printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i, REL DIFF: %f\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]), options.workqueue_intervals_spi[i], diff,rel_diff);
     }
     // print both start timestamps
-    printf("\t SWO: %llu, SPI: %llu\n", std::get<0>(options.workqueue_intervals_swo[min_sum_index]), options.timestamp_spi);
-    return (options.timestamp_spi-std::get<0>(options.workqueue_intervals_swo[min_sum_index]));
+    uint64_t swo_start = std::get<0>(options.workqueue_intervals_swo[min_sum_index]);
+    uint64_t swo_second = std::get<0>(options.workqueue_intervals_swo[min_sum_index+window_length-1]);
+    uint64_t spi_start = options.timestamp_spi;
+    uint64_t spi_second = options.timestamp_end_spi;
+    int64_t offset = spi_start-swo_start;
+    {
+        auto *ftrace_packet_sync = perfetto_trace->add_packet();
+        ftrace_packet_sync->set_trusted_packet_sequence_id(6);
+        ftrace_packet_sync->set_timestamp(spi_start);
+        // set Clock Snapshots for perfetto sync
+        {
+            auto* mutable_clock_snapshot = ftrace_packet_sync->mutable_clock_snapshot();
+            auto* clock = mutable_clock_snapshot->add_clocks();
+            clock->set_clock_id(6);
+            clock->set_timestamp(spi_start);
+            auto* clock_2 = mutable_clock_snapshot->add_clocks();
+            clock_2->set_clock_id(128);
+            clock_2->set_timestamp(spi_start);
+        }
+    }
+    {
+        auto *ftrace_packet_sync = perfetto_trace->add_packet();
+        ftrace_packet_sync->set_trusted_packet_sequence_id(6);
+        // set Clock Snapshots for perfetto sync
+        {
+            auto* mutable_clock_snapshot = ftrace_packet_sync->mutable_clock_snapshot();
+            auto* clock = mutable_clock_snapshot->add_clocks();
+            clock->set_clock_id(6);
+            clock->set_timestamp(swo_second+offset);
+            auto* clock_2 = mutable_clock_snapshot->add_clocks();
+            clock_2->set_clock_id(128);
+            clock_2->set_timestamp(spi_second+1000000);
+        }
+    }
+    return offset;
 }
 
 // ====================================================================================================
@@ -1003,11 +1042,22 @@ static void _feedStream( struct Stream *stream )
     unsigned char cbw[TRANSFER_SIZE];
 
     perfetto_trace = new perfetto::protos::Trace();
-    auto *ftrace_packet = perfetto_trace->add_packet();
-    ftrace_packet->set_trusted_packet_sequence_id(42);
+    ftrace_packet = perfetto_trace->add_packet();
+    ftrace_packet->set_trusted_packet_sequence_id(6);
     ftrace_packet->set_sequence_flags(1);
+    // clock id 6 is the default clock id also called BUILTIN_CLOCK_BOOTTIME
+    ftrace_packet->set_timestamp_clock_id(6);
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
+    // Init second Ftrace packet for clock sync
+    ftrace_packet_2 = perfetto_trace->add_packet();
+    ftrace_packet_2->set_trusted_packet_sequence_id(128);
+    ftrace_packet_2->set_sequence_flags(1);
+    // clock id 128 is a custom gloabl clock id
+    ftrace_packet_2->set_timestamp_clock_id(128);
+    ftrace_2 = ftrace_packet->mutable_ftrace_events();
+    ftrace_2->set_cpu(0);
+
 
 
     if ( options.file != NULL )
@@ -1047,20 +1097,24 @@ static void _feedStream( struct Stream *stream )
 
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
-    int64_t offset = find_matching_pattern();
+    int 64_t offset = 0;
+    for (auto sync_packet in options.workqueue_intervals_spi)
+    {
+        int64_t offset = find_matching_pattern(sync_packet);
+    }
     printf("Offset: %llu\n", offset);
     if(offset > 0)
     {
         _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
-        _spi_digital(0);
+        //_spi_digital(0);
         _spi_decoded(0);
-        _sync_digital(0);
+        //_sync_digital(0);
     }else
     {
         offset=-offset;
-        _spi_digital(offset);
+        //_spi_digital(offset);
         _spi_decoded(offset);
-        _sync_digital(offset);
+        //_sync_digital(offset);
     }
 
     {
@@ -1304,6 +1358,7 @@ void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* i
     options.endTerminate = py_op.endTerminate;
     options.file = py_op.std_file.data();
     options.elf_file = &py_op.elf_file;
+    options.outputDebugFile = py_op.outputDebugFile;
     options.functions = py_op.functions;
     options.mosi_digital = py_op.mosi_digital;
     options.miso_digital = py_op.miso_digital;
