@@ -37,8 +37,6 @@ PYBIND11_MODULE(orbethon,handle){
         .def_readwrite("spi_decoded_mosi",&PyOptions::spi_decoded_mosi)
         .def_readwrite("spi_decoded_miso",&PyOptions::spi_decoded_miso)
         .def_readwrite("workqueue_intervals_spi",&PyOptions::workqueue_intervals_spi)
-        .def_readwrite("timestamp_spi",&PyOptions::timestamp_spi)
-        .def_readwrite("timestamp_end_spi",&PyOptions::timestamp_end_spi)
         .def_readwrite("sync_digital",&PyOptions::sync_digital)
         ;
 

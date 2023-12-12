@@ -95,9 +95,7 @@ struct Options
     std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
-    std::vector<std::vector<uint64_t,uint64_t>> workqueue_intervals_spi;
-    uint64_t timestamp_spi;
-    uint64_t timestamp_end_spi; 
+    std::vector<std::vector<std::tuple<uint64_t,uint64_t>>> workqueue_intervals_spi; 
     /* SPI Sync */
     std::vector<std::tuple<uint64_t,uint64_t>> workqueue_intervals_swo;
     uint64_t workqueue_last_switch_swo;
@@ -128,9 +126,7 @@ struct PyOptions
     std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
     std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
-    std::vector<std::vector<uint64_t,uint64_t>> workqueue_intervals_spi;
-    uint64_t timestamp_spi;
-    uint64_t timestamp_end_spi;
+    std::vector<std::vector<std::tuple<uint64_t,uint64_t>>> workqueue_intervals_spi;
     std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
 };
 
@@ -172,8 +168,6 @@ static perfetto::protos::Trace *perfetto_trace;
 
 static perfetto::protos::FtraceEventBundle *ftrace;
 static perfetto::protos::TracePacket *ftrace_packet;
-static perfetto::protos::FtraceEventBundle *ftrace_2;
-static perfetto::protos::TracePacket *ftrace_packet_2;
 
 static std::unordered_map<int32_t, const char*> *irq_names = nullptr;
 
@@ -887,23 +881,28 @@ static void _spi_digital(int64_t offset)
     }
 }
 
-static void _spi_decoded(int64_t offset)
+static void _spi_decoded(int64_t offset,uint64_t sync_time, double drift)
 {
     // Proccess SPI Decoded intro perfetto trace
     if (options.spi_decoded_mosi.size() > 0)    {
+        // drift += 0.000001;
         // iterate over all samples of analog data array and generate a perfetto trace count event for each
         for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_mosi)
         {
             // apply offset
             uint64_t timestamp_offset_start = timestamp_start + offset;
             uint64_t timestamp_offset_end = timestamp_end + offset;
+            int64_t start_drift = (int64_t)((((double)timestamp_offset_start - (double)sync_time)) * drift);
+            int64_t end_drift = (int64_t)((((double)timestamp_offset_end - (double)sync_time)) * drift);
+            timestamp_offset_start -= start_drift;
+            timestamp_offset_end -= end_drift;
             std::string data_string = " ";
             for (const auto i : data) {
                 data_string += "0x" + std::to_string(i) + ", ";
             }
             {
             // only print cs if smaller than 30.0f
-            auto *event = ftrace_2->add_event();
+            auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_start);
             event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
@@ -913,7 +912,7 @@ static void _spi_decoded(int64_t offset)
             }
             {
             // only print cs if smaller than 30.0f
-            auto *event = ftrace_2->add_event();
+            auto *event = ftrace->add_event();
             event->set_timestamp(timestamp_offset_end);
             event->set_pid(PID_SPI + 1);
             auto *print = event->mutable_print();
@@ -930,6 +929,10 @@ static void _spi_decoded(int64_t offset)
             // apply offset
             uint64_t timestamp_offset_start = timestamp_start + offset;
             uint64_t timestamp_offset_end = timestamp_end + offset;
+            int64_t start_drift = (int64_t)((((double)timestamp_offset_start - (double)sync_time)) * drift);
+            int64_t end_drift = (int64_t)((((double)timestamp_offset_end - (double)sync_time)) * drift);
+            timestamp_offset_start -= start_drift;
+            timestamp_offset_end -= end_drift;
             std::string data_string = " ";
             for (const auto i : data) {
                 data_string += "0x" + std::to_string(i) + ", ";
@@ -958,81 +961,56 @@ static void _spi_decoded(int64_t offset)
     }
 }
 
-static uint64_t find_matching_pattern(std::vector<uint64_t,uint64_t> spi_pattern){
+static std::vector<std::tuple<uint64_t,uint64_t>> find_matching_pattern(){
     printf("Synchronise SWO and SPI ...\n");
-    int window_length = spi_pattern.size();
-    printf("\t Window length: %d\n", window_length);
-    // loop over options.workqueue_intervals_swo and compute abs sum of intervals
-    uint64_t min_sum = (uint64_t)-1;
-    int min_sum_index = -1;
-    uint64_t second_min_sum = (uint64_t)-1;
-    uint64_t min_total_sum = 0;
-    for(int i = 0;i<options.workqueue_intervals_swo.size()-window_length;i++){
-        uint64_t sum = 0;
-        uint64_t total_sum = 0;
-        for(int j = 0;j<window_length;j++){
-            int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-std::get<1>(spi_pattern[j]);
-            sum += abs(diff);
-            total_sum += std::get<1>(options.workqueue_intervals_swo[i+j]);
-        }
-        if(sum < min_sum)
-        {
-            second_min_sum = min_sum;
-            min_sum = sum;
-            min_sum_index = i;
-            min_total_sum = total_sum;
-        }
-    }
-
-    printf("\t Min Offset: %llu\n", min_sum);
-    printf("\t Second Min Offset: %llu\n", second_min_sum);
-    printf("\t Min Offset Index: %d\n", min_sum_index);
-    if(min_total_sum !=0)
+    std::vector<std::tuple<uint64_t,uint64_t>> pattern_stats;
+    // loop over each pattern
+    for (auto spi_pattern : options.workqueue_intervals_spi)
     {
-        printf("\t Min Offset Ratio: %f'%%'\n", (float)min_sum/min_total_sum*100);
-    }
-    // print overlapping intervals
-    for(int i = 0;i<window_length;i++){
-        int diff = std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-options.workqueue_intervals_spi[i];
-        double rel_diff = (double)diff/((options.workqueue_intervals_spi[i]+std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]))/2);
-        printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i, REL DIFF: %f\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]), options.workqueue_intervals_spi[i], diff,rel_diff);
-    }
-    // print both start timestamps
-    uint64_t swo_start = std::get<0>(options.workqueue_intervals_swo[min_sum_index]);
-    uint64_t swo_second = std::get<0>(options.workqueue_intervals_swo[min_sum_index+window_length-1]);
-    uint64_t spi_start = options.timestamp_spi;
-    uint64_t spi_second = options.timestamp_end_spi;
-    int64_t offset = spi_start-swo_start;
-    {
-        auto *ftrace_packet_sync = perfetto_trace->add_packet();
-        ftrace_packet_sync->set_trusted_packet_sequence_id(6);
-        ftrace_packet_sync->set_timestamp(spi_start);
-        // set Clock Snapshots for perfetto sync
+        int window_length = spi_pattern.size();
+        printf("\t Window length: %d\n", window_length);
+        uint64_t min_sum = (uint64_t)-1;
+        int min_sum_index = -1;
+        uint64_t second_min_sum = (uint64_t)-1;
+        uint64_t min_total_sum = 0;
+        // loop over options.workqueue_intervals_swo and compute abs sum of intervals
+        for(int i = 0;i<options.workqueue_intervals_swo.size()-window_length;i++)
         {
-            auto* mutable_clock_snapshot = ftrace_packet_sync->mutable_clock_snapshot();
-            auto* clock = mutable_clock_snapshot->add_clocks();
-            clock->set_clock_id(6);
-            clock->set_timestamp(spi_start);
-            auto* clock_2 = mutable_clock_snapshot->add_clocks();
-            clock_2->set_clock_id(128);
-            clock_2->set_timestamp(spi_start);
+            uint64_t sum = 0;
+            uint64_t total_sum = 0;
+            for(int j = 0;j<window_length;j++)
+            {
+                int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-std::get<1>(spi_pattern[j]);
+                sum += abs(diff);
+                total_sum += std::get<1>(options.workqueue_intervals_swo[i+j]);
+            }
+            if(sum < min_sum)
+            {
+                second_min_sum = min_sum;
+                min_sum = sum;
+                min_sum_index = i;
+                min_total_sum = total_sum;
+            }
         }
-    }
-    {
-        auto *ftrace_packet_sync = perfetto_trace->add_packet();
-        ftrace_packet_sync->set_trusted_packet_sequence_id(6);
-        // set Clock Snapshots for perfetto sync
+        printf("\t Min Offset: %llu\n", min_sum);
+        printf("\t Second Min Offset: %llu\n", second_min_sum);
+        printf("\t Min Offset Index: %d\n", min_sum_index);
+        if(min_total_sum !=0)
         {
-            auto* mutable_clock_snapshot = ftrace_packet_sync->mutable_clock_snapshot();
-            auto* clock = mutable_clock_snapshot->add_clocks();
-            clock->set_clock_id(6);
-            clock->set_timestamp(swo_second+offset);
-            auto* clock_2 = mutable_clock_snapshot->add_clocks();
-            clock_2->set_clock_id(128);
-            clock_2->set_timestamp(spi_second+1000000);
+            printf("\t Min Offset Ratio: %f'%%'\n", (float)min_sum/min_total_sum*100);
         }
+        // print overlapping intervals
+        for(int i = 0;i<window_length;i++)
+        {
+            int diff = std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-std::get<1>(spi_pattern[i]);
+            double rel_diff = (double)diff/((std::get<1>(spi_pattern[i])+std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]))/2);
+            printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i, REL DIFF: %f\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]),std::get<1>(spi_pattern[i]), diff,rel_diff);
+        }
+        uint64_t swo_start = std::get<0>(options.workqueue_intervals_swo[min_sum_index]);
+        uint64_t spi_start = std::get<0>(spi_pattern[0]);
+        pattern_stats.push_back(std::make_tuple(swo_start, spi_start));
     }
-    return offset;
+    return pattern_stats;
 }
 
 // ====================================================================================================
@@ -1045,18 +1023,8 @@ static void _feedStream( struct Stream *stream )
     ftrace_packet = perfetto_trace->add_packet();
     ftrace_packet->set_trusted_packet_sequence_id(6);
     ftrace_packet->set_sequence_flags(1);
-    // clock id 6 is the default clock id also called BUILTIN_CLOCK_BOOTTIME
-    ftrace_packet->set_timestamp_clock_id(6);
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
-    // Init second Ftrace packet for clock sync
-    ftrace_packet_2 = perfetto_trace->add_packet();
-    ftrace_packet_2->set_trusted_packet_sequence_id(128);
-    ftrace_packet_2->set_sequence_flags(1);
-    // clock id 128 is a custom gloabl clock id
-    ftrace_packet_2->set_timestamp_clock_id(128);
-    ftrace_2 = ftrace_packet->mutable_ftrace_events();
-    ftrace_2->set_cpu(0);
 
 
 
@@ -1097,44 +1065,29 @@ static void _feedStream( struct Stream *stream )
 
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
-    int 64_t offset = 0;
-    for (auto sync_packet in options.workqueue_intervals_spi)
-    {
-        int64_t offset = find_matching_pattern(sync_packet);
-    }
-    printf("Offset: %llu\n", offset);
+    auto pattern_stats = find_matching_pattern();
+    int64_t offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
+    double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
+    printf("Nominator = %llu - %llu + %llu = %f\n", std::get<1>(pattern_stats[1]),std::get<0>(pattern_stats[1]),offset,nominator);
+    double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
+    printf("Denominator = %llu - %llu = %f\n", std::get<0>(pattern_stats[1]),std::get<0>(pattern_stats[0]),denominator);
+    double drift = nominator /denominator;
+    printf("SPI and SWO Clock drift %f per nano second.\n", drift);
+    uint64_t sync_point = std::get<1>(pattern_stats[0]);
     if(offset > 0)
     {
+        printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
         _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
-        //_spi_digital(0);
-        _spi_decoded(0);
-        //_sync_digital(0);
+        //_spi_digital(0,sync_point,drift);
+        _spi_decoded(0,sync_point,drift);
+        //_sync_digital(0,sync_point,drift);
     }else
     {
+        printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
         offset=-offset;
-        //_spi_digital(offset);
-        _spi_decoded(offset);
-        //_sync_digital(offset);
-    }
-
-    {
-    auto *event = ftrace->add_event();
-    event->set_timestamp(options.timestamp_spi);
-    event->set_pid(0);
-    auto *print = event->mutable_print();
-    char buffer[300];
-    snprintf(buffer, 300, "B|0|Begin Sync Interval");
-    print->set_buf(buffer);
-    }
-    {
-    // only print cs if smaller than 30.0f
-    auto *event = ftrace->add_event();
-    event->set_timestamp(options.timestamp_end_spi);
-    event->set_pid(0);
-    auto *print = event->mutable_print();
-    char buffer[300];
-    snprintf(buffer, 300, "E|0|End Sync Interval");
-    print->set_buf(buffer);
+        //_spi_digital(offset,sync_point,drift);
+        _spi_decoded(offset,sync_point,drift);
+        //_sync_digital(offset,sync_point,drift);
     }
 
     while ( true )
@@ -1367,8 +1320,6 @@ void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* i
     options.spi_decoded_mosi = py_op.spi_decoded_mosi;
     options.spi_decoded_miso = py_op.spi_decoded_miso;
     options.workqueue_intervals_spi = py_op.workqueue_intervals_spi;
-    options.timestamp_spi = py_op.timestamp_spi;
-    options.timestamp_end_spi = py_op.timestamp_end_spi;
     options.sync_digital = py_op.sync_digital;
 
     irq_names = irq_names_input;

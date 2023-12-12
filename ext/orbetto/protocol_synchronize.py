@@ -38,10 +38,9 @@ def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.05):
     if (length > (len(edges))):
         print("  Warning: Number of sampled work queue switches is less than the specified pattern length")
         length = len(edges)
-    start = 16000
-    #start2 = 32000
+    # get two intervals which are at 1/3 and 2/3 of the total length
     work_queue_patterns = []
-    for offset in np.linspace(10,len(edges)-length-5000,1000):
+    for offset in [int(len(edges)/3),int(2*len(edges)/3)]:
         work_queue_pattern = []
         for i in range(offset,offset+length):
             work_queue_pattern.append((int(edges[i][0]*1e9),int((edges[i+1][0]-edges[i][0])*1e9)))
@@ -57,7 +56,7 @@ def getWorkQueuePattern(df,length=20,logic_levels=(0,3.3),hyst=0.05):
     df_edges['Time [s]'] = df_edges['Time [s]'].astype(int)
     # convert back to list of tuples
     edges_return = list(df_edges.itertuples(index=False, name=None))
-    return work_queue_patterns, int(edges[start][0]*1e9),int(edges[start+length][0]*1e9),edges_return
+    return work_queue_patterns,edges_return
 
 
 
