@@ -805,16 +805,47 @@ static struct Stream *_tryOpenStream()
 }
 
 // ====================================================================================================
-
-static void _sync_digital(int64_t offset)
+int64_t offset;
+double drift;
+uint64_t sync_point;
+static uint64_t _apply_offset_and_drift(uint64_t timestamp)
+{
+    uint64_t timestamp_offset = timestamp + offset;
+    int64_t drift_offset = (int64_t)((((double)timestamp_offset - (double)sync_point)) * drift);
+    timestamp_offset -= drift_offset;
+    return timestamp_offset;
+}
+static void counter_to_print(bool data,uint32_t pid,uint64_t timestamp)
+{
+    if(data)
+    {
+        // create Ftrace event
+        auto *event = ftrace->add_event();
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
+        event->set_pid(pid);
+        auto *print = event->mutable_print();
+        char buffer[20];
+        snprintf(buffer, sizeof(buffer), "B|0|1");
+        print->set_buf(buffer);
+    }else
+    {
+        // create Ftrace event
+        auto *event = ftrace->add_event();
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
+        event->set_pid(pid);
+        auto *print = event->mutable_print();
+        char buffer[20];
+        snprintf(buffer, sizeof(buffer), "E|0|1");
+        print->set_buf(buffer);
+    }
+}
+static void _sync_digital()
 {
     for(const auto& [timestamp, sync] : options.sync_digital)
     {
-        // apply offset
-        uint64_t timestamp_offset = timestamp + offset;
         // create Ftrace event
         auto *event = ftrace->add_event();
-        event->set_timestamp(timestamp_offset);
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
         event->set_pid(PID_SPI + 2);
         auto *print = event->mutable_print();
         char buffer[100];
@@ -823,17 +854,23 @@ static void _sync_digital(int64_t offset)
     }
 }
 
-static void _spi_digital(int64_t offset)
+static void _sync_digital_prints()
+{
+    for(const auto& [timestamp, sync] : options.sync_digital)
+    {
+        counter_to_print((bool)sync, PID_SPI + 2, timestamp);
+    }
+}
+
+static void _spi_digital()
 {
     // Proccess SPI Digital intro perfetto trace
     // iterate over all samples of digital data array and generate a perfetto trace count event for each
     for(const auto& [timestamp, mosi] : options.mosi_digital)
     {
-        // apply offset
-        uint64_t timestamp_offset = timestamp + offset;
         // create Ftrace event
         auto *event = ftrace->add_event();
-        event->set_timestamp(timestamp_offset);
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
         event->set_pid(PID_SPI + 6);
         auto *print = event->mutable_print();
         char buffer[100];
@@ -842,11 +879,9 @@ static void _spi_digital(int64_t offset)
     }
     for (const auto& [timestamp, miso] : options.miso_digital)
     {
-        // apply offset
-        uint64_t timestamp_offset = timestamp + offset;
         // create Ftrace event
         auto *event = ftrace->add_event();
-        event->set_timestamp(timestamp_offset);
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
         event->set_pid(PID_SPI + 5);
         auto *print = event->mutable_print();
         char buffer[100];
@@ -855,11 +890,9 @@ static void _spi_digital(int64_t offset)
     }
     for (const auto& [timestamp, clk] : options.clk_digital)
     {
-        // apply offset
-        uint64_t timestamp_offset = timestamp + offset;
         // create Ftrace event
         auto *event = ftrace->add_event();
-        event->set_timestamp(timestamp_offset);
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
         event->set_pid(PID_SPI + 4);
         auto *print = event->mutable_print();
         char buffer[100];
@@ -868,11 +901,9 @@ static void _spi_digital(int64_t offset)
     }
     for (const auto& [timestamp, cs] : options.cs_digital)
     {
-        // apply offset
-        uint64_t timestamp_offset = timestamp + offset;
         // create Ftrace event
         auto *event = ftrace->add_event();
-        event->set_timestamp(timestamp_offset);
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
         event->set_pid(PID_SPI + 3);
         auto *print = event->mutable_print();
         char buffer[100];
@@ -881,81 +912,92 @@ static void _spi_digital(int64_t offset)
     }
 }
 
-static void _spi_decoded(int64_t offset,uint64_t sync_time, double drift)
+static void _spi_digital_prints()
+{
+    // Proccess SPI Digital intro perfetto trace
+    // iterate over all samples of digital data array and generate a perfetto trace count event for each
+    for(const auto& [timestamp, data] : options.mosi_digital)
+    {
+        counter_to_print((bool)data, PID_SPI + 6,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.miso_digital)
+    {
+        counter_to_print((bool)data, PID_SPI + 5,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.clk_digital)
+    {
+        counter_to_print((bool)data, PID_SPI + 4,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.cs_digital)
+    {
+        counter_to_print((bool)data, PID_SPI + 3,timestamp);
+    }
+}
+
+static void _spi_decoded()
 {
     // Proccess SPI Decoded intro perfetto trace
-    if (options.spi_decoded_mosi.size() > 0)    {
-        // drift += 0.000001;
+    if (options.spi_decoded_mosi.size() > 0)
+    {
         // iterate over all samples of analog data array and generate a perfetto trace count event for each
         for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_mosi)
         {
-            // apply offset
-            uint64_t timestamp_offset_start = timestamp_start + offset;
-            uint64_t timestamp_offset_end = timestamp_end + offset;
-            int64_t start_drift = (int64_t)((((double)timestamp_offset_start - (double)sync_time)) * drift);
-            int64_t end_drift = (int64_t)((((double)timestamp_offset_end - (double)sync_time)) * drift);
-            timestamp_offset_start -= start_drift;
-            timestamp_offset_end -= end_drift;
             std::string data_string = " ";
-            for (const auto i : data) {
+            for (const auto i : data)
+            {
                 data_string += "0x" + std::to_string(i) + ", ";
             }
             {
-            // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
-            event->set_timestamp(timestamp_offset_start);
-            event->set_pid(PID_SPI + 1);
-            auto *print = event->mutable_print();
-            char buffer[300];
-            snprintf(buffer, 300, "B|0|Decoded MOSI|%s", data_string.c_str());
-            print->set_buf(buffer);
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_start));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[300];
+                snprintf(buffer, 300, "B|0|Decoded MOSI|%s", data_string.c_str());
+                print->set_buf(buffer);
             }
             {
-            // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
-            event->set_timestamp(timestamp_offset_end);
-            event->set_pid(PID_SPI + 1);
-            auto *print = event->mutable_print();
-            char buffer[300];
-            snprintf(buffer, 300, "E|0|Decoded MOSI|%s", data_string.c_str());
-            print->set_buf(buffer);
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_end));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[300];
+                snprintf(buffer, 300, "E|0|Decoded MOSI|%s", data_string.c_str());
+                print->set_buf(buffer);
             }
         }
     }
-    if (options.spi_decoded_miso.size() > 0)    {
+    if (options.spi_decoded_miso.size() > 0) 
+    {
         // iterate over all samples of analog data array and generate a perfetto trace count event for each
         for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_miso)
         {
-            // apply offset
-            uint64_t timestamp_offset_start = timestamp_start + offset;
-            uint64_t timestamp_offset_end = timestamp_end + offset;
-            int64_t start_drift = (int64_t)((((double)timestamp_offset_start - (double)sync_time)) * drift);
-            int64_t end_drift = (int64_t)((((double)timestamp_offset_end - (double)sync_time)) * drift);
-            timestamp_offset_start -= start_drift;
-            timestamp_offset_end -= end_drift;
             std::string data_string = " ";
-            for (const auto i : data) {
+            for (const auto i : data)
+            {
                 data_string += "0x" + std::to_string(i) + ", ";
             }
             {
-            // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
-            event->set_timestamp(timestamp_offset_start);
-            event->set_pid(PID_SPI + 1);
-            auto *print = event->mutable_print();
-            char buffer[100];
-            snprintf(buffer, 100, "B|0|Decoded MISO|%s", data_string.c_str());
-            print->set_buf(buffer);
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_start));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "B|0|Decoded MISO|%s", data_string.c_str());
+                print->set_buf(buffer);
             }
             {
-            // only print cs if smaller than 30.0f
-            auto *event = ftrace->add_event();
-            event->set_timestamp(timestamp_offset_end);
-            event->set_pid(PID_SPI + 1);
-            auto *print = event->mutable_print();
-            char buffer[100];
-            snprintf(buffer, 100, "E|0|Decoded MISO|%s", data_string.c_str());
-            print->set_buf(buffer);
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_end));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "E|0|Decoded MISO|%s", data_string.c_str());
+                print->set_buf(buffer);
             }
         }
     }
@@ -1066,28 +1108,33 @@ static void _feedStream( struct Stream *stream )
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
     auto pattern_stats = find_matching_pattern();
-    int64_t offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
+    offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
     double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
     printf("Nominator = %llu - %llu + %llu = %f\n", std::get<1>(pattern_stats[1]),std::get<0>(pattern_stats[1]),offset,nominator);
     double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
     printf("Denominator = %llu - %llu = %f\n", std::get<0>(pattern_stats[1]),std::get<0>(pattern_stats[0]),denominator);
-    double drift = nominator /denominator;
+    drift = nominator /denominator;
     printf("SPI and SWO Clock drift %f per nano second.\n", drift);
-    uint64_t sync_point = std::get<1>(pattern_stats[0]);
+    sync_point = std::get<1>(pattern_stats[0]);
     if(offset > 0)
     {
         printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
         _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
-        //_spi_digital(0,sync_point,drift);
-        _spi_decoded(0,sync_point,drift);
-        //_sync_digital(0,sync_point,drift);
+        offset=0;
+        //_spi_digital();
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+        //_sync_digital();
     }else
     {
         printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
         offset=-offset;
-        //_spi_digital(offset,sync_point,drift);
-        _spi_decoded(offset,sync_point,drift);
-        //_sync_digital(offset,sync_point,drift);
+        //_spi_digital();
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+        //_sync_digital();
     }
 
     while ( true )
