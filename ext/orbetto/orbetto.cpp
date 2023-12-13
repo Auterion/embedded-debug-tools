@@ -571,32 +571,14 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 }
                 if (not thread_name.empty())
                 {
-                    if (active_threads.contains(tid))
+                    if (tid)
                     {
-                        if (active_threads[tid] != thread_name and tid != 0)
-                        {
-                            auto *event = ftrace->add_event();
-                            event->set_timestamp(ns);
-                            event->set_pid(tid);
-                            auto *renametask = event->mutable_task_rename();
-                            renametask->set_pid(tid);
-                            renametask->set_newcomm(thread_name.c_str());
-                        }
-                    }
-                    else if (tid != 0)
-                    {
-                        static std::set<uint32_t> seen_tids;
-                        if (not seen_tids.contains(tid))
-                        {
-                            seen_tids.insert(tid);
-                            auto *event = ftrace->add_event();
-                            event->set_timestamp(ns);
-                            event->set_pid(prev_tid);
-                            auto *newtask = event->mutable_task_newtask();
-                            newtask->set_pid(tid);
-                            newtask->set_comm(thread_name.c_str());
-                            newtask->set_clone_flags(0x10000); // new thread, not new process!
-                        }
+                        auto *event = ftrace->add_event();
+                        event->set_timestamp(ns);
+                        event->set_pid(prev_tid);
+                        auto *renametask = event->mutable_task_rename();
+                        renametask->set_pid(tid);
+                        renametask->set_newcomm(thread_name.c_str());
                     }
                     active_threads[tid] = thread_name;
                 }
@@ -1608,12 +1590,12 @@ static void _feedStream( struct Stream *stream )
         {
             auto *process = process_tree->add_processes();
             process->set_pid(PID_STOP);
-            process->add_cmdline("Threads (stopped)");
+            process->add_cmdline("Threads (Stopped)");
             for (auto&& tid : stopped_threads)
             {
                 if (tid == 0) continue;
                 auto *thread = process_tree->add_threads();
-                thread->set_tid(tid);
+                thread->set_tid(PID_STOP + tid);
                 thread->set_tgid(PID_STOP);
             }
         }
