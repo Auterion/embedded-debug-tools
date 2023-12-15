@@ -8,10 +8,10 @@ end
 
 define px4_trace_swo_stm32f7
     px4_reset
-    shell rm -f trace.swo
     tbreak nx_start
     continue
 
+    shell rm -f trace.swo
     monitor tpiu create itm.tpiu -dap [dap names] -ap-num 0
     monitor itm.tpiu configure -traceclk 216000000 -pin-freq 21600000 -protocol uart -output trace.swo -formatter 0
     monitor itm.tpiu enable
@@ -20,22 +20,50 @@ define px4_trace_swo_stm32f7
 
     px4_configure_orbuculum
 
-    # Enable the SWO output
     enableSTM32SWO 7
 end
+
+
+define px4_trace_swo_stm32h7
+    px4_reset
+    tbreak nx_start
+    continue
+
+    px4_enable_swo_stm32h7 60000000
+
+    px4_configure_orbuculum
+
+    shell orbuculum -O "-Tu -a 60000000" -o trace.swo &
+end
+
 
 define px4_trace_tpiu_swo_stm32f7
     px4_reset
     tbreak nx_start
     continue
 
-    # Enable the ETM output
     enableSTM32TRACE 4 3
 
     px4_configure_orbuculum
 
-    shell orbuculum -t1 &
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell orbuculum -O "-T4" -t1 &
     shell sleep 1
-    shell rm -f trace.swo
+    shell nc localhost 3443 > trace.swo &
+end
+
+
+define px4_trace_tpiu_swo_stm32h7
+    px4_reset
+    tbreak nx_start
+    continue
+
+    px4_enable_trace_stm32h7 4
+
+    px4_configure_orbuculum
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell orbuculum -O "-T4" -t1 &
+    shell sleep 1
     shell nc localhost 3443 > trace.swo &
 end

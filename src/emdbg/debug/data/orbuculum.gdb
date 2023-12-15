@@ -90,8 +90,21 @@ set $ETMBASE=0xE0041000
 
 define _setAddressesSTM32
   # Locations in the memory map for interesting things on STM32
-  set $RCCBASE = 0x40023800
-  set $GPIOBASE = 0x40020000
+  set $CPU = $CPU_STM32
+  if (*0x5C001000)
+    # DBGMCU->IDCODE is valid on the STM32H7
+    set $RCCGPIO = 0x580244E0
+    set $GPIOBASE = 0x58020000
+
+    set $SWOBASE = 0x5C003000
+    set $SWTFBASE = 0x5C004000
+    set $CSTFBASE = 0x5C013000
+    set $ETFBASE = 0x5C014000
+    set $TPIUBASE = 0x5C015000
+  else
+    set $RCCGPIO = 0x40023830
+    set $GPIOBASE = 0x40020000
+  end
 end
 
 define _setAddressesIMXRT
@@ -834,7 +847,7 @@ define enableSTM32Pin
   set $_GPIOPORT = $GPIOBASE + 0x400 * $arg0
 
   # Enable GPIO port in RCC
-  set *($RCCBASE + 0x30) |= (0x1<<$arg0)
+  set *($RCCGPIO) |= (0x1<<$arg0)
 
   # MODER: Alternate Function
   set *($_GPIOPORT+0x00) &= ~(0x3<<2*$arg1)

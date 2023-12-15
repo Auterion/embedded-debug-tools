@@ -9,4 +9,5 @@ dist/
 /ext/orbetto/subprojects/libdwarf*
 /ext/orbetto/subprojects/packagecache
 /ext/orbetto/*.perf
+/ext/orbetto/*.gz
 /ext/orbetto/*.debug

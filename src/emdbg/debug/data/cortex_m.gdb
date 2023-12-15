@@ -20,7 +20,7 @@ define hookpost-backtrace
     set disassemble-next-line on
 end
 define px4_enable_vector_catch
-    set *0xE000EDFC = *0xE000EDFC | 0x07f0
+    set *0xE000EDFC |= 0x07f0
 end
 
 define px4_log_start
@@ -121,27 +121,62 @@ define px4_configure_orbuculum
 end
 
 define px4_enable_swo_stm32h7
+    _setAddressesSTM32
+
     # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
-    set *0xE00E1004 |= 0x00700000;
+    set *0x5C001004 |= 0x00700000
+
     # Unlock SWTF_LAR
-    set *0xE00E4FB0 = 0xC5ACCE55;
-    # Unlock SWO_LAR
-    set *0xE00E3FB0 = 0xC5ACCE55;
-
-    # SWO current output divisor register
-    # SWO_CODR = (CPU/4 / SWO) - 1
-    set *0xE00E3010 = ((480/4 / 20) - 1);
-    # SWO selected pin protocol register SWO_SPPR
-    set *0xE00E30F0 = 0x00000002;
+    set *($SWTFBASE+0xFB0) = 0xC5ACCE55
     # Enable ITM input of SWO trace funnel SWFT_CTRL
-    set *0xE00E4000 |= 0x00000001;
+    set *($SWTFBASE+0x000) |= 0x00000001
 
-    # RCC_AHB4ENR enable GPIOB clock
-    set *0x580244E0 |= 0x00000002;
-    # Configure GPIOB pin 3 Speed
-    set *0x58020408 |= 0x00000080;
-    # Force AF0 for GPIOB pin 3
-    set *0x58020420 &= 0xFFFF0FFF;
-    # Configure GPIOB pin 3 as AF
-    set *0x58020400 = (*0x58020400 & 0xffffff3f) | 0x00000080;
+    # Unlock SWO_LAR
+    set *($SWOBASE+0xFB0) = 0xC5ACCE55
+    # SWO current output divisor register
+    # SWO_CODR = (rcc_pclk4 / SWO) - 1
+    set *($SWOBASE+0x010) = ((480000000/4 / $arg0) - 1)
+    # SWO selected pin protocol register SWO_SPPR
+    set *($SWOBASE+0x0F0) = 0x00000002
+
+    enableSTM32Pin 1 3 3
+end
+
+define px4_enable_trace_stm32h7
+    _setAddressesSTM32
+
+    # Setup PE2, PE3, PE4, PE5, and PE6
+    enableSTM32Pin 4 2 3
+    enableSTM32Pin 4 3 3
+    if ($arg0 >= 2)
+        enableSTM32Pin 4 4 3
+    end
+    if ($arg0 == 4)
+        enableSTM32Pin 4 5 3
+        enableSTM32Pin 4 6 3
+    end
+
+    # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
+    set *0x5C001004 |= 0x00700000
+
+    # Unlock CSTF_LAR
+    set *($CSTFBASE+0xFB0) = 0xC5ACCE55
+    # Enable ITM input ENS1 of CoreSight trace funnel CSTF_CTRL
+    set *($CSTFBASE+0x000) |= 0x00000003
+
+    # Unlock ETF_LAR
+    set *($ETFBASE+0xFB0) = 0xC5ACCE55
+    # set Hardware FIFO mode in ETF_MODE
+    set *($ETFBASE+0x028) = 0x00000002
+    # Set EnFT and EnTI bits in ETF_FFCR
+    set *($ETFBASE+0x304) = 0x00000003
+    # Enable the trace capture in ETF_CTL
+    set *($ETFBASE+0x020) = 0x00000001
+
+    # Unlock TPIU_LAR
+    set *($TPIUBASE+0xFB0) = 0xC5ACCE55
+    # Write port size into TPIU_CURPSIZE
+    set *($TPIUBASE+0x004) = (1 << ($arg0 - 1))
+    # Set ENFCONT and TRIGIN in TPIU_FFCR
+    set *($TPIUBASE+0x304) = 0x00000102
 end
