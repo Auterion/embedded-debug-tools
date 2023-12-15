@@ -61,9 +61,9 @@ enum
     emdbg_itm_block(EMDBG_TASK_RUNNABLE, tcb->pid)
 
 
-#define EMDBG_LOG_SEMAPHORE_INIT(sem, count) \
+#define EMDBG_LOG_SEMAPHORE_INIT(sem) \
     { emdbg_itm32_block(EMDBG_SEMAPHORE_INIT, (uint32_t)sem); \
-      emdbg_itm16_block(EMDBG_SEMAPHORE_INIT, count); }
+      emdbg_itm16_block(EMDBG_SEMAPHORE_INIT, sem->semcount); }
 
 #define EMDBG_LOG_SEMAPHORE_DECR(sem) \
     emdbg_itm32_block(EMDBG_SEMAPHORE_DECR, (uint32_t)sem)
