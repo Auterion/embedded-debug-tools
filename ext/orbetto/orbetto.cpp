@@ -814,7 +814,7 @@ static uint64_t _apply_offset_and_drift(uint64_t timestamp)
     timestamp_offset -= drift_offset;
     return timestamp_offset;
 }
-static void counter_to_print(bool data,uint32_t pid,uint64_t timestamp)
+static void digital_trace_by_toggle_print_statement(bool data,uint32_t pid,uint64_t timestamp)
 {
     if(data)
     {
@@ -843,7 +843,7 @@ static void _sync_digital_prints()
 {
     for(const auto& [timestamp, sync] : options.sync_digital)
     {
-        counter_to_print((bool)sync, PID_SPI + 2, timestamp);
+        digital_trace_by_toggle_print_statement((bool)sync, PID_SPI + 2, timestamp);
     }
 }
 
@@ -853,19 +853,19 @@ static void _spi_digital_prints()
     // iterate over all samples of digital data array and generate a perfetto trace count event for each
     for(const auto& [timestamp, data] : options.mosi_digital)
     {
-        counter_to_print((bool)data, PID_SPI + 6,timestamp);
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 6,timestamp);
     }
     for (const auto& [timestamp, data] : options.miso_digital)
     {
-        counter_to_print((bool)data, PID_SPI + 5,timestamp);
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 5,timestamp);
     }
     for (const auto& [timestamp, data] : options.clk_digital)
     {
-        counter_to_print((bool)data, PID_SPI + 4,timestamp);
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 4,timestamp);
     }
     for (const auto& [timestamp, data] : options.cs_digital)
     {
-        counter_to_print((bool)data, PID_SPI + 3,timestamp);
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 3,timestamp);
     }
 }
 
@@ -898,9 +898,7 @@ static void _spi_decoded()
                 event->set_timestamp(_apply_offset_and_drift(timestamp_end));
                 event->set_pid(PID_SPI + 1);
                 auto *print = event->mutable_print();
-                char buffer[300];
-                snprintf(buffer, 300, "E|0|Decoded MOSI|%s", data_string.c_str());
-                print->set_buf(buffer);
+                print->set_buf("E|0");
             }
         }
     }
@@ -929,10 +927,8 @@ static void _spi_decoded()
                 auto *event = ftrace->add_event();
                 event->set_timestamp(_apply_offset_and_drift(timestamp_end));
                 event->set_pid(PID_SPI + 1);
-                auto *print = event->mutable_print();
-                char buffer[100];
-                snprintf(buffer, 100, "E|0|Decoded MISO|%s", data_string.c_str());
-                print->set_buf(buffer);
+                auto *print = event->mutable_print(););
+                print->set_buf("E|0");
             }
         }
     }
@@ -998,7 +994,7 @@ static void _feedStream( struct Stream *stream )
 
     perfetto_trace = new perfetto::protos::Trace();
     ftrace_packet = perfetto_trace->add_packet();
-    ftrace_packet->set_trusted_packet_sequence_id(6);
+    ftrace_packet->set_trusted_packet_sequence_id(42);
     ftrace_packet->set_sequence_flags(1);
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);

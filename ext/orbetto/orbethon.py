@@ -2,10 +2,6 @@ import os
 import time
 import pandas as pd
 
-#os.system('rm -rf build')
-#os.system('meson setup build')
-os.system('ninja -C build')
-
 from build.orbethon import *
 import argparse
 from elf import process_address,print_sections,process_string_table,process_symbol_table,process_debug_string,get_text_bin

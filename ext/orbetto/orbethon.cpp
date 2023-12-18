@@ -5,7 +5,7 @@
 namespace py = pybind11;
 
 PYBIND11_MODULE(orbethon,handle){
-    handle.doc()="Python rapper for orbetto tool.";
+    handle.doc()="Python wrapper for orbetto tool.";
     handle.def("orbethon",&main_pywrapper);
 
     py::class_<PyOptions>(handle,"Options_Struct")
