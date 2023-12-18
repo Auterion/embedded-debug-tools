@@ -299,68 +299,69 @@ index f097e905da..a059f5456d 100644
  
    /* Save the callback info.  This will be invoked when the DMA completes */
  
-diff --git a/libs/libc/semaphore/sem_init.c b/libs/libc/semaphore/sem_init.c
+diff --git a/platforms/nuttx/NuttX/nuttx/libs/libc/semaphore/sem_init.c b/platforms/nuttx/NuttX/nuttx/libs/libc/semaphore/sem_init.c
 index 785403599d..fa3d4e4745 100644
---- a/libs/libc/semaphore/sem_init.c
-+++ b/libs/libc/semaphore/sem_init.c
+--- a/platforms/nuttx/NuttX/nuttx/libs/libc/semaphore/sem_init.c
++++ b/platforms/nuttx/NuttX/nuttx/libs/libc/semaphore/sem_init.c
 @@ -29,6 +29,7 @@
  #include <errno.h>
-
+ 
  #include <nuttx/semaphore.h>
 +#include <nuttx/itm/itm.h>
-
+ 
  /****************************************************************************
   * Public Functions
 @@ -72,6 +73,7 @@ int nxsem_init(FAR sem_t *sem, int pshared, unsigned int value)
        /* Initialize the semaphore count */
-
+ 
        sem->semcount         = (int16_t)value;
 +      EMDBG_LOG_SEMAPHORE_INIT(sem);
-
+ 
        /* Initialize to support priority inheritance */
-diff --git a/sched/semaphore/sem_post.c b/sched/semaphore/sem_post.c
+ 
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
 index a16150d00d..4a4d953d5f 100644
---- a/sched/semaphore/sem_post.c
-+++ b/sched/semaphore/sem_post.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_post.c
 @@ -111,6 +111,7 @@ int nxsem_post(FAR sem_t *sem)
-
+ 
        nxsem_release_holder(sem);
        sem->semcount++;
 +      EMDBG_LOG_SEMAPHORE_INCR(sem);
-
+ 
  #ifdef CONFIG_PRIORITY_INHERITANCE
        /* Don't let any unblocked tasks run until we complete any priority
-diff --git a/sched/semaphore/sem_recover.c b/sched/semaphore/sem_recover.c
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_recover.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_recover.c
 index 40f297bd65..b9a92419dd 100644
---- a/sched/semaphore/sem_recover.c
-+++ b/sched/semaphore/sem_recover.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_recover.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_recover.c
 @@ -98,6 +98,7 @@ void nxsem_recover(FAR struct tcb_s *tcb)
         */
-
+ 
        sem->semcount++;
 +      EMDBG_LOG_SEMAPHORE_INCR(sem);
-
+ 
        /* Clear the semaphore to assure that it is not reused.  But leave the
         * state as TSTATE_WAIT_SEM.  This is necessary because this is a
-diff --git a/sched/semaphore/sem_trywait.c b/sched/semaphore/sem_trywait.c
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_trywait.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_trywait.c
 index dc1dbe83ae..2ab0004245 100644
---- a/sched/semaphore/sem_trywait.c
-+++ b/sched/semaphore/sem_trywait.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_trywait.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_trywait.c
 @@ -91,6 +91,7 @@ int nxsem_trywait(FAR sem_t *sem)
            /* It is, let the task take the semaphore */
-
+ 
            sem->semcount--;
 +          EMDBG_LOG_SEMAPHORE_DECR(sem);
            nxsem_add_holder(sem);
            rtcb->waitsem = NULL;
            ret = OK;
-diff --git a/sched/semaphore/sem_wait.c b/sched/semaphore/sem_wait.c
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
 index 29580d72cc..c9f15058fe 100644
---- a/sched/semaphore/sem_wait.c
-+++ b/sched/semaphore/sem_wait.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_wait.c
 @@ -97,6 +98,7 @@ int nxsem_wait(FAR sem_t *sem)
            /* It is, let the task take the semaphore. */
-
+ 
            sem->semcount--;
 +          EMDBG_LOG_SEMAPHORE_DECR(sem);
            nxsem_add_holder(sem);
@@ -368,32 +369,33 @@ index 29580d72cc..c9f15058fe 100644
            ret = OK;
 @@ -117,6 +119,7 @@ int nxsem_wait(FAR sem_t *sem)
            /* Handle the POSIX semaphore (but don't set the owner yet) */
-
+ 
            sem->semcount--;
 +          EMDBG_LOG_SEMAPHORE_DECR(sem);
-
+ 
            /* Save the waited on semaphore in the TCB */
-
-diff --git a/sched/semaphore/sem_waitirq.c b/sched/semaphore/sem_waitirq.c
+ 
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_waitirq.c b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_waitirq.c
 index 08170b55cc..df9a424478 100644
---- a/sched/semaphore/sem_waitirq.c
-+++ b/sched/semaphore/sem_waitirq.c
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_waitirq.c
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/sem_waitirq.c
 @@ -96,6 +96,7 @@ void nxsem_wait_irq(FAR struct tcb_s *wtcb, int errcode)
         */
-
+ 
        sem->semcount++;
 +      EMDBG_LOG_SEMAPHORE_INCR(sem);
-
+ 
        /* Indicate that the semaphore wait is over. */
-diff --git a/sched/semaphore/semaphore.h b/sched/semaphore/semaphore.h
+ 
+diff --git a/platforms/nuttx/NuttX/nuttx/sched/semaphore/semaphore.h b/platforms/nuttx/NuttX/nuttx/sched/semaphore/semaphore.h
 index 71578176ab..208a2347b9 100644
---- a/sched/semaphore/semaphore.h
-+++ b/sched/semaphore/semaphore.h
+--- a/platforms/nuttx/NuttX/nuttx/sched/semaphore/semaphore.h
++++ b/platforms/nuttx/NuttX/nuttx/sched/semaphore/semaphore.h
 @@ -29,6 +29,7 @@
  #include <nuttx/compiler.h>
  #include <nuttx/semaphore.h>
  #include <nuttx/sched.h>
 +#include <nuttx/itm/itm.h>
-
+ 
  #include <stdint.h>
  #include <stdbool.h>
