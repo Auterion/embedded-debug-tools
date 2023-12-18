@@ -78,11 +78,32 @@ struct
     int port;
     char *server;
 
+    /* SWO File name */
     char *file;                              /* File host connection */
+    std::string std_file;
+
     bool endTerminate;                       /* Terminate when file/socket "ends" */
 
-    char *elfFile;
+    /* Binary elf_file */
+    std::vector<uint8_t>* elf_file;
+
     bool outputDebugFile;
+
+    /* Parsed functions */
+    std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+
+    /* SPI Debug */
+    std::vector<std::tuple<uint64_t,uint32_t>> mosi_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> miso_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> clk_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::vector<std::tuple<uint64_t,uint64_t>>> workqueue_intervals_spi; 
+    /* SPI Sync */
+    std::vector<std::tuple<uint64_t,uint64_t>> workqueue_intervals_swo;
+    uint64_t workqueue_last_switch_swo;
+    std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
 
 } options =
 {
@@ -90,7 +111,27 @@ struct
     .forceITMSync = true,
     .tsTrigger = DEFAULT_TS_TRIGGER,
     .port = NWCLIENT_SERVER_PORT,
-    .server = (char *)"localhost"
+    .server = (char *)"localhost",
+    .workqueue_last_switch_swo = 0,
+};
+
+struct PyOptions
+{
+    uint64_t cps;
+    enum TSType tsType;
+    std::string std_file;
+    bool endTerminate; 
+    std::vector<uint8_t> elf_file;
+    bool outputDebugFile;
+    std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+    std::vector<std::tuple<uint64_t,uint32_t>> mosi_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> miso_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> clk_digital;
+    std::vector<std::tuple<uint64_t,uint32_t>> cs_digital;
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_mosi; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::tuple<uint64_t,uint64_t,std::vector<uint8_t>>> spi_decoded_miso; /* Decoded spi data packets (shape: #data_packets * [timestamp_start,timestamp_end,data])*/
+    std::vector<std::vector<std::tuple<uint64_t,uint64_t>>> workqueue_intervals_spi;
+    std::vector<std::tuple<uint64_t,uint32_t>> sync_digital;
 };
 
 struct
@@ -127,287 +168,16 @@ int64_t _timestamp( void )
 // ====================================================================================================
 
 static perfetto::protos::Trace *perfetto_trace;
-
 static perfetto::protos::FtraceEventBundle *ftrace;
-static std::unordered_map<int32_t, const char*> irq_names_stm32f765 =
-{
-    {16+-14, "NonMaskableInt"},     // 2 Non Maskable Interrupt
-    {16+-13, "HardFault"},          // 3 Cortex-M Hard Fault Interrupt
-    {16+-12, "MemoryManagement"},   // 4 Cortex-M Memory Management Interrupt
-    {16+-11, "BusFault"},           // 5 Cortex-M Bus Fault Interrupt
-    {16+-10, "UsageFault"},         // 6 Cortex-M Usage Fault Interrupt
-    {16+ -5, "SVCall"},             // 11 Cortex-M SV Call Interrupt
-    {16+ -4, "DebugMonitor"},       // 12 Cortex-M Debug Monitor Interrupt
-    {16+ -2, "PendSV"},             // 14 Cortex-M Pend SV Interrupt
-    {16+ -1, "SysTick"},            // 15 Cortex-M System Tick Interrupt
 
-    {16+  0, "WWDG"},               // Window WatchDog Interrupt
-    {16+  1, "PVD"},                // PVD through EXTI Line detection Interrupt
-    {16+  2, "TAMP_STAMP"},         // Tamper and TimeStamp interrupts through the EXTI line
-    {16+  3, "RTC_WKUP"},           // RTC Wakeup interrupt through the EXTI line
-    {16+  4, "FLASH"},              // FLASH global Interrupt
-    {16+  5, "RCC"},                // RCC global Interrupt
-    {16+  6, "EXTI0"},              // EXTI Line0 Interrupt
-    {16+  7, "EXTI1"},              // EXTI Line1 Interrupt
-    {16+  8, "EXTI2"},              // EXTI Line2 Interrupt
-    {16+  9, "EXTI3"},              // EXTI Line3 Interrupt
-    {16+ 10, "EXTI4"},              // EXTI Line4 Interrupt
-    {16+ 11, "DMA1_Stream0"},       // DMA1 Stream 0 global Interrupt
-    {16+ 12, "DMA1_Stream1"},       // DMA1 Stream 1 global Interrupt
-    {16+ 13, "DMA1_Stream2"},       // DMA1 Stream 2 global Interrupt
-    {16+ 14, "DMA1_Stream3"},       // DMA1 Stream 3 global Interrupt
-    {16+ 15, "DMA1_Stream4"},       // DMA1 Stream 4 global Interrupt
-    {16+ 16, "DMA1_Stream5"},       // DMA1 Stream 5 global Interrupt
-    {16+ 17, "DMA1_Stream6"},       // DMA1 Stream 6 global Interrupt
-    {16+ 18, "ADC"},                // ADC1, ADC2 and ADC3 global Interrupts
-    {16+ 19, "CAN1_TX"},            // CAN1 TX Interrupt
-    {16+ 20, "CAN1_RX0"},           // CAN1 RX0 Interrupt
-    {16+ 21, "CAN1_RX1"},           // CAN1 RX1 Interrupt
-    {16+ 22, "CAN1_SCE"},           // CAN1 SCE Interrupt
-    {16+ 23, "EXTI9_5"},            // External Line[9:5] Interrupts
-    {16+ 24, "TIM1_BRK_TIM9"},      // TIM1 Break interrupt and TIM9 global interrupt
-    {16+ 25, "TIM1_UP_TIM10"},      // TIM1 Update Interrupt and TIM10 global interrupt
-    {16+ 26, "TIM1_TRG_COM_TIM11"}, // TIM1 Trigger and Commutation Interrupt and TIM11 global interrupt
-    {16+ 27, "TIM1_CC"},            // TIM1 Capture Compare Interrupt
-    {16+ 28, "TIM2"},               // TIM2 global Interrupt
-    {16+ 29, "TIM3"},               // TIM3 global Interrupt
-    {16+ 30, "TIM4"},               // TIM4 global Interrupt
-    {16+ 31, "I2C1_EV"},            // I2C1 Event Interrupt
-    {16+ 32, "I2C1_ER"},            // I2C1 Error Interrupt
-    {16+ 33, "I2C2_EV"},            // I2C2 Event Interrupt
-    {16+ 34, "I2C2_ER"},            // I2C2 Error Interrupt
-    {16+ 35, "SPI1"},               // SPI1 global Interrupt
-    {16+ 36, "SPI2"},               // SPI2 global Interrupt
-    {16+ 37, "USART1"},             // USART1 global Interrupt
-    {16+ 38, "USART2"},             // USART2 global Interrupt
-    {16+ 39, "USART3"},             // USART3 global Interrupt
-    {16+ 40, "EXTI15_10"},          // External Line[15:10] Interrupts
-    {16+ 41, "RTC_Alarm"},          // RTC Alarm (A and B) through EXTI Line Interrupt
-    {16+ 42, "OTG_FS_WKUP"},        // USB OTG FS Wakeup through EXTI line interrupt
-    {16+ 43, "TIM8_BRK_TIM12"},     // TIM8 Break Interrupt and TIM12 global interrupt
-    {16+ 44, "TIM8_UP_TIM13"},      // TIM8 Update Interrupt and TIM13 global interrupt
-    {16+ 45, "TIM8_TRG_COM_TIM14"}, // TIM8 Trigger and Commutation Interrupt and TIM14 global interrupt
-    {16+ 46, "TIM8_CC"},            // TIM8 Capture Compare Interrupt
-    {16+ 47, "DMA1_Stream7"},       // DMA1 Stream7 Interrupt
-    {16+ 48, "FMC"},                // FMC global Interrupt
-    {16+ 49, "SDMMC1"},             // SDMMC1 global Interrupt
-    {16+ 50, "TIM5"},               // TIM5 global Interrupt
-    {16+ 51, "SPI3"},               // SPI3 global Interrupt
-    {16+ 52, "UART4"},              // UART4 global Interrupt
-    {16+ 53, "UART5"},              // UART5 global Interrupt
-    {16+ 54, "TIM6_DAC"},           // TIM6 global and DAC1&2 underrun error  interrupts
-    {16+ 55, "TIM7"},               // TIM7 global interrupt
-    {16+ 56, "DMA2_Stream0"},       // DMA2 Stream 0 global Interrupt
-    {16+ 57, "DMA2_Stream1"},       // DMA2 Stream 1 global Interrupt
-    {16+ 58, "DMA2_Stream2"},       // DMA2 Stream 2 global Interrupt
-    {16+ 59, "DMA2_Stream3"},       // DMA2 Stream 3 global Interrupt
-    {16+ 60, "DMA2_Stream4"},       // DMA2 Stream 4 global Interrupt
-    {16+ 61, "ETH"},                // Ethernet global Interrupt
-    {16+ 62, "ETH_WKUP"},           // Ethernet Wakeup through EXTI line Interrupt
-    {16+ 63, "CAN2_TX"},            // CAN2 TX Interrupt
-    {16+ 64, "CAN2_RX0"},           // CAN2 RX0 Interrupt
-    {16+ 65, "CAN2_RX1"},           // CAN2 RX1 Interrupt
-    {16+ 66, "CAN2_SCE"},           // CAN2 SCE Interrupt
-    {16+ 67, "OTG_FS"},             // USB OTG FS global Interrupt
-    {16+ 68, "DMA2_Stream5"},       // DMA2 Stream 5 global interrupt
-    {16+ 69, "DMA2_Stream6"},       // DMA2 Stream 6 global interrupt
-    {16+ 70, "DMA2_Stream7"},       // DMA2 Stream 7 global interrupt
-    {16+ 71, "USART6"},             // USART6 global interrupt
-    {16+ 72, "I2C3_EV"},            // I2C3 event interrupt
-    {16+ 73, "I2C3_ER"},            // I2C3 error interrupt
-    {16+ 74, "OTG_HS_EP1_OUT"},     // USB OTG HS End Point 1 Out global interrupt
-    {16+ 75, "OTG_HS_EP1_IN"},      // USB OTG HS End Point 1 In global interrupt
-    {16+ 76, "OTG_HS_WKUP"},        // USB OTG HS Wakeup through EXTI interrupt
-    {16+ 77, "OTG_HS"},             // USB OTG HS global interrupt
-    {16+ 78, "DCMI"},               // DCMI global interrupt
-    {16+ 80, "RNG"},                // RNG global interrupt
-    {16+ 81, "FPU"},                // FPU global interrupt
-    {16+ 82, "UART7"},              // UART7 global interrupt
-    {16+ 83, "UART8"},              // UART8 global interrupt
-    {16+ 84, "SPI4"},               // SPI4 global Interrupt
-    {16+ 85, "SPI5"},               // SPI5 global Interrupt
-    {16+ 86, "SPI6"},               // SPI6 global Interrupt
-    {16+ 87, "SAI1"},               // SAI1 global Interrupt
-    {16+ 90, "DMA2D"},              // DMA2D global Interrupt
-    {16+ 91, "SAI2"},               // SAI2 global Interrupt
-    {16+ 92, "QUADSPI"},            // Quad SPI global interrupt
-    {16+ 93, "LPTIM1"},             // LP TIM1 interrupt
-    {16+ 94, "CEC"},                // HDMI-CEC global Interrupt
-    {16+ 95, "I2C4_EV"},            // I2C4 Event Interrupt
-    {16+ 96, "I2C4_ER"},            // I2C4 Error Interrupt
-    {16+ 97, "SPDIF_RX"},           // SPDIF-RX global Interrupt
-    {16+ 99, "DFSDM1_FLT0"},        // DFSDM1 Filter 0 global Interrupt
-    {16+100, "DFSDM1_FLT1"},        // DFSDM1 Filter 1 global Interrupt
-    {16+101, "DFSDM1_FLT2"},        // DFSDM1 Filter 2 global Interrupt
-    {16+102, "DFSDM1_FLT3"},        // DFSDM1 Filter 3 global Interrupt
-    {16+103, "SDMMC2"},             // SDMMC2 global Interrupt
-    {16+104, "CAN3_TX"},            // CAN3 TX Interrupt
-    {16+105, "CAN3_RX0"},           // CAN3 RX0 Interrupt
-    {16+106, "CAN3_RX1"},           // CAN3 RX1 Interrupt
-    {16+107, "CAN3_SCE"},           // CAN3 SCE Interrupt
-    {16+109, "MDIOS"},              // MDIO Slave global Interrupt
-};
-static std::unordered_map<int32_t, const char*> irq_names_stm32h753 =
-{
-    {16+-14, "NonMaskableInt"},     // 2 Non Maskable Interrupt
-    {16+-13, "HardFault"},          // 3 Cortex-M Hard Fault Interrupt
-    {16+-12, "MemoryManagement"},   // 4 Cortex-M Memory Management Interrupt
-    {16+-11, "BusFault"},           // 5 Cortex-M Bus Fault Interrupt
-    {16+-10, "UsageFault"},         // 6 Cortex-M Usage Fault Interrupt
-    {16+ -5, "SVCall"},             // 11 Cortex-M SV Call Interrupt
-    {16+ -4, "DebugMonitor"},       // 12 Cortex-M Debug Monitor Interrupt
-    {16+ -2, "PendSV"},             // 14 Cortex-M Pend SV Interrupt
-    {16+ -1, "SysTick"},            // 15 Cortex-M System Tick Interrupt
-
-    {16+  0, "WWDG"},               // Window WatchDog Interrupt ( wwdg1_it, wwdg2_it)
-    {16+  1, "PVD_AVD"},            // PVD/AVD through EXTI Line detection Interrupt
-    {16+  2, "TAMP_STAMP"},         // Tamper and TimeStamp interrupts through the EXTI line
-    {16+  3, "RTC_WKUP"},           // RTC Wakeup interrupt through the EXTI line
-    {16+  4, "FLASH"},              // FLASH global Interrupt
-    {16+  5, "RCC"},                // RCC global Interrupt
-    {16+  6, "EXTI0"},              // EXTI Line0 Interrupt
-    {16+  7, "EXTI1"},              // EXTI Line1 Interrupt
-    {16+  8, "EXTI2"},              // EXTI Line2 Interrupt
-    {16+  9, "EXTI3"},              // EXTI Line3 Interrupt
-    {16+ 10, "EXTI4"},              // EXTI Line4 Interrupt
-    {16+ 11, "DMA1_Stream0"},       // DMA1 Stream 0 global Interrupt
-    {16+ 12, "DMA1_Stream1"},       // DMA1 Stream 1 global Interrupt
-    {16+ 13, "DMA1_Stream2"},       // DMA1 Stream 2 global Interrupt
-    {16+ 14, "DMA1_Stream3"},       // DMA1 Stream 3 global Interrupt
-    {16+ 15, "DMA1_Stream4"},       // DMA1 Stream 4 global Interrupt
-    {16+ 16, "DMA1_Stream5"},       // DMA1 Stream 5 global Interrupt
-    {16+ 17, "DMA1_Stream6"},       // DMA1 Stream 6 global Interrupt
-    {16+ 18, "ADC"},                // ADC1 and  ADC2 global Interrupts
-    {16+ 19, "FDCAN1_IT0"},         // FDCAN1 Interrupt line 0
-    {16+ 20, "FDCAN2_IT0"},         // FDCAN2 Interrupt line 0
-    {16+ 21, "FDCAN1_IT1"},         // FDCAN1 Interrupt line 1
-    {16+ 22, "FDCAN2_IT1"},         // FDCAN2 Interrupt line 1
-    {16+ 23, "EXTI9_5"},            // External Line[9:5] Interrupts
-    {16+ 24, "TIM1_BRK"},           // TIM1 Break Interrupt
-    {16+ 25, "TIM1_UP"},            // TIM1 Update Interrupt
-    {16+ 26, "TIM1_TRG_COM"},       // TIM1 Trigger and Commutation Interrupt
-    {16+ 27, "TIM1_CC"},            // TIM1 Capture Compare Interrupt
-    {16+ 28, "TIM2"},               // TIM2 global Interrupt
-    {16+ 29, "TIM3"},               // TIM3 global Interrupt
-    {16+ 30, "TIM4"},               // TIM4 global Interrupt
-    {16+ 31, "I2C1_EV"},            // I2C1 Event Interrupt
-    {16+ 32, "I2C1_ER"},            // I2C1 Error Interrupt
-    {16+ 33, "I2C2_EV"},            // I2C2 Event Interrupt
-    {16+ 34, "I2C2_ER"},            // I2C2 Error Interrupt
-    {16+ 35, "SPI1"},               // SPI1 global Interrupt
-    {16+ 36, "SPI2"},               // SPI2 global Interrupt
-    {16+ 37, "USART1"},             // USART1 global Interrupt
-    {16+ 38, "USART2"},             // USART2 global Interrupt
-    {16+ 39, "USART3"},             // USART3 global Interrupt
-    {16+ 40, "EXTI15_10"},          // External Line[15:10] Interrupts
-    {16+ 41, "RTC_Alarm"},          // RTC Alarm (A and B) through EXTI Line Interrupt
-    {16+ 43, "TIM8_BRK_TIM12"},     // TIM8 Break Interrupt and TIM12 global interrupt
-    {16+ 44, "TIM8_UP_TIM13"},      // TIM8 Update Interrupt and TIM13 global interrupt
-    {16+ 45, "TIM8_TRG_COM_TIM14"}, // TIM8 Trigger and Commutation Interrupt and TIM14 global interrupt
-    {16+ 46, "TIM8_CC"},            // TIM8 Capture Compare Interrupt
-    {16+ 47, "DMA1_Stream7"},       // DMA1 Stream7 Interrupt
-    {16+ 48, "FMC"},                // FMC global Interrupt
-    {16+ 49, "SDMMC1"},             // SDMMC1 global Interrupt
-    {16+ 50, "TIM5"},               // TIM5 global Interrupt
-    {16+ 51, "SPI3"},               // SPI3 global Interrupt
-    {16+ 52, "UART4"},              // UART4 global Interrupt
-    {16+ 53, "UART5"},              // UART5 global Interrupt
-    {16+ 54, "TIM6_DAC"},           // TIM6 global and DAC1&2 underrun error  interrupts
-    {16+ 55, "TIM7"},               // TIM7 global interrupt
-    {16+ 56, "DMA2_Stream0"},       //   DMA2 Stream 0 global Interrupt
-    {16+ 57, "DMA2_Stream1"},       //   DMA2 Stream 1 global Interrupt
-    {16+ 58, "DMA2_Stream2"},       //   DMA2 Stream 2 global Interrupt
-    {16+ 59, "DMA2_Stream3"},       //   DMA2 Stream 3 global Interrupt
-    {16+ 60, "DMA2_Stream4"},       //   DMA2 Stream 4 global Interrupt
-    {16+ 61, "ETH"},                // Ethernet global Interrupt
-    {16+ 62, "ETH_WKUP"},           // Ethernet Wakeup through EXTI line Interrupt
-    {16+ 63, "FDCAN_CAL"},          // FDCAN Calibration unit Interrupt
-    {16+ 68, "DMA2_Stream5"},       // DMA2 Stream 5 global interrupt
-    {16+ 69, "DMA2_Stream6"},       // DMA2 Stream 6 global interrupt
-    {16+ 70, "DMA2_Stream7"},       // DMA2 Stream 7 global interrupt
-    {16+ 71, "USART6"},             // USART6 global interrupt
-    {16+ 72, "I2C3_EV"},            // I2C3 event interrupt
-    {16+ 73, "I2C3_ER"},            // I2C3 error interrupt
-    {16+ 74, "OTG_HS_EP1_OUT"},     // USB OTG HS End Point 1 Out global interrupt
-    {16+ 75, "OTG_HS_EP1_IN"},      // USB OTG HS End Point 1 In global interrupt
-    {16+ 76, "OTG_HS_WKUP"},        // USB OTG HS Wakeup through EXTI interrupt
-    {16+ 77, "OTG_HS"},             // USB OTG HS global interrupt
-    {16+ 78, "DCMI"},               // DCMI global interrupt
-    {16+ 79, "CRYP"},               // CRYP crypto global interrupt
-    {16+ 80, "HASH_RNG"},           // HASH and RNG global interrupt
-    {16+ 81, "FPU"},                // FPU global interrupt
-    {16+ 82, "UART7"},              // UART7 global interrupt
-    {16+ 83, "UART8"},              // UART8 global interrupt
-    {16+ 84, "SPI4"},               // SPI4 global Interrupt
-    {16+ 85, "SPI5"},               // SPI5 global Interrupt
-    {16+ 86, "SPI6"},               // SPI6 global Interrupt
-    {16+ 87, "SAI1"},               // SAI1 global Interrupt
-    {16+ 88, "LTDC"},               // LTDC global Interrupt
-    {16+ 89, "LTDC_ER"},            // LTDC Error global Interrupt
-    {16+ 90, "DMA2D"},              // DMA2D global Interrupt
-    {16+ 91, "SAI2"},               // SAI2 global Interrupt
-    {16+ 92, "QUADSPI"},            // Quad SPI global interrupt
-    {16+ 93, "LPTIM1"},             // LP TIM1 interrupt
-    {16+ 94, "CEC"},                // HDMI-CEC global Interrupt
-    {16+ 95, "I2C4_EV"},            // I2C4 Event Interrupt
-    {16+ 96, "I2C4_ER"},            // I2C4 Error Interrupt
-    {16+ 97, "SPDIF_RX"},           // SPDIF-RX global Interrupt
-    {16+ 98, "OTG_FS_EP1_OUT"},     // USB OTG HS2 global interrupt
-    {16+ 99, "OTG_FS_EP1_IN"},      // USB OTG HS2 End Point 1 Out global interrupt
-    {16+100, "OTG_FS_WKUP"},        // USB OTG HS2 End Point 1 In global interrupt
-    {16+101, "OTG_FS"},             // USB OTG HS2 Wakeup through EXTI interrupt
-    {16+102, "DMAMUX1_OVR"},        // Overrun interrupt
-    {16+103, "HRTIM1_Master"},      // HRTIM Master Timer global Interrupts
-    {16+104, "HRTIM1_TIMA"},        // HRTIM Timer A global Interrupt
-    {16+105, "HRTIM1_TIMB"},        // HRTIM Timer B global Interrupt
-    {16+106, "HRTIM1_TIMC"},        // HRTIM Timer C global Interrupt
-    {16+107, "HRTIM1_TIMD"},        // HRTIM Timer D global Interrupt
-    {16+108, "HRTIM1_TIME"},        // HRTIM Timer E global Interrupt
-    {16+109, "HRTIM1_FLT"},         // HRTIM Fault global Interrupt
-    {16+110, "DFSDM1_FLT0"},        // Filter1 Interrupt
-    {16+111, "DFSDM1_FLT1"},        // Filter2 Interrupt
-    {16+112, "DFSDM1_FLT2"},        // Filter3 Interrupt
-    {16+113, "DFSDM1_FLT3"},        // Filter4 Interrupt
-    {16+114, "SAI3"},               // SAI3 global Interrupt
-    {16+115, "SWPMI1"},             // Serial Wire Interface 1 global interrupt
-    {16+116, "TIM15"},              // TIM15 global Interrupt
-    {16+117, "TIM16"},              // TIM16 global Interrupt
-    {16+118, "TIM17"},              // TIM17 global Interrupt
-    {16+119, "MDIOS_WKUP"},         // MDIOS Wakeup  Interrupt
-    {16+120, "MDIOS"},              // MDIOS global Interrupt
-    {16+121, "JPEG"},               // JPEG global Interrupt
-    {16+122, "MDMA"},               // MDMA global Interrupt
-    {16+124, "SDMMC2"},             // SDMMC2 global Interrupt
-    {16+125, "HSEM1"},              // HSEM1 global Interrupt
-    {16+127, "ADC3"},               // ADC3 global Interrupt
-    {16+128, "DMAMUX2_OVR"},        // Overrun interrupt
-    {16+129, "BDMA_Channel0"},      // BDMA Channel 0 global Interrupt
-    {16+130, "BDMA_Channel1"},      // BDMA Channel 1 global Interrupt
-    {16+131, "BDMA_Channel2"},      // BDMA Channel 2 global Interrupt
-    {16+132, "BDMA_Channel3"},      // BDMA Channel 3 global Interrupt
-    {16+133, "BDMA_Channel4"},      // BDMA Channel 4 global Interrupt
-    {16+134, "BDMA_Channel5"},      // BDMA Channel 5 global Interrupt
-    {16+135, "BDMA_Channel6"},      // BDMA Channel 6 global Interrupt
-    {16+136, "BDMA_Channel7"},      // BDMA Channel 7 global Interrupt
-    {16+137, "COMP"},               // COMP global Interrupt
-    {16+138, "LPTIM2"},             // LP TIM2 global interrupt
-    {16+139, "LPTIM3"},             // LP TIM3 global interrupt
-    {16+140, "LPTIM4"},             // LP TIM4 global interrupt
-    {16+141, "LPTIM5"},             // LP TIM5 global interrupt
-    {16+142, "LPUART1"},            // LP UART1 interrupt
-    {16+144, "CRS"},                // Clock Recovery Global Interrupt
-    {16+145, "ECC"},                // ECC diagnostic Global Interrupt
-    {16+146, "SAI4"},               // SAI4 global interrupt
-    {16+149, "WAKEUP_PIN"},         // Interrupt for all 6 wake-up pins
-};
-// FIXME: detect this automatically
-// static auto &irq_names = irq_names_stm32f765;
-static auto &irq_names = irq_names_stm32h753;
+static std::unordered_map<int32_t, const char*> *irq_names = nullptr;
 
 static constexpr uint16_t PID_TSK{0};
 static constexpr uint16_t PID_STOP{10000};
 static constexpr uint32_t PID_DMA{100000};
 static constexpr uint32_t PID_UART{200000};
+static constexpr uint32_t PID_PC{300000};
+static constexpr uint32_t PID_SPI{400000};
 static constexpr uint32_t PID_SEMAPHORE{1000000};
 static uint16_t prev_tid{0};
 static std::unordered_map<uint16_t, std::string> active_threads;
@@ -551,6 +321,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 
     static std::string thread_name;
     uint16_t tid = (m->value & 0xfffful);
+    printf("TID is %u\n", tid);
     const bool tid_tl = tid > 3000;
     if (stopped_threads.contains(tid)) tid += PID_STOP;
     else if (tid != 0) tid += PID_TSK;
@@ -573,12 +344,24 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 {
                     if (tid)
                     {
-                        auto *event = ftrace->add_event();
-                        event->set_timestamp(ns);
-                        event->set_pid(prev_tid);
-                        auto *renametask = event->mutable_task_rename();
-                        renametask->set_pid(tid);
-                        renametask->set_newcomm(thread_name.c_str());
+                        printf("tid reached %u\n", tid);
+                        {
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(prev_tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
+                        // Do the same for PC Thread
+                        {
+                            auto *event = ftrace->add_event();
+                            event->set_timestamp(ns);
+                            event->set_pid(PID_PC + prev_tid);
+                            auto *renametask = event->mutable_task_rename();
+                            renametask->set_pid(PID_PC + tid);
+                            renametask->set_newcomm(thread_name.c_str());
+                        }
                     }
                     active_threads[tid] = thread_name;
                 }
@@ -640,7 +423,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 workqueue_map[prev_tid] = m->value;
                 if (_r.symbols and not workqueue_names.contains(m->value))
                 {
-                    if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
+                    if (const char *name = (const char *) &(*options.elf_file)[m->value - 0x08008000]; name)
                     {
                         printf("Found Name %s for 0x%08x\n", name, m->value);
                         workqueue_names[m->value] = name;
@@ -1010,8 +793,8 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
         auto *entry = event->mutable_irq_handler_entry();
         entry->set_irq(irq);
         entry->set_name("unknown");
-        if (irq_names.contains(irq))
-            entry->set_name(irq_names[irq]);
+        if (irq_names->contains(irq))
+            entry->set_name((*irq_names)[irq]);
     }
     else
     {
@@ -1020,9 +803,55 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
     }
 }
 
+uint64_t last_function_index = -1;
+auto last_prev_tid = prev_tid;
+
 static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
+    printf(" PC handler is called with pid %u\n", prev_tid);
     assert( m->msgtype == MSG_PC_SAMPLE );
+    // check if pc is in idle task then skip
+    if(prev_tid == 0) return;
+    // find the new function name
+    auto pc_function = std::lower_bound(options.functions.begin(), options.functions.end(), m->pc,
+        [](const std::tuple<int32_t,std::string> addr_func_tuple, uint32_t value)
+        {
+            return get<0>(addr_func_tuple) < value;
+        });
+    // begin the new function in ftrace
+    if (pc_function == options.functions.end()) 
+    {
+        printf("For PC at 0x%08x no Function name could be found.\n", m->pc);
+    }else
+    {
+        uint64_t index = get<0>(*pc_function);
+        std::string function_name = get<1>(*pc_function);
+        // printf("Function: %s\n", function_name.c_str());
+        if(index==last_function_index and prev_tid==last_prev_tid) return;
+        // end the last function in ftrace
+        if(last_function_index != (uint64_t)-1)
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+            event->set_pid(PID_PC + last_prev_tid);
+            auto *exit = event->mutable_funcgraph_exit();
+            exit->set_depth(0);
+            exit->set_func(last_function_index);
+        }
+        // start ftrace event
+        {
+            printf("Writing a function in tid %u\n", prev_tid);
+            auto *event = ftrace->add_event();
+            event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
+            event->set_pid(PID_PC + prev_tid);
+            auto *entry = event->mutable_funcgraph_entry();
+            entry->set_depth(0);
+            entry->set_func(index);
+            // save last event
+            last_prev_tid = prev_tid;
+            last_function_index = index;
+        }
+    }
 }
 
 // ====================================================================================================
@@ -1043,6 +872,25 @@ static void _itmPumpProcessPre( char c )
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
                 }
+                // TODO: does this need to be changed because itm channels got renamed?
+                else if (m->srcAddr == 15) // workqueue start
+                {
+                    const uint64_t ns = (_r.timeStamp * 1e9) / options.cps;
+                    if(options.workqueue_last_switch_swo == 0)
+                    {
+                        options.workqueue_last_switch_swo = ns;
+                        printf("First workqueue start at %llu\n", ns);
+                    }else
+                    {
+                        options.workqueue_intervals_swo.push_back(std::make_tuple(options.workqueue_last_switch_swo, ns-options.workqueue_last_switch_swo));
+                        options.workqueue_last_switch_swo = ns;
+                    }
+                }
+            }
+            else if(p.genericMsg.msgtype == MSG_TS)
+            {
+                struct TSMsg *m = (struct TSMsg *)&p;
+                _r.timeStamp += m->timeInc;
             }
         }
     }
@@ -1175,300 +1023,13 @@ static void _protocolPump( uint8_t c )
     }
 }
 // ====================================================================================================
-static void _printHelp( const char *const progName )
 
-{
-    fprintf( stdout, "Usage: %s [options]" EOL, progName );
-    fprintf( stdout, "    -c, --channel:      <Number>,<Format> of channel to add into output stream (repeat per channel)" EOL );
-    fprintf( stdout, "    -C, --cpufreq:      <Frequency in KHz> (Scaled) speed of the CPU" EOL
-             "                        generally /1, /4, /16 or /64 of the real CPU speed," EOL );
-    fprintf( stdout, "    -E, --eof:          Terminate when the file/socket ends/is closed, or wait for more/reconnect" EOL );
-    fprintf( stdout, "    -f, --input-file:   <filename> Take input from specified file" EOL );
-    fprintf( stdout, "    -g, --trigger:      <char> to use to trigger timestamp (default is newline)" EOL );
-    fprintf( stdout, "    -h, --help:         This help" EOL );
-    fprintf( stdout, "    -n, --itm-sync:     Enforce sync requirement for ITM (i.e. ITM needs to issue syncs)" EOL );
-    fprintf( stdout, "    -s, --server:       <Server>:<Port> to use" EOL );
-    fprintf( stdout, "    -e, --elf:          <file>: Use this ELF file for information" EOL );
-    fprintf( stdout, "    -d, --debug:        Output a human-readable protobuf file" EOL );
-    fprintf( stdout, "    -t, --tpiu:         <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
-    fprintf( stdout, "    -T, --timestamp:    <a|r|d|s|t>: Add absolute, relative (to session start)," EOL
-             "                        delta, system timestamp or system timestamp delta to output. Note" EOL
-             "                        a,r & d are host dependent and you may need to run orbuculum with -H." EOL );
-    fprintf( stdout, "    -v, --verbose:      <level> Verbose mode 0(errors)..3(debug)" EOL );
-    fprintf( stdout, "    -V, --version:      Print version and exit" EOL );
-}
-// ====================================================================================================
 static void _printVersion( void )
 
 {
     genericsPrintf( "orbcat version " GIT_DESCRIBE EOL );
 }
-// ====================================================================================================
-static struct option _longOptions[] =
-{
-    {"channel", required_argument, NULL, 'c'},
-    {"cpufreq", required_argument, NULL, 'C'},
-    {"eof", no_argument, NULL, 'E'},
-    {"input-file", required_argument, NULL, 'f'},
-    {"help", no_argument, NULL, 'h'},
-    {"trigger", required_argument, NULL, 'g' },
-    {"itm-sync", no_argument, NULL, 'n'},
-    {"server", required_argument, NULL, 's'},
-    {"tpiu", required_argument, NULL, 't'},
-    {"timestamp", required_argument, NULL, 'T'},
-    {"elf", required_argument, NULL, 'e'},
-    {"debug", no_argument, NULL, 'd'},
-    {"verbose", required_argument, NULL, 'v'},
-    {"version", no_argument, NULL, 'V'},
-    {NULL, no_argument, NULL, 0}
-};
-// ====================================================================================================
-bool _processOptions( int argc, char *argv[] )
 
-{
-    int c, optionIndex = 0;
-    unsigned int chan;
-    char *chanIndex;
-#define DELIMITER ','
-
-    while ( ( c = getopt_long ( argc, argv, "c:C:Ef:de:g:hVns:t:T:v:", _longOptions, &optionIndex ) ) != -1 )
-        switch ( c )
-        {
-            // ------------------------------------
-            case 'C':
-                options.cps = atoi( optarg ) * 1000;
-                break;
-
-            // ------------------------------------
-            case 'h':
-                _printHelp( argv[0] );
-                return false;
-
-            // ------------------------------------
-            case 'V':
-                _printVersion();
-                return false;
-
-            // ------------------------------------
-            case 'E':
-                options.endTerminate = true;
-                break;
-
-            // ------------------------------------
-            case 'd':
-                options.outputDebugFile = true;
-                break;
-
-            // ------------------------------------
-            case 'f':
-                options.file = optarg;
-                break;
-
-            // ------------------------------------
-            case 'g':
-                printf( "%s" EOL, optarg );
-                options.tsTrigger = genericsUnescape( optarg )[0];
-                break;
-
-            // ------------------------------------
-            case 'n':
-                options.forceITMSync = false;
-                break;
-
-            // ------------------------------------
-            case 'e':
-                options.elfFile = optarg;
-                break;
-
-            // ------------------------------------
-            case 's':
-            {
-                options.server = optarg;
-                // See if we have an optional port number too
-                char *a = optarg;
-
-                while ( ( *a ) && ( *a != ':' ) )
-                {
-                    a++;
-                }
-
-                if ( *a == ':' )
-                {
-                    *a = 0;
-                    options.port = atoi( ++a );
-                }
-
-                if ( !options.port )
-                {
-                    options.port = NWCLIENT_SERVER_PORT;
-                }
-
-                break;
-            }
-
-            // ------------------------------------
-            case 't':
-                options.useTPIU = true;
-                options.tpiuChannel = atoi( optarg );
-                break;
-
-            // ------------------------------------
-            case 'T':
-                switch ( *optarg )
-                {
-                    case 'a':
-                        options.tsType = TSAbsolute;
-                        break;
-
-                    case 'r':
-                        options.tsType = TSRelative;
-                        break;
-
-                    case 'd':
-                        options.tsType = TSDelta;
-                        break;
-
-                    case 's':
-                        options.tsType = TSStamp;
-                        break;
-
-                    case 't':
-                        options.tsType = TSStampDelta;
-                        break;
-
-                    default:
-                        genericsReport( V_ERROR, "Unrecognised Timestamp type" EOL );
-                        return false;
-                }
-
-                break;
-
-            // ------------------------------------
-            case 'v':
-                if ( !isdigit( *optarg ) )
-                {
-                    genericsReport( V_ERROR, "-v requires a numeric argument." EOL );
-                    return false;
-                }
-
-                genericsSetReportLevel( (enum verbLevel)atoi( optarg ) );
-                break;
-
-            // ------------------------------------
-            /* Individual channel setup */
-            case 'c':
-                chanIndex = optarg;
-
-                chan = atoi( optarg );
-
-                if ( chan >= NUM_CHANNELS )
-                {
-                    genericsReport( V_ERROR, "Channel index out of range" EOL );
-                    return false;
-                }
-
-                /* Scan for format */
-                while ( ( *chanIndex ) && ( *chanIndex != DELIMITER ) )
-                {
-                    chanIndex++;
-                }
-
-                /* Step over delimiter */
-                chanIndex++;
-
-                /* Scan past any whitespace */
-                while ( ( *chanIndex ) && ( isspace( *chanIndex ) ) )
-                {
-                    chanIndex++;
-                }
-
-                if ( !*chanIndex )
-                {
-                    genericsReport( V_ERROR, "No output format for channel %d (avoid spaces before the output spec)" EOL, chan );
-                    return false;
-                }
-
-                //*chanIndex++ = 0;
-                options.presFormat[chan] = strdup( genericsUnescape( chanIndex ) );
-                break;
-
-            // ------------------------------------
-            case '?':
-                if ( optopt == 'b' )
-                {
-                    genericsReport( V_ERROR, "Option '%c' requires an argument." EOL, optopt );
-                }
-                else if ( !isprint ( optopt ) )
-                {
-                    genericsReport( V_ERROR, "Unknown option character `\\x%x'." EOL, optopt );
-                }
-
-                return false;
-
-            // ------------------------------------
-            default:
-                return false;
-                // ------------------------------------
-        }
-
-    if ( ( options.useTPIU ) && ( !options.tpiuChannel ) )
-    {
-        genericsReport( V_ERROR, "TPIU set for use but no channel set for ITM output" EOL );
-        return false;
-    }
-
-    genericsReport( V_INFO, "orbcat version " GIT_DESCRIBE EOL );
-    genericsReport( V_INFO, "Server     : %s:%d" EOL, options.server, options.port );
-    genericsReport( V_INFO, "ForceSync  : %s" EOL, options.forceITMSync ? "true" : "false" );
-    genericsReport( V_INFO, "Timestamp  : %s" EOL, tsTypeString[options.tsType] );
-
-    if ( options.cps )
-    {
-        genericsReport( V_INFO, "S-CPU Speed: %d KHz" EOL, options.cps );
-    }
-
-    if ( options.tsType != TSNone )
-    {
-        char unesc[2] = {options.tsTrigger, 0};
-        genericsReport( V_INFO, "TriggerChr : '%s'" EOL, genericsEscape( unesc ) );
-    }
-
-    if ( options.file )
-    {
-
-        genericsReport( V_INFO, "Input File : %s", options.file );
-
-        if ( options.endTerminate )
-        {
-            genericsReport( V_INFO, " (Terminate on exhaustion)" EOL );
-        }
-        else
-        {
-            genericsReport( V_INFO, " (Ongoing read)" EOL );
-        }
-    }
-
-    if ( options.useTPIU )
-    {
-        genericsReport( V_INFO, "Using TPIU : true (ITM on channel %d)" EOL, options.tpiuChannel );
-    }
-    else
-    {
-        genericsReport( V_INFO, "Using TPIU : false" EOL );
-    }
-
-    genericsReport( V_INFO, "Channels   :" EOL );
-
-    for ( int g = 0; g < NUM_CHANNELS; g++ )
-    {
-        if ( options.presFormat[g] )
-        {
-            genericsReport( V_INFO, "             %02d [%s]" EOL, g, genericsEscape( options.presFormat[g] ) );
-        }
-    }
-
-    return true;
-}
 // ====================================================================================================
 static struct Stream *_tryOpenStream()
 {
@@ -1481,6 +1042,190 @@ static struct Stream *_tryOpenStream()
         return streamCreateSocket( options.server, options.port );
     }
 }
+
+// ====================================================================================================
+int64_t offset;
+double drift;
+uint64_t sync_point;
+static uint64_t _apply_offset_and_drift(uint64_t timestamp)
+{
+    uint64_t timestamp_offset = timestamp + offset;
+    int64_t drift_offset = (int64_t)((((double)timestamp_offset - (double)sync_point)) * drift);
+    timestamp_offset -= drift_offset;
+    return timestamp_offset;
+}
+static void digital_trace_by_toggle_print_statement(bool data,uint32_t pid,uint64_t timestamp)
+{
+    if(data)
+    {
+        // create Ftrace event
+        auto *event = ftrace->add_event();
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
+        event->set_pid(pid);
+        auto *print = event->mutable_print();
+        char buffer[20];
+        snprintf(buffer, sizeof(buffer), "B|0| ");
+        print->set_buf(buffer);
+    }else
+    {
+        // create Ftrace event
+        auto *event = ftrace->add_event();
+        event->set_timestamp(_apply_offset_and_drift(timestamp));
+        event->set_pid(pid);
+        auto *print = event->mutable_print();
+        char buffer[20];
+        snprintf(buffer, sizeof(buffer), "E|0");
+        print->set_buf(buffer);
+    }
+}
+
+static void _sync_digital_prints()
+{
+    for(const auto& [timestamp, sync] : options.sync_digital)
+    {
+        digital_trace_by_toggle_print_statement((bool)sync, PID_SPI + 2, timestamp);
+    }
+}
+
+static void _spi_digital_prints()
+{
+    // Proccess SPI Digital intro perfetto trace
+    // iterate over all samples of digital data array and generate a perfetto trace count event for each
+    for(const auto& [timestamp, data] : options.mosi_digital)
+    {
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 6,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.miso_digital)
+    {
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 5,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.clk_digital)
+    {
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 4,timestamp);
+    }
+    for (const auto& [timestamp, data] : options.cs_digital)
+    {
+        digital_trace_by_toggle_print_statement((bool)data, PID_SPI + 3,timestamp);
+    }
+}
+
+static void _spi_decoded()
+{
+    // Proccess SPI Decoded intro perfetto trace
+    if (options.spi_decoded_mosi.size() > 0)
+    {
+        // iterate over all samples of analog data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_mosi)
+        {
+            std::string data_string = " ";
+            for (const auto i : data)
+            {
+                data_string += "0x" + std::to_string(i) + ", ";
+            }
+            {
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_start));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[300];
+                snprintf(buffer, 300, "B|0|Decoded MOSI|%s", data_string.c_str());
+                print->set_buf(buffer);
+            }
+            {
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_end));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+        }
+    }
+    if (options.spi_decoded_miso.size() > 0) 
+    {
+        // iterate over all samples of analog data array and generate a perfetto trace count event for each
+        for(const auto& [timestamp_start, timestamp_end, data] : options.spi_decoded_miso)
+        {
+            std::string data_string = " ";
+            for (const auto i : data)
+            {
+                data_string += "0x" + std::to_string(i) + ", ";
+            }
+            {
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_start));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, 100, "B|0|Decoded MISO|%s", data_string.c_str());
+                print->set_buf(buffer);
+            }
+            {
+                // only print cs if smaller than 30.0f
+                auto *event = ftrace->add_event();
+                event->set_timestamp(_apply_offset_and_drift(timestamp_end));
+                event->set_pid(PID_SPI + 1);
+                auto *print = event->mutable_print();
+                print->set_buf("E|0");
+            }
+        }
+    }
+}
+
+static std::vector<std::tuple<uint64_t,uint64_t>> find_matching_pattern(){
+    printf("Synchronise SWO and SPI ...\n");
+    std::vector<std::tuple<uint64_t,uint64_t>> pattern_stats;
+    // loop over each pattern
+    for (auto spi_pattern : options.workqueue_intervals_spi)
+    {
+        int window_length = spi_pattern.size();
+        printf("\t Window length: %d\n", window_length);
+        uint64_t min_sum = (uint64_t)-1;
+        int min_sum_index = -1;
+        uint64_t second_min_sum = (uint64_t)-1;
+        uint64_t min_total_sum = 0;
+        // loop over options.workqueue_intervals_swo and compute abs sum of intervals
+        for(int i = 0;i<options.workqueue_intervals_swo.size()-window_length;i++)
+        {
+            uint64_t sum = 0;
+            uint64_t total_sum = 0;
+            for(int j = 0;j<window_length;j++)
+            {
+                int diff = std::get<1>(options.workqueue_intervals_swo[i+j])-std::get<1>(spi_pattern[j]);
+                sum += abs(diff);
+                total_sum += std::get<1>(options.workqueue_intervals_swo[i+j]);
+            }
+            if(sum < min_sum)
+            {
+                second_min_sum = min_sum;
+                min_sum = sum;
+                min_sum_index = i;
+                min_total_sum = total_sum;
+            }
+        }
+        printf("\t Min Offset: %llu\n", min_sum);
+        printf("\t Second Min Offset: %llu\n", second_min_sum);
+        printf("\t Min Offset Index: %d\n", min_sum_index);
+        if(min_total_sum !=0)
+        {
+            printf("\t Min Offset Ratio: %f'%%'\n", (float)min_sum/min_total_sum*100);
+        }
+        // print overlapping intervals
+        for(int i = 0;i<window_length;i++)
+        {
+            int diff = std::get<1>(options.workqueue_intervals_swo[min_sum_index+i])-std::get<1>(spi_pattern[i]);
+            double rel_diff = (double)diff/((std::get<1>(spi_pattern[i])+std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]))/2);
+            printf("\t\t SWO: %llu, SPI: %llu, DIFF: %i, REL DIFF: %f\n", std::get<1>(options.workqueue_intervals_swo[min_sum_index+i]),std::get<1>(spi_pattern[i]), diff,rel_diff);
+        }
+        uint64_t swo_start = std::get<0>(options.workqueue_intervals_swo[min_sum_index]);
+        uint64_t spi_start = std::get<0>(spi_pattern[0]);
+        pattern_stats.push_back(std::make_tuple(swo_start, spi_start));
+    }
+    return pattern_stats;
+}
+
 // ====================================================================================================
 static void _feedStream( struct Stream *stream )
 {
@@ -1529,6 +1274,36 @@ static void _feedStream( struct Stream *stream )
         stream = streamCreateFile( options.file );
     }
 
+    // reset timestamp for second swo parsing
+    _r.timeStamp = 0;
+    auto pattern_stats = find_matching_pattern();
+    offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
+    double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
+    double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
+    drift = nominator /denominator;
+    printf("SPI and SWO Clock have %f %% drift.\n", drift*100);
+    sync_point = std::get<1>(pattern_stats[0]);
+    if(offset > 0)
+    {
+        printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
+        _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
+        offset=0;
+        //_spi_digital();
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+        //_sync_digital();
+    }else
+    {
+        printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
+        offset=-offset;
+        //_spi_digital();
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+        //_sync_digital();
+    }
+
     while ( true )
     {
         size_t receivedSize;
@@ -1561,6 +1336,17 @@ static void _feedStream( struct Stream *stream )
     {
         auto *interned_data = ftrace_packet->mutable_interned_data();
         for (auto&& [func, name] : workqueue_names)
+        {
+            {
+                auto *interned_string = interned_data->add_kernel_symbols();
+                interned_string->set_iid(func);
+                interned_string->set_str(name.c_str());
+            }
+        }
+    }
+    {
+        auto *interned_data = ftrace_packet->mutable_interned_data();
+        for (auto&& [func, name] : options.functions)
         {
             {
                 auto *interned_string = interned_data->add_kernel_symbols();
@@ -1644,6 +1430,66 @@ static void _feedStream( struct Stream *stream )
             //     thread->set_name(buffer);
             // }
         }
+        // Init Programm Counter Process with threads
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC);
+            process->add_cmdline("PC");
+            for (auto&& [tid, name] : active_threads)
+            {
+                if (tid == 0) continue;
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + tid);
+                thread->set_tgid(PID_PC);
+            }
+        }
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC+PID_STOP);
+            process->add_cmdline("PC (stopped)");
+            for (auto&& tid : stopped_threads)
+            {
+                if (tid == 0) continue;
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + PID_STOP + tid);
+                thread->set_tgid(PID_PC+PID_STOP);
+            }
+        }
+        // Init SPI Protocol Process with Channels as Threads
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_SPI);
+            process->add_cmdline("SPI");
+            for(int channels = 6;channels>0;channels--)
+            {
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_SPI + channels);
+                thread->set_tgid(PID_SPI);
+                char buffer[100];
+                switch(channels)
+                {
+                    case 6:
+                        snprintf(buffer, sizeof(buffer), "SPI MOSI");
+                        break;
+                    case 5:
+                        snprintf(buffer, sizeof(buffer), "SPI MISO");
+                        break;
+                    case 4:
+                        snprintf(buffer, sizeof(buffer), "SPI CLK");
+                        break;
+                    case 3:
+                        snprintf(buffer, sizeof(buffer), "SPI CS");
+                        break;
+                    case 2:
+                        snprintf(buffer, sizeof(buffer), "SPI Sync");
+                        break;
+                    case 1:
+                        snprintf(buffer, sizeof(buffer), "SPI Decoded");
+                        break;
+                }
+                thread->set_name(buffer);
+            }
+        }
     }
 
 
@@ -1663,33 +1509,15 @@ static void _feedStream( struct Stream *stream )
 }
 
 // ====================================================================================================
-int main( int argc, char *argv[] )
+int main()
 
 {
     bool alreadyReported = false;
-
-    if ( !_processOptions( argc, argv ) )
-    {
-        exit( -1 );
-    }
 
     /* Reset the TPIU handler before we start */
     TPIUDecoderInit( &_r.t );
     ITMDecoderInit( &_r.i, options.forceITMSync );
     MSGSeqInit( &_r.d, &_r.i, MSG_REORDER_BUFLEN );
-
-    if ( options.elfFile )
-    {
-        /* Only load memory for now */
-        _r.symbols = symbolAcquire(options.elfFile, false, true, false);
-        assert( _r.symbols );
-        printf("Loaded ELF file %s with %u sections\n", options.elfFile, _r.symbols->nsect_mem);
-        for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)
-        {
-            auto mem = _r.symbols->mem[ii];
-            printf("Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
-        }
-    }
 
     while ( true )
     {
@@ -1740,5 +1568,28 @@ int main( int argc, char *argv[] )
     }
 
     return 0;
+}
+
+void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* irq_names_input){
+    // set option struct from python
+    options.cps = py_op.cps;
+    options.tsType = py_op.tsType;
+    options.endTerminate = py_op.endTerminate;
+    options.file = py_op.std_file.data();
+    options.elf_file = &py_op.elf_file;
+    options.outputDebugFile = py_op.outputDebugFile;
+    options.functions = py_op.functions;
+    options.mosi_digital = py_op.mosi_digital;
+    options.miso_digital = py_op.miso_digital;
+    options.clk_digital = py_op.clk_digital;
+    options.cs_digital = py_op.cs_digital;
+    options.spi_decoded_mosi = py_op.spi_decoded_mosi;
+    options.spi_decoded_miso = py_op.spi_decoded_miso;
+    options.workqueue_intervals_spi = py_op.workqueue_intervals_spi;
+    options.sync_digital = py_op.sync_digital;
+
+    irq_names = irq_names_input;
+    // call main
+    main();
 }
 // ====================================================================================================
