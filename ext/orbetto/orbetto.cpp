@@ -1043,7 +1043,7 @@ static void _feedStream( struct Stream *stream )
     double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
     double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
     drift = nominator /denominator;
-    printf("SPI and SWO Clock drift %f per nano second.\n", drift);
+    printf("SPI and SWO Clock have %f %% drift.\n", drift*100);
     sync_point = std::get<1>(pattern_stats[0]);
     if(offset > 0)
     {

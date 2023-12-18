@@ -2,7 +2,8 @@ from ripyl.decode import find_edges
 import pandas as pd
 import os
 
-def find_edges_dynamic(data, name, logic_levels,hysteresis):
+
+def find_edges_dynamic(data, name, logic_levels, hysteresis):
     """
     Find edges in a list of samples
     Inputs:
@@ -26,8 +27,8 @@ def find_edges_dynamic(data, name, logic_levels,hysteresis):
             edges = list(df.itertuples(index=False, name=None))
     else:
         # compute edges
-        edges = list(find_edges(data, logic_levels,hysteresis=hysteresis))
+        edges = list(find_edges(data, logic_levels, hysteresis=hysteresis))
         # save as csv file in buffer folder
-        df = pd.DataFrame(edges,columns=['Time [s]','Value'])
-        df.to_csv("buffer/"+name+".csv",index=False)
+        df = pd.DataFrame(edges, columns=['Time [s]', 'Value'])
+        df.to_csv("buffer/"+name+".csv", index=False)
     return edges
