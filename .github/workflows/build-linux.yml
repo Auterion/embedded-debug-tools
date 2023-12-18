@@ -11,14 +11,15 @@ jobs:
       - run: sudo pip3 install meson==1.2.0
       - uses: actions/checkout@v3
       - run: git clone https://github.com/pybind/pybind11.git
+        working-directory: ext/orbetto  
+      - run: git clone https://github.com/puddly/ripyl.git # Ripyl is a Protocol Decoder Python Library
         working-directory: ext/orbetto
-      - run: git clone https://github.com/puddly/ripyl.git
-        working-directory: ext/orbetto
-      - run: sudo pip3 install scipy
-      - run: sudo pip3 install numpy
-      - run: sudo pip3 install setuptools==45
-      - run: python3 setup.py install
-        working-directory: ext/orbetto/ripyl
+      - run: sudo pip3 install scipy  # Python dependency for Ripyl
+      - run: sudo pip3 install numpy  # Python dependency for Ripyl
+      - run: sudo pip3 install setuptools==45  # Ripyl needs setuptools 45 to install
+      - run: python3 setup.py install # Install Ripyl
+        working-directory: ext/orbetto/ripyl # in the source directory
+      - run: sudo pip3 install pandas # Python dependency for fast data analysis
       - run: meson setup ./build
         working-directory: ext/orbetto
       - run: ninja -C ./build
