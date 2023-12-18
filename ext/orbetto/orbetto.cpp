@@ -321,7 +321,6 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 
     static std::string thread_name;
     uint16_t tid = (m->value & 0xfffful);
-    printf("TID is %u\n", tid);
     const bool tid_tl = tid > 3000;
     if (stopped_threads.contains(tid)) tid += PID_STOP;
     else if (tid != 0) tid += PID_TSK;
@@ -344,7 +343,6 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 {
                     if (tid)
                     {
-                        printf("tid reached %u\n", tid);
                         {
                             auto *event = ftrace->add_event();
                             event->set_timestamp(ns);
@@ -808,7 +806,6 @@ auto last_prev_tid = prev_tid;
 
 static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
-    printf(" PC handler is called with pid %u\n", prev_tid);
     assert( m->msgtype == MSG_PC_SAMPLE );
     // check if pc is in idle task then skip
     if(prev_tid == 0) return;
@@ -840,7 +837,6 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
         }
         // start ftrace event
         {
-            printf("Writing a function in tid %u\n", prev_tid);
             auto *event = ftrace->add_event();
             event->set_timestamp((_r.timeStamp * 1e9) / options.cps);
             event->set_pid(PID_PC + prev_tid);
@@ -873,7 +869,7 @@ static void _itmPumpProcessPre( char c )
                     // printf("Thread %u stopped\n", m->value);
                 }
                 // TODO: does this need to be changed because itm channels got renamed?
-                else if (m->srcAddr == 15) // workqueue start
+                else if (m->srcAddr == EMDBG_WORKQUEUE && m->value) // workqueue start
                 {
                     const uint64_t ns = (_r.timeStamp * 1e9) / options.cps;
                     if(options.workqueue_last_switch_swo == 0)
@@ -1277,7 +1273,9 @@ static void _feedStream( struct Stream *stream )
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
     auto pattern_stats = find_matching_pattern();
-    offset = std::get<1>(pattern_stats[0]) - std::get<0>(pattern_stats[0]);
+    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[0]), std::get<1>(pattern_stats[0]));
+    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[1]), std::get<1>(pattern_stats[1]));
+    offset = ((int)std::get<1>(pattern_stats[0])) - ((int)std::get<0>(pattern_stats[0]));
     double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
     double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
     drift = nominator /denominator;

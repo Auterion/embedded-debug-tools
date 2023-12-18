@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 define hook-load
-    px4_reset
+    #px4_reset
 end
 define hookpost-load
     px4_reset
