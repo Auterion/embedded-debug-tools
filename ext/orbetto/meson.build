@@ -31,13 +31,3 @@ py.extension_module('orbethon',
     dependencies : [dependency('protobuf', 'python3')] + orbuculum.get_variable('dependencies'),
     link_with: [liborb, perfbuf_lib],
 )
-
-
-# Compile and link everything together
-executable('orbetto',
-    sources: ['orbetto.cpp', git_version_info_h],
-    include_directories: ['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external'] + perfbuf_lib.private_dir_include(),
-    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
-    link_with: [liborb, perfbuf_lib],
-    install: true,
-)

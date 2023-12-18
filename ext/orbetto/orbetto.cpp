@@ -927,7 +927,7 @@ static void _spi_decoded()
                 auto *event = ftrace->add_event();
                 event->set_timestamp(_apply_offset_and_drift(timestamp_end));
                 event->set_pid(PID_SPI + 1);
-                auto *print = event->mutable_print(););
+                auto *print = event->mutable_print();
                 print->set_buf("E|0");
             }
         }
