@@ -18,6 +18,8 @@ jobs:
       - run: python3 setup.py install # Install Ripyl
         working-directory: ext/orbetto/ripyl # in the source directory
       - run: sudo pip3 install pandas # Python dependency for fast data analysis
+      - run: sudo pip3 install pyelftools # Python dependency for elf file analysis
+      - run: sudo pip3 install cxxfilt # Python dependency for c++ function name demangling
       - run: meson setup ./build
         working-directory: ext/orbetto
       - run: ninja -C ./build
