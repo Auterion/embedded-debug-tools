@@ -6,8 +6,11 @@ jobs:
   osx:
     runs-on: macos-12
     steps:
-      - run: brew install zmq sdl2 libelf protobuf meson ninja
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - uses: actions/checkout@v3
+      - run: brew install zmq sdl2 libelf protobuf meson ninja
       - run: git clone https://github.com/pybind/pybind11.git
         working-directory: ext/orbetto
       - run: git clone https://github.com/puddly/ripyl.git # Ripyl is a Protocol Decoder Python Library
