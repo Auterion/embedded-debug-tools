@@ -131,6 +131,28 @@ You will now have a `trace.swo` file in your directory that should be several
 MBs large.
 
 
+### Debug SPI Traces
+
+To include a SPI protocol in perfetto visualization, it needs to be synchronized with the SWO pin for
+correct display. To do that, the Logic Analyzer needs to record all four SPI Channels (MISO,MOSI,CLK,CS)
+and an additional fifth synchronization GPIO, which can be configured by a patch on to the default PX4 software.
+The analog spi traces must be imported in the tool as a `.csv` file with column names (MISO, MOSI, CLK, CS, SYNC)
+as an argument.
+The tracing process in GDB and in the Logic Analyzer should be started at the same time to ensure a functioning
+sync.
+To generate the protobuf file run the following python script in embedded-debug-tools/ext/orbetto:
+
+```sh
+python3 orbethon.py -f path/to/trace.swo -e path/to/fmu.elf --enable_spi_debug -sa path/to/spi/analog/data.csv
+```
+> **Note**  
+> As the SPI analog signal is decoded in python (ripyl library) the computation can take quite some time 
+> (2-3 time longer than realtime for 5MHz sampling).
+
+> **Note**  
+> Use the argument --dynamic_decode if the same spi trace is used multiple times to reduce runtime.
+
+
 ## Visualization
 
 To convert the `trace.swo` binary file to the Perfetto format, call the
@@ -139,9 +161,9 @@ To convert the `trace.swo` binary file to the Perfetto format, call the
 ```sh
 # cd embedded-debug-tools/ext/orbetto
 # FMUv5x runs at 216MHz
-build/orbetto -T s -C 216000 -E -f path/to/trace.swo -e path/to/fmu.elf
+python3 orbethon.py -T s -C 216000 -E -f path/to/trace.swo -e path/to/fmu.elf
 # FMUv6x runs at 480MHz
-build/orbetto -T s -C 480000 -E -f path/to/trace.swo -e path/to/fmu.elf
+python3 orbethon.py -T s -C 480000 -E -f path/to/trace.swo -e path/to/fmu.elf
 ```
 
 You should now have a `orbetto.perf` file that you can drag into

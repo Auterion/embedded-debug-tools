@@ -93,6 +93,7 @@ struct
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
 
     /* SPI Debug */
+    bool spi_debug;
     std::vector<std::tuple<uint64_t,uint32_t>> mosi_digital;
     std::vector<std::tuple<uint64_t,uint32_t>> miso_digital;
     std::vector<std::tuple<uint64_t,uint32_t>> clk_digital;
@@ -124,6 +125,7 @@ struct PyOptions
     std::vector<uint8_t> elf_file;
     bool outputDebugFile;
     std::vector<std::tuple<int32_t,std::string>> functions; /* Parsed function tuple from elf file (shape: #func * [addr,func_name])*/
+    bool spi_debug;
     std::vector<std::tuple<uint64_t,uint32_t>> mosi_digital;
     std::vector<std::tuple<uint64_t,uint32_t>> miso_digital;
     std::vector<std::tuple<uint64_t,uint32_t>> clk_digital;
@@ -1170,7 +1172,7 @@ static void _spi_decoded()
     }
 }
 
-static std::vector<std::tuple<uint64_t,uint64_t>> find_matching_pattern(){
+static std::vector<std::tuple<uint64_t,uint64_t>> _find_matching_pattern(){
     printf("Synchronise SWO and SPI ...\n");
     std::vector<std::tuple<uint64_t,uint64_t>> pattern_stats;
     // loop over each pattern
@@ -1220,6 +1222,34 @@ static std::vector<std::tuple<uint64_t,uint64_t>> find_matching_pattern(){
         pattern_stats.push_back(std::make_tuple(swo_start, spi_start));
     }
     return pattern_stats;
+}
+
+static void _parse_SPI(){
+    auto pattern_stats = _find_matching_pattern();
+    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[0]), std::get<1>(pattern_stats[0]));
+    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[1]), std::get<1>(pattern_stats[1]));
+    offset = ((int)std::get<1>(pattern_stats[0])) - ((int)std::get<0>(pattern_stats[0]));
+    double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
+    double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
+    drift = nominator /denominator;
+    printf("SPI and SWO Clock have %f %% drift.\n", drift*100);
+    sync_point = std::get<1>(pattern_stats[0]);
+    if(offset > 0)
+    {
+        printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
+        _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
+        offset=0;
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+    }else
+    {
+        printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
+        offset=-offset;
+        _sync_digital_prints();
+        _spi_digital_prints();
+        _spi_decoded();
+    }
 }
 
 // ====================================================================================================
@@ -1272,34 +1302,11 @@ static void _feedStream( struct Stream *stream )
 
     // reset timestamp for second swo parsing
     _r.timeStamp = 0;
-    auto pattern_stats = find_matching_pattern();
-    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[0]), std::get<1>(pattern_stats[0]));
-    printf("Pattern Stats: %llu, %llu\n", std::get<0>(pattern_stats[1]), std::get<1>(pattern_stats[1]));
-    offset = ((int)std::get<1>(pattern_stats[0])) - ((int)std::get<0>(pattern_stats[0]));
-    double nominator = ((double)(std::get<1>(pattern_stats[1])-(std::get<0>(pattern_stats[1])+offset)));
-    double denominator = ((double)(std::get<0>(pattern_stats[1])-std::get<0>(pattern_stats[0])));
-    drift = nominator /denominator;
-    printf("SPI and SWO Clock have %f %% drift.\n", drift*100);
-    sync_point = std::get<1>(pattern_stats[0]);
-    if(offset > 0)
+    if (options.spi_debug)
     {
-        printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
-        _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
-        offset=0;
-        //_spi_digital();
-        _sync_digital_prints();
-        _spi_digital_prints();
-        _spi_decoded();
-        //_sync_digital();
-    }else
-    {
-        printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
-        offset=-offset;
-        //_spi_digital();
-        _sync_digital_prints();
-        _spi_digital_prints();
-        _spi_decoded();
-        //_sync_digital();
+        _parse_SPI();
+    }else{
+        printf("SPI Debugging is Disabled\n");
     }
 
     while ( true )
@@ -1453,8 +1460,9 @@ static void _feedStream( struct Stream *stream )
                 thread->set_tgid(PID_PC+PID_STOP);
             }
         }
-        // Init SPI Protocol Process with Channels as Threads
-        {
+        if(options.spi_debug){
+            // Init SPI Protocol Process with Channels as Threads
+            {
             auto *process = process_tree->add_processes();
             process->set_pid(PID_SPI);
             process->add_cmdline("SPI");
@@ -1486,6 +1494,7 @@ static void _feedStream( struct Stream *stream )
                         break;
                 }
                 thread->set_name(buffer);
+            }
             }
         }
     }
@@ -1577,6 +1586,7 @@ void main_pywrapper(PyOptions py_op, std::unordered_map<int32_t, const char*>* i
     options.elf_file = &py_op.elf_file;
     options.outputDebugFile = py_op.outputDebugFile;
     options.functions = py_op.functions;
+    options.spi_debug = py_op.spi_debug;
     options.mosi_digital = py_op.mosi_digital;
     options.miso_digital = py_op.miso_digital;
     options.clk_digital = py_op.clk_digital;

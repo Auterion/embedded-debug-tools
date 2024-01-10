@@ -30,6 +30,7 @@ PYBIND11_MODULE(orbethon,handle){
         .def_readwrite("elf_file",&PyOptions::elf_file)
         .def_readwrite("outputDebugFile",&PyOptions::outputDebugFile)
         .def_readwrite("functions",&PyOptions::functions)
+        .def_readwrite("spi_debug",&PyOptions::spi_debug)
         .def_readwrite("miso_digital",&PyOptions::miso_digital)
         .def_readwrite("mosi_digital",&PyOptions::mosi_digital)
         .def_readwrite("clk_digital",&PyOptions::clk_digital)

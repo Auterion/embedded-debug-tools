@@ -35,6 +35,8 @@ def processOptions(args, options):
     options.endTerminate = args.eof
     # enable debug
     options.outputDebugFile = args.debug
+    # enable spi debug
+    options.spi_debug = args.enable_spi_debug
 
 
 def init_argparse(options):
@@ -80,6 +82,10 @@ def init_argparse(options):
                         type=str,
                         choices=['stm32h753', 'stm32f765'],
                         default='stm32f765')
+    parser.add_argument('--enable_spi_debug',
+                        help="enable spi debug output",
+                        action='store_true',
+                        default=False)
     parser.add_argument('-sa', '--spi_analog',
                         help="select spi analog csv file to decode",
                         type=str,
@@ -141,14 +147,17 @@ def main():
     options = Options_Struct()
     # get arguments and write them to options struct
     args = init_argparse(options)
-    # check if dynamic decoding is disabled to delete buffer folder which then will be created again with new data
-    if not args.dynamic_decoding:
-        # check if buffer dir exists if yes delete it
-        if os.path.exists("buffer"):
-            os.system('rm -rf buffer')
+    if args.enable_spi_debug:
+        # check if dynamic decoding is disabled to delete buffer folder which then will be created again with new data
+        if not args.dynamic_decoding:
+            # check if buffer dir exists if yes delete it
+            if os.path.exists("buffer"):
+                os.system('rm -rf buffer')
 
-    # ---------- Decode SPI and ELF ----------#
-    decode_analog_protocols(args, options)
+        # ---------- Decode SPI ----------#
+        decode_analog_protocols(args, options)
+
+    # ---------- Decode ELF ----------#
     read_elf_file(args, options)
 
     # ---------- Run Orbetto Tool ----------#
