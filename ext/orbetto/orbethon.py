@@ -1,6 +1,7 @@
 import time
 import pandas as pd
 import os
+from pathlib import Path
 
 from build.orbethon import *
 import argparse
@@ -98,6 +99,10 @@ def init_argparse(options):
                         help="enable debug output",
                         action='store_true',
                         default=False)
+    parser.add_argument('-b', '--buffer-dir',
+                        help="data buffer directory",
+                        type=Path,
+                        default="buffer")
     # get arguments
     args = parser.parse_args()
     # add arguments that are directly handed to orbetto to options struct
@@ -113,12 +118,19 @@ def decode_analog_protocols(args, options):
         - options : options struct
     """
     # read csv file that stores analog spi and sync data with pandas
-    df = pd.read_csv(args.spi_analog)
+    if args.dynamic_decoding:
+        # init empty df with column names
+        df = pd.DataFrame(columns=['Time [s]', 'MOSI', 'MISO', 'CLK', 'CS', 'SYNC'])
+        # insert two 0 rows for consistency
+        df.loc[0] = [0, 0, 0, 0, 0, 0]
+        df.loc[1] = [0, 0, 0, 0, 0, 0]
+    else:
+        df = pd.read_csv(args.spi_analog)
     # perform edge detection on analog sync signal and extract work queue pattern
     options.workqueue_intervals_spi, options.sync_digital = getWorkQueuePattern(
-        df)
+        df, args.buffer_dir)
     # perform edge detection on analog spi signals
-    signal = edge_detection_on_spi(df)
+    signal = edge_detection_on_spi(df, args.buffer_dir)
     # save decoded spi signals to options struct
     options.mosi_digital = signal[1]
     options.miso_digital = signal[0]
@@ -151,7 +163,7 @@ def main():
         # check if dynamic decoding is disabled to delete buffer folder which then will be created again with new data
         if not args.dynamic_decoding:
             # check if buffer dir exists if yes delete it
-            if os.path.exists("buffer"):
+            if args.buffer_dir.exists():
                 os.system('rm -rf buffer')
 
         # ---------- Decode SPI ----------#

@@ -15,3 +15,5 @@ dist/
 /ext/orbetto/pybind11/
 /ext/orbetto/ripyl/
 /ext/orbetto/buffer/
+*.zip
+*.csv

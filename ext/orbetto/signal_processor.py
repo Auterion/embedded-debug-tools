@@ -3,7 +3,7 @@ import pandas as pd
 import os
 
 
-def find_edges_dynamic(data, name, logic_levels, hysteresis):
+def find_edges_dynamic(data, path, logic_levels, hysteresis):
     """
     Find edges in a list of samples
     Inputs:
@@ -15,20 +15,22 @@ def find_edges_dynamic(data, name, logic_levels, hysteresis):
     """
     edges = []
     # check if buffer folder exits in current directory
-    if not os.path.exists("buffer"):
+    if not path.parent.exists():
         os.makedirs("buffer")
     # check if csv file with data already exists
-    if os.path.exists("buffer/"+name+".csv"):
+    if path.exists():
+        print(f"    Read {path.name}.csv file from buffer ...")
         # read csv file with pandas
-        df = pd.read_csv("buffer/"+name+".csv")
+        df = pd.read_csv(path)
         # check if csv file contains data
         if len(df.index) > 0:
             # convert df to list of tuples
             edges = list(df.itertuples(index=False, name=None))
     else:
+        print(f"    Parse {path.name} data ...")
         # compute edges
         edges = list(find_edges(data, logic_levels, hysteresis=hysteresis))
         # save as csv file in buffer folder
         df = pd.DataFrame(edges, columns=['Time [s]', 'Value'])
-        df.to_csv("buffer/"+name+".csv", index=False)
+        df.to_csv(path, index=False)
     return edges

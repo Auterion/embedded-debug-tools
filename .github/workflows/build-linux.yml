@@ -37,5 +37,19 @@ jobs:
           name: orbetto-linux
           path: ext/orbetto/build/install/**/*
           if-no-files-found: error
+      - run: mkdir buffer
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/mosi.csv.zip | funzip > buffer/mosi.csv
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/miso.csv.zip | funzip > buffer/miso.csv
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/cs.csv.zip | funzip > buffer/cs.csv
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/clk.csv.zip | funzip > buffer/clk.csv
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/sync.csv.zip | funzip > buffer/sync.csv
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/trace.swo.zip | funzip > trace.swo
+      - run: curl -L https://github.com/niklaut/orbetto-support-files/raw/main/px4_fmu-v5x_default.elf.zip | funzip > px4_fmu-v5x_default.elf
+      - run: python3 ext/orbetto/orbethon.py -f trace.swo -e px4_fmu-v5x_default.elf --enable_spi_debug -dd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test_output
+          path: orbetto.perf
+          if-no-files-found: error
 
 

@@ -24,16 +24,17 @@ def _get_protocol_information_only(df_input):
     df['Time [s]'] = df['Time [s]'] * 1e9
     # convert every type to int
     df['Time [s]'] = df['Time [s]'].astype(int)
-    # if cs is bigger than 3V, set every other signal to 0
-    df.loc[df['CS'] > 3, ['MOSI', 'MISO', 'CLK']] = 0
-    # get index of first CS rising edge
-    start = df[df['CS'] > 3].index[0]
-    # set every sample before the first CS rising edge to 0
-    df.loc[0:start-1, ['MOSI', 'MISO', 'CLK']] = 0
+    if (df['CS'] > 3).any():
+        # if cs is bigger than 3V, set every other signal to 0
+        df.loc[df['CS'] > 3, ['MOSI', 'MISO', 'CLK']] = 0
+        # get index of first CS rising edge
+        start = df[df['CS'] > 3].index[0]
+        # set every sample before the first CS rising edge to 0
+        df.loc[0:start-1, ['MOSI', 'MISO', 'CLK']] = 0
     return df
 
 
-def edge_detection_on_spi(df_input):
+def edge_detection_on_spi(df_input, buffer_dir):
     """
     Perform edge detection on analog SPI CSV.
     Inputs:
@@ -53,10 +54,10 @@ def edge_detection_on_spi(df_input):
     clk_sc = [SampleChunk(df["CLK"].tolist(), df["Time [s]"][0], period)]
     cs_sc = [SampleChunk(df["CS"].tolist(), df["Time [s]"][0], period)]
     # Perform edge detection
-    miso_edges = find_edges_dynamic(miso_sc, "miso", (0, 5), hysteresis=0.4)
-    mosi_edges = find_edges_dynamic(mosi_sc, "mosi", (0, 3.3), hysteresis=0.4)
-    clk_edges = find_edges_dynamic(clk_sc, "clk", (0, 3.3), hysteresis=0.4)
-    cs_edges = find_edges_dynamic(cs_sc, "cs", (0, 3.3), hysteresis=0.4)
+    miso_edges = find_edges_dynamic(miso_sc, buffer_dir / "miso.csv", (0, 5), hysteresis=0.4)
+    mosi_edges = find_edges_dynamic(mosi_sc, buffer_dir / "mosi.csv", (0, 3.3), hysteresis=0.4)
+    clk_edges = find_edges_dynamic(clk_sc, buffer_dir / "clk.csv", (0, 3.3), hysteresis=0.4)
+    cs_edges = find_edges_dynamic(cs_sc, buffer_dir / "cs.csv", (0, 3.3), hysteresis=0.4)
     return miso_edges, mosi_edges, clk_edges, cs_edges
 
 def _decode_SPI_Frame(word_size, value):
