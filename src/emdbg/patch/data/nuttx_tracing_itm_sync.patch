@@ -1,0 +1,33 @@
+diff --git a/platforms/common/px4_work_queue/WorkQueue.cpp b/platforms/common/px4_work_queue/WorkQueue.cpp
+index a463bf9..ff6c457 100644
+--- a/platforms/common/px4_work_queue/WorkQueue.cpp
++++ b/platforms/common/px4_work_queue/WorkQueue.cpp
+@@ -41,6 +41,10 @@
+ #include <px4_platform_common/time.h>
+ #include <drivers/drv_hrt.h>
+ #include <nuttx/itm/itm.h>
++#include "stm32_gpio.h"
++#ifndef PROBE_SYNC
++#define PROBE_SYNC (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_2MHz|GPIO_PORTE|GPIO_PIN14) // AUX1
++#endif
+ 
+ namespace px4
+ {
+@@ -64,6 +68,7 @@ WorkQueue::WorkQueue(const wq_config_t &config) :
+ 
+ 	px4_sem_init(&_exit_lock, 0, 1);
+ 	px4_sem_setprotocol(&_exit_lock, SEM_PRIO_NONE);
++	stm32_configgpio(PROBE_SYNC);
+ }
+ 
+ WorkQueue::~WorkQueue()
+@@ -186,6 +191,9 @@ void WorkQueue::Run()
+ 
+ 			work_unlock(); // unlock work queue to run (item may requeue itself)
+                        EMDBG_LOG_WORKQUEUE_START(work);
++		       static bool marking_state = false;
++                       stm32_gpiowrite(PROBE_SYNC, marking_state);
++                       marking_state = !marking_state;
+ 			work->RunPreamble();
+ 			work->Run();
+                        EMDBG_LOG_WORKQUEUE_STOP(work);

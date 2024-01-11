@@ -192,10 +192,10 @@ class PatchManager:
         :raises `OperationError`: if any of the operations failed.
         """
         LOGGER.info(f"Restoring '{self.name}'")
-        for op in self._ops:
+        for op in reversed(self._ops):
             if not op.test_undo():
                 raise OperationError(f"Reverting failed: {op}")
-        for op in self._ops:
+        for op in reversed(self._ops):
             if not op.undo():
                 raise OperationError(f"Reverting failed: {op}")
 
