@@ -42,7 +42,7 @@ index 017ee5b55b..bcd193ecc0 100644
            else
              {
 diff --git a/platforms/nuttx/src/px4/common/cpuload.cpp b/platforms/nuttx/src/px4/common/cpuload.cpp
-index 62c5c6205d..2c22732b32 100644
+index 38f7899788..c75d97f0ec 100644
 --- a/platforms/nuttx/src/px4/common/cpuload.cpp
 +++ b/platforms/nuttx/src/px4/common/cpuload.cpp
 @@ -48,6 +48,7 @@
@@ -53,64 +53,84 @@ index 62c5c6205d..2c22732b32 100644
  
  __EXPORT struct system_load_s system_load;
  
-@@ -110,6 +111,7 @@ void cpuload_initialize_once()
+@@ -117,6 +118,7 @@ void cpuload_initialize_once()
  
  void sched_note_start(FAR struct tcb_s *tcb)
  {
-+  EMDBG_LOG_TASK_START(tcb);
-   // find first free slot
-   if (system_load.initialized) {
-      for (auto &task : system_load.tasks) {
-@@ -128,6 +130,7 @@ void sched_note_start(FAR struct tcb_s *tcb)
++	EMDBG_LOG_TASK_START(tcb);
+ 	// find first free slot
+ 	if (system_load.initialized) {
+ 		for (auto &task : system_load.tasks) {
+@@ -139,6 +141,7 @@ void sched_note_start(FAR struct tcb_s *tcb)
  
  void sched_note_stop(FAR struct tcb_s *tcb)
  {
-+  EMDBG_LOG_TASK_STOP(tcb);
-   if (system_load.initialized) {
-      for (auto &task : system_load.tasks) {
-         if (task.tcb && task.tcb->pid == tcb->pid) {
-@@ -143,8 +146,10 @@ void sched_note_stop(FAR struct tcb_s *tcb)
-   }
++	EMDBG_LOG_TASK_STOP(tcb);
+ 	if (system_load.initialized) {
+ 		for (auto &task : system_load.tasks) {
+ 			if (task.tcb && task.tcb->pid == tcb->pid) {
+@@ -158,8 +161,10 @@ void sched_note_stop(FAR struct tcb_s *tcb)
+ #endif
  }
  
 +static uint8_t emdbg_prev_state = 0;
  void sched_note_suspend(FAR struct tcb_s *tcb)
  {
-+  emdbg_prev_state = tcb->task_state;
-   if (system_load.initialized) {
-      if (tcb->pid == 0) {
-         system_load.tasks[0].total_runtime += hrt_elapsed_time(&system_load.tasks[0].curr_start_time);
-@@ -170,6 +175,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
++	emdbg_prev_state = tcb->task_state;
+ 	if (system_load.initialized) {
+ 		if (tcb->pid == 0) {
+ 			system_load.tasks[0].total_runtime += hrt_elapsed_time(&system_load.tasks[0].curr_start_time);
+@@ -189,6 +194,7 @@ void sched_note_suspend(FAR struct tcb_s *tcb)
  
  void sched_note_resume(FAR struct tcb_s *tcb)
  {
-+  EMDBG_LOG_TASK_RESUME(tcb, emdbg_prev_state);
-   if (system_load.initialized) {
-      if (tcb->pid == 0) {
-         hrt_store_absolute_time(&system_load.tasks[0].curr_start_time);
++	EMDBG_LOG_TASK_RESUME(tcb, emdbg_prev_state);
+ 	if (system_load.initialized) {
+ 		if (tcb->pid == 0) {
+ 			hrt_store_absolute_time(&system_load.tasks[0].curr_start_time);
+
 diff --git a/platforms/common/px4_work_queue/WorkQueue.cpp b/platforms/common/px4_work_queue/WorkQueue.cpp
-index fa32017912..1b2aa522b1 100644
+index c8aa15995b..898803d3e5 100644
 --- a/platforms/common/px4_work_queue/WorkQueue.cpp
 +++ b/platforms/common/px4_work_queue/WorkQueue.cpp
-@@ -39,6 +39,7 @@
+@@ -40,6 +40,11 @@
  #include <px4_platform_common/tasks.h>
  #include <px4_platform_common/time.h>
  #include <drivers/drv_hrt.h>
 +#include <nuttx/itm/itm.h>
-
++//#define EMDBG_PROBE_SYNC (GPIO_OUTPUT|GPIO_PUSHPULL|GPIO_SPEED_100MHz|GPIO_PORTE|GPIO_PIN14) // AUX1
++#ifdef EMDBG_PROBE_SYNC
++#include "stm32_gpio.h"
++#endif
+ 
  namespace px4
  {
-@@ -183,8 +184,10 @@ void WorkQueue::Run()
-                        WorkItem *work = _q.pop();
-
-                        work_unlock(); // unlock work queue to run (item may requeue itself)
-+                       EMDBG_LOG_WORKQUEUE_START(work);
-                        work->RunPreamble();
-                        work->Run();
-+                       EMDBG_LOG_WORKQUEUE_STOP(work);
-                        // Note: after Run() we cannot access work anymore, as it might have been deleted
-                        work_lock(); // re-lock
-                }
+@@ -63,6 +68,9 @@ WorkQueue::WorkQueue(const wq_config_t &config) :
+ 
+ 	px4_sem_init(&_exit_lock, 0, 1);
+ 	px4_sem_setprotocol(&_exit_lock, SEM_PRIO_NONE);
++#ifdef EMDBG_PROBE_SYNC
++	stm32_configgpio(EMDBG_PROBE_SYNC);
++#endif
+ }
+ 
+ WorkQueue::~WorkQueue()
+@@ -184,8 +192,15 @@ void WorkQueue::Run()
+ 			WorkItem *work = _q.pop();
+ 
+ 			work_unlock(); // unlock work queue to run (item may requeue itself)
++			EMDBG_LOG_WORKQUEUE_START(work);
++#ifdef EMDBG_PROBE_SYNC
++			static bool marking_state = false;
++			stm32_gpiowrite(EMDBG_PROBE_SYNC, marking_state);
++			marking_state = !marking_state;
++#endif
+ 			work->RunPreamble();
+ 			work->Run();
++			EMDBG_LOG_WORKQUEUE_STOP(work);
+ 			// Note: after Run() we cannot access work anymore, as it might have been deleted
+ 			work_lock(); // re-lock
+ 		}
 diff --git a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_free.c b/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_free.c
 index 5513ba1772..8cf297e747 100644
 --- a/platforms/nuttx/NuttX/nuttx/mm/mm_heap/mm_free.c

@@ -65,16 +65,6 @@ def nuttx_tracing_itm_v11(px4_root: Path) -> PatchManager:
     ]
     return PatchManager("Add tracing support to NuttX v11 via ITM", operations)
 
-def nuttx_tracing_itm_v11_sync(px4_root: Path) -> PatchManager:
-    """
-    Adds scheduler and heap instrumentation to NuttX v11 via ITM.
-    """
-    operations = _nuttx_tracing_itm(px4_root) + [
-        PatchOperation(px4_root, _data("nuttx_tracing_itm_v11.patch")),
-        PatchOperation(px4_root, _data("nuttx_tracing_itm_sync.patch")),
-    ]
-    return PatchManager("Add ITM<->LA syncing support to NuttX via GPIO", operations)
-
 
 def nuttx_tracing_itm_uart4(px4_root: Path) -> PatchManager:
     """

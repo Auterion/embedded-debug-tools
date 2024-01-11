@@ -166,8 +166,7 @@ class PatchManager:
         :param ops: list of operations.
         """
         self.name = name
-        # make sure that PatchOperations happen first, since they can fail
-        self._ops = sorted(ops, key=lambda o: isinstance(o, CopyOperation))
+        self._ops = ops
 
     def do(self):
         """
