@@ -46,7 +46,7 @@ jobs:
         run: meson install -C ./build --destdir ./install
 
       - name: Upload orbetto tool
-      - uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3
         with:
           name: orbetto-osx
           path: ext/orbetto/build/install/**/*
@@ -69,7 +69,7 @@ jobs:
           python3 ext/orbetto/orbethon.py -f trace.swo -e px4_fmu-v5x_default.elf --enable_spi_debug -dd
 
       - name: Upload generated perfetto trace file
-      - uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: test_output
           path: orbetto.perf
