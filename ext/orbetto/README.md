@@ -136,6 +136,7 @@ MBs large.
 To include a SPI protocol in perfetto visualization, it needs to be synchronized with the SWO pin for
 correct display. To do that, the Logic Analyzer needs to record all four SPI Channels (MISO,MOSI,CLK,CS)
 and an additional fifth synchronization GPIO, which can be configured by a patch on to the default PX4 software.
+Checkout the Readme in "embedded-debug-tools/src/patch" for further information.
 The analog spi traces must be imported in the tool as a `.csv` file with column names (MISO, MOSI, CLK, CS, SYNC)
 as an argument.
 The tracing process in GDB and in the Logic Analyzer should be started at the same time to ensure a functioning
@@ -145,12 +146,20 @@ To generate the protobuf file run the following python script in embedded-debug-
 ```sh
 python3 orbethon.py -f path/to/trace.swo -e path/to/fmu.elf --enable_spi_debug -sa path/to/spi/analog/data.csv
 ```
+
+To set the sync output on GPIO_PIN14 in the PX4-Autopilot the following patch needs to be applied:
+
+```sh
+# cd PX4-Autopilot
+python3 -m emdbg.patch nuttx_tracing_itm_sync --apply -v
+```
+
 > **Note**  
 > As the SPI analog signal is decoded in python (ripyl library) the computation can take quite some time 
 > (2-3 time longer than realtime for 5MHz sampling).
 
 > **Note**  
-> Use the argument --dynamic_decode if the same spi trace is used multiple times to reduce runtime.
+> Use the argument --dynamic_decode if the same spi trace is used multiple times to reduce runtime significantly.
 
 
 ## Visualization
