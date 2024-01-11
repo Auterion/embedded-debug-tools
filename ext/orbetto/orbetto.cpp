@@ -542,6 +542,7 @@ struct dma_config_t
     uint32_t config;
 };
 static std::unordered_map<uint32_t, dma_config_t> dma_channel_config;
+static std::unordered_map<uint32_t, uint64_t> dma_channel_transfer;
 static std::unordered_map<uint32_t, std::string> dma_channel_name;
 static std::unordered_map<uint32_t, bool> dma_channel_state;
 static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
@@ -854,6 +855,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             const uint32_t instance = m->value >> 5;
             const uint32_t channel = m->value & 0x1f;
             const uint32_t did = PID_DMA + instance * 100 + channel;
+            dma_channel_transfer[did] += dma_channel_config[did].size;
             // printf("%llu: DMA%u CH%u Stop\n", ns, instance, channel);
             {
                 auto *event = ftrace->add_event();
@@ -861,6 +863,16 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 event->set_pid(did);
                 auto *print = event->mutable_print();
                 print->set_buf("E|0");
+            }
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(did);
+                auto *print = event->mutable_print();
+                char buffer[200];
+                snprintf(buffer, 100, "C|%u|DMA%u CH%u Transfer|%u", PID_DMA,
+                         instance, channel, dma_channel_transfer[did]);
+                print->set_buf(buffer);
             }
             dma_channel_state[did] = false;
             break;
