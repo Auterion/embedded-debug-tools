@@ -46,7 +46,7 @@ class OpenOcdBackend(ProbeBackend):
 
     def start(self):
         self.process = call(self.commands, self.config, self.search,
-                            blocking=False, silent=True)
+                            blocking=False, log_output=False)
         LOGGER.info(f"Starting {self.process.pid}...")
 
     def stop(self):
@@ -58,8 +58,8 @@ class OpenOcdBackend(ProbeBackend):
 
 
 def call(commands: list[str] = None, config: list[Path] = None,
-         search: list[Path] = None, blocking: bool = True,
-         silent: bool = False)  -> "int | subprocess.Popen":
+         search: list[Path] = None, log_output: Path | bool = None,
+         flags: str = None, blocking: bool = True)  -> "int | subprocess.Popen":
     """
     Starts `openocd` and connects to the microcontroller without resetting the
     device. You can overwrite the default binary by exporting an alternative in
@@ -72,18 +72,20 @@ def call(commands: list[str] = None, config: list[Path] = None,
     :param commands: list of commands to execute on launch.
     :param config: list of configuration files to execute on launch.
     :param search: list of directories to search configuration files in.
+    :param log_output: Redirect OpenOCD stdout output to a file, or disable
+                       entirely via `False`.
+    :param flags: Additional flags
     :param blocking: Run in current process as a blocking call.
                      Set to `False` to run in a new subprocess.
-    :param silent: Disable any reporting from `openocd`.
 
     :return: The process return code if `blocking` or the Popen object.
     """
-    commands = ["init"] + utils.listify(commands)
+    if log_output == False: log_output = "/dev/null"
+    commands = [f"log_output {log_output}"] if log_output is not None else []
+    commands += ["init"] + utils.listify(commands)
     config = utils.listify(config)
     search = utils.listify(search)
-    if silent:
-        null_file = "/dev/null"
-        commands.append("log_output " + null_file)
+
 
     # Provide additional search paths via the OPENOCD_SCRIPTS environment variable
     # See http://openocd.org/doc/html/Running.html
@@ -91,8 +93,8 @@ def call(commands: list[str] = None, config: list[Path] = None,
 
     binary = os.environ.get("PX4_OPENOCD", "openocd")
 
-    command_openocd = "{} {} {} {}".format(
-        binary,
+    command_openocd = "{} {} {} {} {}".format(
+        binary, flags or "",
         " ".join(map('-s "{}"'.format, search)),
         " ".join(map('-f "{}"'.format, config)),
         " ".join(map('-c "{}"'.format, commands))
