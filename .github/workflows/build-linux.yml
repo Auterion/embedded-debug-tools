@@ -19,7 +19,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev ninja-build protobuf-compiler
+          sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev ninja-build protobuf-compiler
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,7 +27,7 @@ jobs:
           python-version: '3.11'
       - name: Install Python dependencies
         run: |
-          pip3 install scipy numpy setuptools==45 pandas pyelftools cxxfilt
+          pip3 install meson==1.2.0 scipy numpy setuptools==45 pandas pyelftools cxxfilt
 
       - name: Manually install Ripyl dependency
         working-directory: ext/orbetto/ripyl
