@@ -11,3 +11,9 @@ dist/
 /ext/orbetto/*.perf
 /ext/orbetto/*.gz
 /ext/orbetto/*.debug
+.vscode/
+/ext/orbetto/pybind11/
+/ext/orbetto/ripyl/
+/ext/orbetto/buffer/
+*.zip
+*.csv

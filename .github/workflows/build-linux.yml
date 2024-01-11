@@ -6,20 +6,75 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt-get update
-      - run: sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev python3-pip ninja-build protobuf-compiler
-      - run: sudo pip3 install meson==1.2.0
-      - uses: actions/checkout@v3
-      - run: meson setup ./build
+      - name: Clone repository
+        uses: actions/checkout@v3
+
+      - name: Clone support repositories
         working-directory: ext/orbetto
-      - run: ninja -C ./build
-        working-directory: ext/orbetto
-      - run: meson install -C ./build --destdir ./install
-        working-directory: ext/orbetto
-      - uses: actions/upload-artifact@v3
+        run: |
+          git clone https://github.com/pybind/pybind11.git &
+          git clone https://github.com/puddly/ripyl.git &
+          wait
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev ninja-build protobuf-compiler
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          name: orbetto-linux
+          python-version: '3.11'
+      - name: Install Python dependencies
+        run: |
+          pip3 install meson==1.2.0 scipy numpy setuptools==45 pandas pyelftools cxxfilt
+
+      - name: Manually install Ripyl dependency
+        working-directory: ext/orbetto/ripyl
+        run: |
+          python3 setup.py install
+
+      - name: Configure orbetto tool
+        run: meson setup ./build
+        working-directory: ext/orbetto
+
+      - name: Build orbetto tool
+        run: ninja -C ./build
+        working-directory: ext/orbetto
+
+      - name: Install orbetto tool
+        working-directory: ext/orbetto
+        run: meson install -C ./build --destdir ./install
+
+      - name: Upload orbetto tool
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: orbetto-osx
           path: ext/orbetto/build/install/**/*
           if-no-files-found: error
 
+      - name: Download support files
+        run: |
+          mkdir buffer
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/mosi.csv.zip | funzip > buffer/mosi.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/miso.csv.zip | funzip > buffer/miso.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/cs.csv.zip | funzip > buffer/cs.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/clk.csv.zip | funzip > buffer/clk.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/sync.csv.zip | funzip > buffer/sync.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/trace.swo.zip | funzip > trace.swo &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/px4_fmu-v5x_default.elf.zip | funzip > px4_fmu-v5x_default.elf &
+          wait
 
+      - name: Test orbetto tool
+        run: |
+          python3 ext/orbetto/orbethon.py -f trace.swo -e px4_fmu-v5x_default.elf --enable_spi_debug -dd
+
+      - name: Upload generated perfetto trace file
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: orbetto_test_trace
+          path: orbetto.perf
+          compression-level: 9
+          if-no-files-found: error
