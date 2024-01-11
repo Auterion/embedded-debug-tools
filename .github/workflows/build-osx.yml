@@ -46,6 +46,7 @@ jobs:
         run: meson install -C ./build --destdir ./install
 
       - name: Upload orbetto tool
+        if: always()
         uses: actions/upload-artifact@v3
         with:
           name: orbetto-osx
@@ -55,13 +56,13 @@ jobs:
       - name: Download support files
         run: |
           mkdir buffer
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/mosi.csv.zip | funzip > buffer/mosi.csv &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/miso.csv.zip | funzip > buffer/miso.csv &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/cs.csv.zip | funzip > buffer/cs.csv &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/clk.csv.zip | funzip > buffer/clk.csv &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/sync.csv.zip | funzip > buffer/sync.csv &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/trace.swo.zip | funzip > trace.swo &
-          curl -L https://github.com/niklaut/orbetto-support-files/raw/main/px4_fmu-v5x_default.elf.zip | funzip > px4_fmu-v5x_default.elf &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/mosi.csv.zip | funzip > buffer/mosi.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/miso.csv.zip | funzip > buffer/miso.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/cs.csv.zip | funzip > buffer/cs.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/clk.csv.zip | funzip > buffer/clk.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/sync.csv.zip | funzip > buffer/sync.csv &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/trace.swo.zip | funzip > trace.swo &
+          curl -L -s https://github.com/niklaut/orbetto-support-files/raw/main/px4_fmu-v5x_default.elf.zip | funzip > px4_fmu-v5x_default.elf &
           wait
 
       - name: Test orbetto tool
@@ -69,12 +70,10 @@ jobs:
           python3 ext/orbetto/orbethon.py -f trace.swo -e px4_fmu-v5x_default.elf --enable_spi_debug -dd
 
       - name: Upload generated perfetto trace file
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test_output
+          name: orbetto_test_trace
           path: orbetto.perf
           compression-level: 9
           if-no-files-found: error
-
-
-
