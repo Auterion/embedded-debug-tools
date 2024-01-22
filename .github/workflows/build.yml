@@ -1,9 +1,10 @@
-name: Build Linux binaries
+name: Build and Test Orbetto
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   linux:
+    name: Build and Test Orbetto on Linux
     runs-on: ubuntu-latest
     steps:
       - run: sudo apt-get update
@@ -19,6 +20,24 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: orbetto-linux
+          path: ext/orbetto/build/install/**/*
+          if-no-files-found: error
+
+  osx:
+    name: Build and Test Orbetto on macOS
+    runs-on: macos-13
+    steps:
+      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils
+      - uses: actions/checkout@v3
+      - run: meson setup ./build
+        working-directory: ext/orbetto
+      - run: ninja -C ./build
+        working-directory: ext/orbetto
+      - run: meson install -C ./build --destdir ./install
+        working-directory: ext/orbetto
+      - uses: actions/upload-artifact@v3
+        with:
+          name: orbetto-osx
           path: ext/orbetto/build/install/**/*
           if-no-files-found: error
 
