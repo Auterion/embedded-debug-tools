@@ -46,7 +46,7 @@ Please install the following dependencies:
 sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev python3-pip ninja-build protobuf-compiler
 sudo pip3 install meson==1.2.0
 # macOS
-brew install zmq sdl2 libelf protobuf meson ninja
+brew install libusb zmq sdl2 libelf dwarfutils protobuf meson ninja capstone
 ```
 
 Then build the `build/orbetto` binary:

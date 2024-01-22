@@ -6,7 +6,7 @@ jobs:
   osx:
     runs-on: macos-12
     steps:
-      - run: brew install zmq sdl2 libelf protobuf meson ninja
+      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils
       - uses: actions/checkout@v3
       - run: meson setup ./build
         working-directory: ext/orbetto

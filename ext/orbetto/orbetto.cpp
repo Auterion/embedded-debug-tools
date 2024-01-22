@@ -1692,8 +1692,8 @@ int main( int argc, char *argv[] )
 
     if ( options.elfFile )
     {
-        /* Only load memory for now */
-        _r.symbols = symbolAcquire(options.elfFile, false, true, false);
+        printf("Loading ELF file %s\n", options.elfFile);
+        _r.symbols = symbolAcquire(options.elfFile, true, true);
         assert( _r.symbols );
         printf("Loaded ELF file %s with %u sections\n", options.elfFile, _r.symbols->nsect_mem);
         for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)

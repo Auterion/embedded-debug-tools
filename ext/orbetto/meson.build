@@ -22,7 +22,7 @@ git_version_info_h = orbuculum.get_variable('git_version_info_h')
 
 # Compile and link everything together
 executable('orbetto',
-    sources: ['orbetto.cpp', 'loadelf.c', git_version_info_h],
+    sources: ['orbetto.cpp', git_version_info_h],
     include_directories: ['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external'] + perfbuf_lib.private_dir_include(),
     dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
     link_with: [liborb, perfbuf_lib],
