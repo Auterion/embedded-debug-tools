@@ -124,7 +124,7 @@ define px4_enable_swo_stm32h7
     _setAddressesSTM32
 
     # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
-    set *0x5C001004 |= 0x00700000
+    set *0x5C001004 = 0x00700007
 
     # Unlock SWTF_LAR
     set *($SWTFBASE+0xFB0) = 0xC5ACCE55
@@ -157,7 +157,7 @@ define px4_enable_trace_stm32h7
     end
 
     # DBGMCU_CR D3DBGCKEN D1DBGCKEN TRACECLKEN
-    set *0x5C001004 |= 0x00700000
+    set *0x5C001004 = 0x00700007
 
     # Unlock CSTF_LAR
     set *($CSTFBASE+0xFB0) = 0xC5ACCE55
@@ -179,4 +179,37 @@ define px4_enable_trace_stm32h7
     set *($TPIUBASE+0x004) = (1 << ($arg0 - 1))
     # Set ENFCONT and TRIGIN in TPIU_FFCR
     set *($TPIUBASE+0x304) = 0x00000102
+end
+
+define px4_trace_tpiu_swo_stm32f7
+    px4_reset
+    tbreak nx_start
+    continue
+
+    enableSTM32TRACE 4 3
+
+    px4_configure_orbuculum
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    shell orbuculum -O "-T4" -t1 &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
+end
+
+
+define px4_trace_tpiu_swo_stm32h7
+    px4_reset
+    tbreak nx_start
+    continue
+
+    px4_enable_trace_stm32h7 4
+
+    px4_configure_orbuculum
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    shell orbuculum -O "-T4" -t1 &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
 end

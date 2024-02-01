@@ -35,35 +35,3 @@ define px4_trace_swo_stm32h7
 
     shell orbuculum -O "-Tu -a 60000000" -o trace.swo &
 end
-
-
-define px4_trace_tpiu_swo_stm32f7
-    px4_reset
-    tbreak nx_start
-    continue
-
-    enableSTM32TRACE 4 3
-
-    px4_configure_orbuculum
-
-    # -o trace.swo dumps the RAW data, not the demuxed data!!!
-    shell orbuculum -O "-T4" -t1 &
-    shell sleep 1
-    shell nc localhost 3443 > trace.swo &
-end
-
-
-define px4_trace_tpiu_swo_stm32h7
-    px4_reset
-    tbreak nx_start
-    continue
-
-    px4_enable_trace_stm32h7 4
-
-    px4_configure_orbuculum
-
-    # -o trace.swo dumps the RAW data, not the demuxed data!!!
-    shell orbuculum -O "-T4" -t1 &
-    shell sleep 1
-    shell nc localhost 3443 > trace.swo &
-end
