@@ -15,26 +15,28 @@ The functionality currently instrumented with cycle accuracy:
 - Heap malloc/free with address and size.
 - DMA transfer start/stop with configuration.
 - Semaphore init/wait/post with count.
+- Program counter sampling with function name lookup.
 
 Perfetto is a FTrace visualizer that works really well for this use case:
 
-![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto2.png)
+![](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto2.png)
 
-![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto3.png)
+![](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto3.png)
 
-![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto4.png)
+![](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto4.png)
 
-![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto5.png)
+![](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto5.png)
 
-![](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto6.png)
+![](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto6.png)
 
-[Here is an example trace of only the scheduler](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perf),
-[here is one with the scheduler and workqueues](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_wq.perf),
-[another one with heap tracking](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_heap.perf),
-[one with DMA transfer profiling](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto.perfetto_trace.gz),
-and [one with semaphore count tracing](https://gist.githubusercontent.com/niklaut/608160cd9917888b22750f5f773c7265/raw/orbetto_semaphores.perfetto_trace.gz), 
-that you can download and drag into the [the Perfetto UI](https://ui.perfetto.dev)
-to test it yourself.
+Example trace files that you can download and drag into the
+[the Perfetto UI](https://ui.perfetto.dev) to test it yourself:
+
+- [Scheduler and Workqueues](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto_wq.perfetto_trace.gz).
+- [Allocations on Heap](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto_heap.perfetto_trace.gz).
+- [DMA transfer profiling](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto_dma.perfetto_trace.gz).
+- [Semaphore count tracing](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto_semaphores.perfetto_trace.gz).
+- [Program counter sampling](https://github.com/niklaut/orbetto-support-files/raw/main/orbetto_pc.perfetto_trace.gz).
 
 
 ## Installation
@@ -139,9 +141,9 @@ To convert the `trace.swo` binary file to the Perfetto format, call the
 ```sh
 # cd embedded-debug-tools/ext/orbetto
 # FMUv5x runs at 216MHz
-build/orbetto -T s -C 216000 -E -f path/to/trace.swo -e path/to/fmu.elf
+build/orbetto -C 216000 -f path/to/trace.swo -e path/to/fmu.elf
 # FMUv6x runs at 480MHz
-build/orbetto -T s -C 480000 -E -f path/to/trace.swo -e path/to/fmu.elf
+build/orbetto -C 480000 -f path/to/trace.swo -e path/to/fmu.elf
 ```
 
 You should now have a `orbetto.perf` file that you can drag into
