@@ -68,10 +68,11 @@ static perfetto::protos::Trace *perfetto_trace;
 static perfetto::protos::FtraceEventBundle *ftrace;
 // ====================================================================================================
 
-static constexpr uint16_t PID_TSK{0};
-static constexpr uint16_t PID_STOP{10000};
-static constexpr uint32_t PID_DMA{100000};
-static constexpr uint32_t PID_UART{200000};
+static constexpr uint32_t PID_TSK{0};
+static constexpr uint32_t PID_STOP{10000};
+static constexpr uint32_t PID_PC{100000};
+static constexpr uint32_t PID_DMA{200000};
+static constexpr uint32_t PID_UART{300000};
 static constexpr uint32_t PID_SEMAPHORE{1000000};
 static uint16_t prev_tid{0};
 static std::set<uint16_t> active_threads;
@@ -679,9 +680,58 @@ static void _handleExc( struct excMsg *m, struct ITMDecoder *i )
 }
 
 // ====================================================================================================
+static bool has_pc_samples{false};
+static std::unordered_map<uint32_t, std::string> function_names;
 static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
 {
-    assert( m->msgtype == MSG_PC_SAMPLE );
+    static uint32_t prev_function_addr{0};
+    static uint16_t prev_prev_tid{0};
+    // check if pc is in idle task, end the previous sample, then skip
+    if(prev_tid == 0)
+    {
+        if(prev_function_addr)
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(_r.ns);
+            event->set_pid(PID_PC + prev_prev_tid);
+            auto *exit = event->mutable_funcgraph_exit();
+            exit->set_depth(0);
+            exit->set_func(prev_function_addr);
+            prev_function_addr = 0;
+        }
+        return;
+    }
+    // Find the function from the PC counter
+    if (const auto *function = symbolFunctionAt(_r.symbols, m->pc); function)
+    {
+        uint32_t function_addr = function->lowaddr;
+        // Keep two samples of the same function in one print
+        if (function_addr == prev_function_addr and prev_tid == prev_prev_tid) return;
+        if (not function_names.contains(function_addr))
+            function_names[function_addr] = function->funcname;
+
+        // end the previous function sample
+        if(prev_function_addr)
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(_r.ns);
+            event->set_pid(PID_PC + prev_prev_tid);
+            auto *exit = event->mutable_funcgraph_exit();
+            exit->set_depth(0);
+            exit->set_func(prev_function_addr);
+        }
+        // start the current function sample
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(_r.ns);
+            event->set_pid(PID_PC + prev_tid);
+            auto *entry = event->mutable_funcgraph_entry();
+            entry->set_depth(0);
+            entry->set_func(function_addr);
+            prev_function_addr = function_addr;
+            prev_prev_tid = prev_tid;
+        }
+    }
 }
 
 // ====================================================================================================
@@ -700,6 +750,10 @@ static void _itmPumpProcessPre( char c )
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
                 }
+            }
+            else if (p.genericMsg.msgtype == MSG_PC_SAMPLE)
+            {
+                has_pc_samples = true;
             }
         }
     }
@@ -998,11 +1052,22 @@ int main(int argc, char *argv[])
 
     {
         auto *interned_data = ftrace_packet->mutable_interned_data();
-        for (auto&& [func, name] : workqueue_names)
+        for (auto&& [addr, name] : workqueue_names)
         {
             auto *interned_string = interned_data->add_kernel_symbols();
-            interned_string->set_iid(func);
+            interned_string->set_iid(addr);
             interned_string->set_str(name.c_str());
+        }
+        if (has_pc_samples)
+        {
+            for (auto&& [addr, name] : function_names)
+            {
+                {
+                    auto *interned_string = interned_data->add_kernel_symbols();
+                    interned_string->set_iid(addr);
+                    interned_string->set_str(name.c_str());
+                }
+            }
         }
     }
 
@@ -1032,6 +1097,34 @@ int main(int argc, char *argv[])
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(PID_STOP + tid);
                 thread->set_tgid(PID_STOP);
+            }
+        }
+        if (has_pc_samples)
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC);
+            process->add_cmdline("PC");
+            for (auto&& tid : active_threads)
+            {
+                if (tid == 0) continue;
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + tid);
+                thread->set_tgid(PID_PC);
+                thread->set_name(thread_names[tid]);
+            }
+        }
+        if (has_pc_samples)
+        {
+            auto *process = process_tree->add_processes();
+            process->set_pid(PID_PC + PID_STOP);
+            process->add_cmdline("PC (stopped)");
+            for (auto&& tid : stopped_threads)
+            {
+                if (tid == 0) continue;
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC + PID_STOP + tid);
+                thread->set_tgid(PID_PC + PID_STOP);
+                thread->set_name(thread_names[tid]);
             }
         }
         {
