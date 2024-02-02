@@ -18,12 +18,13 @@ perfbuf_lib = static_library('perfbuf', sources: perfbuf_sources, dependencies: 
 # Clone the orbuculum git repository
 orbuculum = subproject('orbuculum')
 liborb = orbuculum.get_variable('liborb')
+orbinc = orbuculum.get_variable('incdirs')
 git_version_info_h = orbuculum.get_variable('git_version_info_h')
 
 # Compile and link everything together
 executable('orbetto',
-    sources: ['orbetto.cpp', git_version_info_h],
-    include_directories: ['subprojects/orbuculum/Inc', 'subprojects/orbuculum/Inc/external'] + perfbuf_lib.private_dir_include(),
+    sources: ['src/orbetto.cpp', 'src/device.cpp', git_version_info_h],
+    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc,
     dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
     link_with: [liborb, perfbuf_lib],
     install: true,
