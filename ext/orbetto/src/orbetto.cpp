@@ -16,6 +16,7 @@
 #include <set>
 #include <iostream>
 #include <fstream>
+#include <cxxabi.h>
 
 using namespace std::string_literals;
 
@@ -707,8 +708,16 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
         uint32_t function_addr = function->lowaddr;
         // Keep two samples of the same function in one print
         if (function_addr == prev_function_addr and prev_tid == prev_prev_tid) return;
-        if (not function_names.contains(function_addr))
+        if (not function_names.contains(function_addr)) {
             function_names[function_addr] = function->funcname;
+            if (function->manglename) {
+                if (char *realname = abi::__cxa_demangle(function->manglename, 0, 0, 0); realname) {
+                    // std::cout << realname << std::endl;
+                    function_names[function_addr] = realname;
+                    free(realname);
+                }
+            }
+        }
 
         // end the previous function sample
         if(prev_function_addr)
@@ -1124,7 +1133,7 @@ int main(int argc, char *argv[])
                 auto *thread = process_tree->add_threads();
                 thread->set_tid(PID_PC + PID_STOP + tid);
                 thread->set_tgid(PID_PC + PID_STOP);
-                thread->set_name(thread_names[tid]);
+                thread->set_name(thread_names[PID_STOP + tid]);
             }
         }
         {
