@@ -1,6 +1,13 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+define killme
+    !killall -9 orbuculum
+    !killall -9 orbtrace
+    !killall -9 JLinkGDBServer
+    !killall -9 openocd
+    !killall -9 arm-none-eabi-gdb-py3
+end
 define hook-load
     px4_reset
 end
