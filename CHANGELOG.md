@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.9
+
+- Fix recognition of PX4 hardfault logs as crashdumps.
+
 ## 1.3.8
 
 - Fix NuttX semaphore patch formatting.

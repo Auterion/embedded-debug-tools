@@ -19,7 +19,7 @@ class Fmu:
     """
     def _DBGMCU_CONFIG(target):
         # Vector catch all exceptions, but not reset
-        common = ["set *0xE000EDFC = *0xE000EDFC | 0x07f0"]
+        common = ["set *0xE000EDFC |= 0x07f0"]
         # Halt all timers and peripherals while debugging
         if "fmu-v5x" in target:
             return ["set *0xE0042008 = 0xffffffff",

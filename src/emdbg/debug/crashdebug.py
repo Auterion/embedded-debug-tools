@@ -26,7 +26,7 @@ class CrashProbeBackend(ProbeBackend):
         super().__init__()
         coredump = Path(coredump)
         if (coredump.suffix.lower() == ".log" and
-            "[hardfault_log]" in (contents := coredump.read_text())):
+            "arm_hardfault" in (contents := coredump.read_text())):
             from ..analyze import convert_hardfault
             tmpfile = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
             tmpfile.writelines(convert_hardfault(contents))
