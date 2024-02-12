@@ -16,7 +16,6 @@ import signal
 import tempfile
 import shlex
 import time
-import sysconfig
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -65,14 +64,14 @@ def command_string(backend: ProbeBackend, source: Path = None,
     args = [f"-c {coredump}"] if coredump else []
     args += [f'-ex "{a}"' for a in cmds] + ["-q"]
     args += list(map('-x "{}"'.format, listify(config)))
-    site_packages = sysconfig.get_paths()["purelib"]
 
     gdb = "arm-none-eabi-gdb"
     if with_python or socket:
         gdb += "-py3"
         # Import packages from both the host the from emdbg
-        args += [f'-ex "python import sys; sys.path.append(\'{site_packages}\');"',
-                 f'-ex "python import sys; sys.path.append(\'{debug_dir}\');"']
+        args += [f'-ex "python import sys; sys.path.append(\'{debug_dir}\');"']
+        args += [f'-ex "python import sys; sys.path.append(\'{path}\');"'
+                 for path in sys.path if "-packages" in path]
         # We need to do this terrible hackery since pkg_resources fails on the first import
         args += ['-ex "python exec(\'try: import cmsis_svd;\\\\nexcept: pass\\\\nimport cmsis_svd\')"',
                  '-ex "python exec(\'try: import arm_gdb;\\\\nexcept: pass\\\\nimport arm_gdb\')"']
