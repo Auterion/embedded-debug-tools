@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.8
+
+- Fix NuttX semaphore patch formatting.
+- Allow tracing to be started with a J-Link too.
+- Fix Orbtrace FMU config.
+- Fix site-package paths on Linux.
+- Add `killme` command for ending a misbehaving GDB session by force.
+
 ## 1.3.7
 
 - Add missing NuttX Semaphore tracing patches.
