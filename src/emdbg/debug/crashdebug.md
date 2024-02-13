@@ -88,11 +88,21 @@ passed a NULL pointer from inside `uORB::DeviceNode::write`.
 ## Installation
 
 You need to have the [platform-specific `CrashDebug` binary][binary] available
-in your path:
+in your path.
+
+### Ubuntu
+
+```sh
+sudo curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/lin64/CrashDebug \
+          -o /usr/bin/CrashDebug
+sudo chmod +x /usr/bin/CrashDebug
+```
+
+### macOS
 
 ```sh
 curl -L https://github.com/adamgreen/CrashDebug/raw/master/bins/osx64/CrashDebug \
-        $HOMEBREW_PREFIX/bin/CrashDebug
+     -o $HOMEBREW_PREFIX/bin/CrashDebug
 # Clear the quarantine flag
 sudo xattr -r -d com.apple.quarantine $HOMEBREW_PREFIX/bin/CrashDebug
 ```

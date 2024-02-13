@@ -17,6 +17,8 @@ is the closest we have to an official toolchain.
 We strongly recommend to *only* symlink the `arm-none-eabi-gdb-py3` binary into
 your path, and keep the remaining `arm-none-eabi-gcc` at v9 as done for PX4.
 
+### Ubuntu
+
 ```sh
 sudo install -d -o $USER /opt/xpack
 
@@ -26,6 +28,8 @@ curl -L https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/down
 ln -s /opt/xpack/xpack-arm-none-eabi-gcc-12.2.1-1.2/bin/arm-none-eabi-gdb-py3 \
       /opt/gcc-arm-none-eabi-9-2020-q2-update/bin/arm-none-eabi-gdb-py3
 ```
+
+### macOS
 
 On macOS you additionally need to clear the quarantine flags after expansion:
 

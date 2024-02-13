@@ -33,11 +33,8 @@ export PX4_OPENOCD=/path/to/other/openocd
 
 OpenOCD works with all STLink debug probes.
 
-On macOS you can simply use Homebrew:
 
-```sh
-brew install openocd
-```
+### Ubuntu
 
 Ubuntu 22.04 only ships with OpenOCD v0.11, which is quite old, so you need to
 manually install OpenOCD v0.12:
@@ -68,6 +65,12 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0483", MODE="0666", GROUP="dialout"
 EOF
 sudo udevadm control --reload-rules
 sudo udevadm trigger
+```
+
+### macOS
+
+```sh
+brew install openocd
 ```
 
 [openocd]: https://openocd.org

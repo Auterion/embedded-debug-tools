@@ -44,11 +44,16 @@ python3 -m emdbg.debug.jlink -device STM32F765II itm --channel 1 --baudrate 4000
 
 You need to have the [J-Link drivers][drivers] installed for this module to work:
 
+### Ubuntu
+
 ```sh
-# Ubuntu
 wget --post-data "accept_license_agreement=accepted" https://www.segger.com/downloads/jlink/JLink_Linux_x86_64.deb
 sudo dpkg -i JLink_Linux_x86_64.deb
-# macOS
+```
+
+### macOS
+
+```sh
 brew install segger-jlink
 ```
 
