@@ -25,17 +25,22 @@ class CrashProbeBackend(ProbeBackend):
     def __init__(self, coredump: Path):
         super().__init__()
         coredump = Path(coredump)
-        if (coredump.suffix.lower() == ".log" and
-            "arm_hardfault" in (contents := coredump.read_text())):
-            from ..analyze import convert_hardfault
-            tmpfile = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
-            tmpfile.writelines(convert_hardfault(contents))
-            tmpfile.flush()
-            self.coredump = tmpfile.name
-            self._tmpfile = tmpfile
-        else:
+        if coredump.name.startswith("coredump") and coredump.suffix.lower() == ".txt":
             self.coredump = coredump
             self._tmpfile = None
+        else:
+            contents = coredump.read_text()
+            if "arm_hardfault" in contents:
+                from ..analyze import convert_hardfault
+                tmpfile = tempfile.NamedTemporaryFile(mode="w+t", delete=False)
+                tmpfile.writelines(convert_hardfault(contents))
+                tmpfile.flush()
+                self.coredump = tmpfile.name
+                self._tmpfile = tmpfile
+            else:
+                raise NotImplementedError("Unknown coredump format! "
+                        "Only coredump_{datetime}.txt or hardfault*.log is supported!")
+
         self.binary = "CrashDebug"
         if "Windows" in platform.platform():
             self.binary = "CrashDebug.exe"
