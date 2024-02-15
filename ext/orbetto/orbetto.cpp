@@ -1239,17 +1239,14 @@ static void _parse_SPI(){
         printf("SPI is ahead of SWO by %llu nano seconds.\n", offset);
         _r.timeStamp = (uint64_t)(((double)offset) / 1e9 * options.cps);
         offset=0;
-        _sync_digital_prints();
-        _spi_digital_prints();
-        _spi_decoded();
     }else
     {
         printf("SWO is ahead of SPI by %llu nano seconds.\n", -offset);
         offset=-offset;
-        _sync_digital_prints();
-        _spi_digital_prints();
-        _spi_decoded();
     }
+    _sync_digital_prints();
+    _spi_digital_prints();
+    _spi_decoded();
 }
 
 // ====================================================================================================
