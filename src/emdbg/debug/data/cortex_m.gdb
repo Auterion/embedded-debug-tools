@@ -6,6 +6,7 @@ define killme
     !killall -9 orbtrace
     !killall -9 JLinkGDBServer
     !killall -9 openocd
+    !killall -9 CrashDebug
     !killall -9 arm-none-eabi-gdb-py3
 end
 define hook-load

@@ -2,6 +2,7 @@
 
 ## 1.3.10
 
+- Add CrashDebug to `killme` command.
 - Limit yoctopuce dependency to v1.0.
 
 ## 1.3.9
