@@ -46437,6 +46437,10 @@ xs:noNamespaceSchemaLocation="CMSIS-SVD_Schema_1_1.xsd">
         </register>
       </registers>
     </peripheral>
+    <peripheral derivedFrom="SDMMC1">
+      <name>SDMMC2</name>
+      <baseAddress>0x40011C00</baseAddress>
+    </peripheral>
     <peripheral>
       <name>LPTIM1</name>
       <description>Low power timer</description>
