@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.10
+
+- Limit yoctopuce dependency to v1.0.
+
 ## 1.3.9
 
 - Fix recognition of PX4 hardfault logs as crashdumps.

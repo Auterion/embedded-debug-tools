@@ -33,7 +33,7 @@ dependencies = [
     "cmsis-svd",
     "arm-gdb",
     "pydwf",
-    "yoctopuce",
+    "yoctopuce<2.0",
     "rpyc",
     "rich",
 ]
