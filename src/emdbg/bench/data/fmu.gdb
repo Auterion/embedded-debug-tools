@@ -1,58 +1,6 @@
 # Copyright (c) 2023, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
-define hook-load
-    px4_reset
-end
-define hookpost-load
-    px4_reset
-end
-define hook-quit
-    px4_switch_task -1
-end
-define hook-continue
-    px4_switch_task -1
-end
-define hook-backtrace
-    set disassemble-next-line off
-end
-define hookpost-backtrace
-    set disassemble-next-line on
-end
-define px4_enable_vector_catch
-    set *0xE000EDFC |= 0x07f0
-end
-
-define px4_log_start
-    set pagination off
-    set style enabled off
-    set logging file $arg0
-    set logging overwrite on
-    set logging enabled on
-end
-
-define px4_log_stop
-    set logging enabled off
-    set style enabled on
-end
-
-define px4_fbreak
-    break $arg0
-    commands
-        finish
-        continue
-    end
-end
-
-define px4_btfbreak
-    break $arg0
-    commands
-        px4_backtrace
-        finish
-        continue
-    end
-end
-
 define px4_commands_backtrace
     commands
         printf "%10uus> Task=%.25s\n", (hrt_absolute_time::base_time + *(uint16_t*)0x40010424), ((struct tcb_s *)g_readytorun->head)->name
@@ -75,22 +23,9 @@ define px4_commands_backtrace100
     end
 end
 
-define px4_breaktrace
-    break $arg0
-    px4_commands_backtrace
+define px4_calltrace_spi_exchange
+    px4_breaktrace spi_exchange
 end
-
-define px4_breaktrace10
-    break $arg0
-    px4_commands_backtrace10
-end
-
-define px4_breaktrace100
-    break $arg0
-    px4_commands_backtrace100
-end
-
-
 
 define px4_calltrace_sdmmc
     px4_breaktrace sdmmc_modifyreg32
