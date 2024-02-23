@@ -67,6 +67,17 @@ class PX4_Files(gdb.Command):
         else:
             print("No tasks found!")
 
+class PX4_Dmesg(gdb.Command):
+    """
+    Print the dmesg buffer.
+    """
+    def __init__(self):
+        super().__init__("px4_dmesg", gdb.COMMAND_USER)
+
+    @report_exception
+    def invoke(self, argument, from_tty):
+        gdb.execute("print g_console_buffer")
+
 
 class PX4_Registers(gdb.Command):
     """
@@ -325,6 +336,7 @@ class PX4_Show_Peripheral(gdb.Command):
 PX4_Discover()
 PX4_Tasks()
 PX4_Files()
+PX4_Dmesg()
 PX4_Registers()
 PX4_Interrupts()
 PX4_Gpios()
@@ -398,11 +410,13 @@ class PX4_Reload(gdb.Command):
 PX4_Reload()
 
 # Pretty Printers
-def _px4_print_semaphore(val):
+def _px4_pretty_printer(val):
     stype = str(val.type)
     if stype == "sem_t" or stype == "struct sem_s":
         return px4.Semaphore(gdb, val)
     if stype == "struct uart_buffer_s":
         return px4.UartBuffer(gdb, val)
+    if stype == "ConsoleBuffer" or stype == "class ConsoleBuffer":
+        return px4.ConsoleBuffer(gdb, val)
     return None
-gdb.pretty_printers.append(_px4_print_semaphore)
+gdb.pretty_printers.append(_px4_pretty_printer)

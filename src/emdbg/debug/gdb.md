@@ -229,6 +229,36 @@ Pretty prints a table of open files and their private data handle.
 ```
 
 
+### px4_dmesg
+
+```
+px4_dmesg
+```
+
+Prints the dmesg buffer of PX4.
+
+```
+(gdb) px4_dmesg
+$1 = ConsoleBuffer(2394B/4095B: [0 -> 2394]) =
+HW arch: PX4_FMU_V6X
+HW type: V6X010010
+HW version: 0x010
+HW revision: 0x010
+PX4 git-hash: 1cac91d5a9d19dc081bc54d0ea2b7d26ed64c8d8
+PX4 version: 1.14.0 40 (17694784)
+PX4 git-branch: develop
+Vendor version: 3.0.0 64 (50331712)
+OS: NuttX
+OS version: Release 11.0.0 (184549631)
+OS git-hash: b25bc43cd81e257c5e63ac17c7c4331510584af6
+Build datetime: Feb 23 2024 17:18:44
+Build uri: localhost
+Build variant: default
+Toolchain: GNU GCC, 9.3.1 20200408 (release)
+PX4GUID: 000600000000373833333430510d002c0045
+```
+
+
 ### px4_switch_task
 
 ```

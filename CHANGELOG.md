@@ -2,6 +2,7 @@
 
 ## 1.3.10
 
+- Add `px4_dmesg` command and pretty printer to display the dmesg buffer in GDB.
 - Add missing SDMMC2 peripheral to STM32F765 SVD file.
 - Add CrashDebug to `killme` command.
 - Limit yoctopuce dependency to v1.0.
