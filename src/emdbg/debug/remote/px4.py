@@ -67,6 +67,7 @@ class PX4_Files(gdb.Command):
         else:
             print("No tasks found!")
 
+
 class PX4_Dmesg(gdb.Command):
     """
     Print the dmesg buffer.
@@ -77,6 +78,40 @@ class PX4_Dmesg(gdb.Command):
     @report_exception
     def invoke(self, argument, from_tty):
         gdb.execute("print g_console_buffer")
+
+
+class PX4_Perf(gdb.Command):
+    """
+    Print the perf counters.
+    """
+    def __init__(self):
+        super().__init__("px4_perf", gdb.COMMAND_USER)
+        self.header = ["pointer", "name", "events", "elapsed", "average", "least", "most", "rms", "interval", "first", "last"]
+        self.parser = argparse.ArgumentParser(self.__doc__)
+        self.parser.add_argument("name", help="Regex filter for perf counter names.", nargs='?')
+        self.parser.add_argument("-s", "--sort", help="Column name to sort the table by.",
+                                 choices=self.header)
+
+    @report_exception
+    def invoke(self, argument, from_tty):
+        args = self.parser.parse_args(shlex.split(argument))
+        def _perf_filter(pc):
+            if args.name is not None and not re.search(args.name, pc.name):
+                return False
+            return True
+        attr = args.sort
+        def _sort_key(pc):
+            if attr == "pointer": value = int(pc._perf)
+            else: value = getattr(pc, attr)
+            return (-1 if value is None else value, pc.name)
+
+        table = px4.all_perf_counters_as_table(gdb, _perf_filter,
+                        None if args.sort is None else _sort_key)
+
+        if table is not None:
+            _CONSOLE.print(table)
+        else:
+            print("No perf counters found!")
 
 
 class PX4_Registers(gdb.Command):
@@ -337,6 +372,7 @@ PX4_Discover()
 PX4_Tasks()
 PX4_Files()
 PX4_Dmesg()
+PX4_Perf()
 PX4_Registers()
 PX4_Interrupts()
 PX4_Gpios()
@@ -400,6 +436,7 @@ class PX4_Reload(gdb.Command):
         importlib.reload(px4.data)
         importlib.reload(px4.semaphore)
         importlib.reload(px4.buffer)
+        importlib.reload(px4.perf)
         importlib.reload(px4.svd)
         importlib.reload(px4.system_load)
         importlib.reload(px4.task)

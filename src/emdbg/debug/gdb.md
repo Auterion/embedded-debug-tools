@@ -259,6 +259,39 @@ PX4GUID: 000600000000373833333430510d002c0045
 ```
 
 
+### px4_perf
+
+```
+px4_perf [NAME] [-s {pointer,name,events,elapsed,average,least,most,rms,interval,first,last}]
+
+options:
+  NAME                  Regex filter for perf counter names.
+  -s, --sort {pointer,name,events,elapsed,average,least,most,rms,interval,first,last},
+                        Column name to sort the table by.
+```
+
+Pretty prints a table of all performance counters and their values.
+You can regex filter for the names of counters and sort the table by column.
+
+```
+(gdb) px4_perf -s events
+                  ╷                                                  ╷        ╷         ╷         ╷         ╷         ╷           ╷          ╷         ╷
+  perf_ctr_count* │ Name                                             │ Events │ Elapsed │ Average │   Least │    Most │       RMS │ Interval │   First │  Last
+ ═════════════════╪══════════════════════════════════════════════════╪════════╪═════════╪═════════╪═════════╪═════════╪═══════════╪══════════╪═════════╪═══════
+       0x30013e60 │ mission_dm_cache_miss                            │      0 │         │         │         │         │           │          │         │
+       0x3800af50 │ rc_update: cycle                                 │      0 │       - │       - │       - │       - │         - │          │         │
+       0x3800af90 │ rc_update: cycle interval                        │      0 │         │       - │       - │       - │         - │        - │       - │     -
+       0x3800c610 │ icm42688p: FIFO reset                            │      4 │         │         │         │         │           │          │         │
+       0x38004600 │ param: get                                       │  20689 │         │         │         │         │           │          │         │
+       0x24018870 │ param: find                                      │  27540 │         │         │         │         │           │          │         │
+       0x3000de70 │ mavlink: tx run elapsed                          │  29431 │   2.9 s │  99.9µs │  54  µs │   2.7ms │  84.289µs │          │         │
+       0x30002c90 │ mavlink: tx run elapsed                          │  29453 │   3.5 s │ 118.4µs │  64  µs │   1.6ms │  90.483µs │          │         │
+       0x30014410 │ uavcan: cycle interval                           │  29462 │         │   3  ms │ 194  µs │  65.8ms │ 513.188µs │    1.5 m │   1.2 s │ 1.5 m
+       0x38008910 │ board_adc: sample                                │  70952 │ 192.9ms │   2.7µs │   2  µs │ 850  µs │  13.039µs │          │         │
+                  ╵                                                  ╵        ╵         ╵         ╵         ╵         ╵           ╵          ╵         ╵
+```
+
+
 ### px4_switch_task
 
 ```

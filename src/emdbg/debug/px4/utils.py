@@ -202,6 +202,70 @@ def add_datetime(filename: str|Path):
     return filename.with_stem(f"{filename.stem}_{datetime.now().strftime('%Y_%m_%d_%H_%M_%S')}")
 
 
+def format_units(value: int | float | None, prefixes: dict[str, int] | str,
+                 unit: str = None, fmt: str = None, if_zero: str = None) -> str:
+    """
+    Format a value with the largest prefix.
+
+    The value is divided by the list of prefixes until it is smaller than the
+    next largest prefix. Trailing zeros are replaced by spaces and padding is
+    applied to align the prefixes and units. If the value is zero, the
+    `if_zero` string is returned if defined.
+
+    Predefined prefixes can be passed as a `group:input-prefix`:
+    - `t`: time prefixes from nanoseconds to days.
+    - `si`: SI prefixes from nano to Tera.
+
+    .. note:: The micro prefix is µ, not u.
+
+    Example:
+
+    ```py
+    format_units(123456, "t:µs", fmt=".1f")    # "123.5ms"
+    format_units(0, "t:s", if_zero="-")        # "-"
+    format_units(1234, "si:", "Hz", fmt=".2f") # "1.23kHz"
+    format_units(1001, "si:", "Hz", fmt=".2f") # "1   kHz"
+    format_units(2345, {"k": 1e3, "M": 1e3}, "Si", fmt=".1f") # "2.3MSi"
+    ```
+
+    :param value: An integer or floating point value. If None, an empty string is returned.
+    :param prefixes:
+        A dictionary of prefix string to ratio of the next largest prefix. The
+        dictionary must be sorted from smallest to largest prefix. The prefix of
+        the input value must be the first entry.
+    :param unit: A unit string to be appended to the formatted value.
+    :param fmt: A format specifier to be applied when formatting the value.
+    :param if_zero: A string to be returned when the value is zero.
+    """
+    if value is None: return ""
+    if if_zero is not None and value == 0: return if_zero
+
+    # Find the correct prefix from a list of predefined common prefixes
+    _found = False
+    if prefixes.startswith("t:"):
+        time_units = {"ns": 1e3, "µs": 1e3, "ms": 1e3, "s": 60, "m": 60, "h": 24, "d": 365.25/12}
+        prefixes = prefixes.split(":")[1]
+        prefixes = {k:v for k, v in time_units.items() if _found or (_found := (k == prefixes))}
+    elif prefixes.startswith("si:"):
+        prefixes = prefixes.split(":")[1]
+        prefixes = {k:1e3 for k in ["n", "µ", "m", "", "k", "M", "G", "T"]
+                    if _found or (_found := (k == prefixes))}
+
+    # Divide the value until it is smaller than the next largest prefix
+    for prefix, factor in prefixes.items():
+        if value < factor: break
+        value /= factor
+
+    # Format the value
+    value = f"{value:{fmt or ''}}"
+    value_stripped = value.rstrip("0").rstrip(".")
+    if if_zero is not None and value_stripped == "0": return if_zero
+    # pad the value to the right to align it
+    padding = max(len(p) for p in prefixes.keys()) - len(prefix)
+    padding += len(value) - len(value_stripped)
+    return f"{value_stripped}{padding * ' '}{prefix}{unit or ''}"
+
+
 # -----------------------------------------------------------------------------
 def format_table(fmtstr: str, header: list[str], rows: list[list[str]], columns: int = 1) -> str:
     """

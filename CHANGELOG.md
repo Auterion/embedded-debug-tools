@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.11
+
+- Add `px4_perf` command to list performance counters.
+
 ## 1.3.10
 
 - Add `px4_dmesg` command and pretty printer to display the dmesg buffer in GDB.
