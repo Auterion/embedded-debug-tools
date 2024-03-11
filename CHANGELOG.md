@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+- Return string from Nsh protocol instead of list of lines.
+
 ## 1.3.11
 
 - Add `px4_perf` command to list performance counters.

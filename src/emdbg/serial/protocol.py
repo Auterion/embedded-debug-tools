@@ -34,11 +34,7 @@ class _NshReader(Protocol):
         return packets
 
     def write_line(self, line: str):
-        # Pace the transmission to 1 char / 10ms to not loose character
-        for char in (line + "\n"):
-            self.device.write(char.encode("utf-8"))
-            # self.device.flushOutput()
-            time.sleep(0.01)
+        self.device.write((line + "\n").encode("utf-8"))
 
     def clear_input(self):
         self.device.reset_input_buffer()
@@ -80,6 +76,7 @@ class Nsh:
         self._print_data = ""
         self.filter_ansi_escapes = True
         self._logfile = None
+        self.clear()
 
     def _write_line(self, line):
         self._serial.write_line(line)
@@ -89,7 +86,7 @@ class Nsh:
         if Nsh._NEWLINE in self._print_data:
             *lines, self._print_data = self._print_data.split(Nsh._NEWLINE)
             for line in self._filter(lines):
-                LOGGER.info(line)
+                LOGGER.debug(line)
                 if self._logfile is not None:
                     self._logfile.write(line + "\n")
 
@@ -108,12 +105,16 @@ class Nsh:
             time.sleep(0.1)
         return []
 
+    def _join(self, lines: list[str]) -> str | None:
+        return Nsh._NEWLINE.join(lines) if lines else None
+
+
     def clear(self):
         """Clear the receive and transmit buffers."""
         self._serial.clear()
         self._print_data = ""
 
-    def log_to_file(self, filename: Path | str, add_datetime: bool = False):
+    def log_to_file(self, filename: Path | str, add_datetime: bool = False) -> Path:
         """
         Log the received data to `filename` or close the log file.
 
@@ -136,7 +137,7 @@ class Nsh:
         return filename
 
 
-    def read_lines(self, timeout: float = _TIMEOUT) -> list[str]:
+    def read_lines(self, timeout: float = _TIMEOUT) -> str | None:
         """
         Return any lines received within `timeout`.
         Note that any ANSI escape codes (for color or cursor position) are
@@ -144,12 +145,13 @@ class Nsh:
 
         :param timeout: seconds to wait until new lines arrive.
 
-        :return: list of received lines or an empty list
+        :return: received lines or None on timeout
         """
-        return self._filter(self._read_packets(Nsh._NEWLINE, timeout))
+        lines = self._filter(self._read_packets(Nsh._NEWLINE, timeout))
+        return self._join(lines)
 
 
-    def wait_for(self, pattern: str, timeout: float = _TIMEOUT) -> list[str]:
+    def wait_for(self, pattern: str, timeout: float = _TIMEOUT) -> str | None:
         """
         Waits for a regex pattern to appear in a line in the stream.
         This function reads any new received lines and searches for `pattern` in
@@ -161,7 +163,7 @@ class Nsh:
                         line beginnings and ends you must use `^pattern$`.
         :param timeout: seconds to wait until new lines arrive.
 
-        :return: list of received lines until matched pattern or an empty list
+        :return: received lines until matched pattern or None on timeout
         """
         lines = []
         start = time.time()
@@ -172,10 +174,10 @@ class Nsh:
             lines.append(new_lines)
             for line in new_lines:
                 if re.search(pattern, line):
-                    return lines
+                    return self._join(lines)
             time.sleep(0.1)
         LOGGER.warning(f"Waiting for '{pattern}' timed out after {timeout:.1f}s!")
-        return []
+        return None
 
     def wait_for_prompt(self, timeout: float = _TIMEOUT) -> list[str]:
         """
@@ -189,12 +191,12 @@ class Nsh:
         """
         if prompts := self._read_packets(Nsh._NEWLINE + Nsh._PROMPT, timeout):
             prompt = Nsh._PROMPT + Nsh._PROMPT.join(prompts)
-            return self._filter(prompt.split(Nsh._NEWLINE))
+            return self._join(self._filter(prompt.split(Nsh._NEWLINE)))
         LOGGER.warning(f"Waiting for 'nsh> ' prompt timed out after {timeout:.1f}s!")
-        return []
+        return None
 
 
-    def command(self, command: str, timeout: float = _TIMEOUT) -> list[str]:
+    def command(self, command: str, timeout: float = _TIMEOUT) -> str | None:
         """
         Send a command and return all lines until the next prompt.
         If the command is asynchronous, you need to poll for new lines separately.
@@ -220,7 +222,7 @@ class Nsh:
         self.command(command, None)
 
 
-    def reboot(self, timeout: int = 15) -> list[str]:
+    def reboot(self, timeout: int = 15) -> str | None:
         """
         Send the reboot command and wait for the reboot to be completed.
 
@@ -244,7 +246,7 @@ class Nsh:
         timeout = timeout / attempts
         while attempt < attempts:
             self._write_line("")
-            if self.wait_for_prompt(timeout):
+            if self.wait_for_prompt(timeout) is not None:
                 return True
             attempt += 1
         return False
