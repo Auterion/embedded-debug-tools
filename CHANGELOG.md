@@ -3,6 +3,7 @@
 ## 1.4.0
 
 - Return string from Nsh protocol instead of list of lines.
+- Mark `px4_perf` counters changed since last GDB interrupt.
 
 ## 1.3.11
 
