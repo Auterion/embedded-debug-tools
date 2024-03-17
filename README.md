@@ -21,30 +21,21 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
 ## Features
 
 - Debug Probes: SWD and ITM/DWT over SWO.
-    - [SEGGER J-Link](https://www.segger.com/products/debug-probes/j-link/): BASE Compact, EDU Mini.
-    - [OpenOCD](https://openocd.org): [STMicro STLinkv3](https://www.st.com/en/development-tools/stlink-v3minie.html).
-    - Coredump: [CrashDebug](https://github.com/adamgreen/CrashDebug) with support for PX4 Hardfault logs.
+    - [SEGGER J-Link](https://www.segger.com/products/debug-probes/j-link/): BASE Compact (3MB/s), EDU Mini.
+    - [STMicro STLink-v3 MINIE](https://www.st.com/en/development-tools/stlink-v3minie.html): (2MB/s).
+    - [Orbcode ORBTrace mini](https://orbcode.org/orbtrace-mini): SWO (6MB/s).
+    - Coredump via [CrashDebug](https://github.com/adamgreen/CrashDebug) with support for PX4 Hardfault logs.
 - Trace Probes: ITM/DWT/ETM over TRACE.
-    - [Orbcode ORBTrace mini](https://orbcode.org/orbtrace-mini).
-    - [SEGGER J-Trace](https://www.segger.com/products/debug-probes/j-trace/models/j-trace/) (planned).
+    - [Orbcode ORBTrace mini](https://orbcode.org/orbtrace-mini): (50MB/s).
+    - [SEGGER J-Trace](https://www.segger.com/products/debug-probes/j-trace/models/j-trace/): (>100MB/s) (planned).
 - [GDB Debugger](https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain).
     - Automatic management of debug probe drivers.
     - Remote interfacing via [GDB/MI](https://github.com/cs01/pygdbmi) and RPyC.
     - Plugins via [GDB Python API](https://sourceware.org/gdb/onlinedocs/gdb/Python-API.html).
     - [User commands for PX4 and NuttX](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/gdb.md#user-commands).
-        - Task information.
-        - Task switching to inspect call stack.
-        - Coredumping of memories and peripherals.
-        - GPIO state visualization.
-        - Backtrace generation.
-        - Register state visualization using SVD files.
-        - Register access watching and difference visualization.
     - Hardfault trapping with immediate backtrace.
 - [Real-time instrumentation using ITM/DWT](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto).
-    - Up to 2MB/s SWO capture via STLinkv3, 3MB/s via JLink.
-    - Visualization of task switching and interrupts via [perfetto](https://perfetto.dev).
-    - Latency measurement of scheduler and task priorities.
-    - Heap usage tracking via malloc, free, realloc, alignmem.
+    - Visualization of entire RTOS state via [perfetto](https://perfetto.dev).
     - Nanosecond resolution with very little runtime overhead.
 - Patch Manager for out-of-tree modifications.
 - Power Switch.
@@ -52,7 +43,7 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
 - Logic Analyzer and Waveform Generator.
     - [Digilent Analog Discovery 2](https://digilent.com/reference/test-and-measurement/analog-discovery-2/start) via Python API.
     - [Sigrok](https://sigrok.org/wiki/Main_Page) (prototyped).
-    - Visualization via [perfetto](https://perfetto.dev) (planned).
+    - Visualization via [perfetto](https://perfetto.dev) (prototyped).
 - Serial Protocols.
     - NuttX NSH command prompt.
 - Hardware configuration.
@@ -64,17 +55,35 @@ the `scripts` folder.
 
 ## Presentations
 
-### Debugging Microcontrollers
+Sorted in reverse chronological order.
 
-Presented at Chaos Communication Camp by Niklas Hauser on 2023-08-18.
+### Analyzing Cortex-M Firmware with the Perfetto Trace Processor
 
-[![](https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg)](https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers)
+Presented at [emBO++](http://embo.io) by Niklas Hauser on 2024-03-15.
+
+[Slides with Notes](https://salkinium.com/talks/embo24_perfetto.pdf).
+
+### Debugging PX4
+
+Presented at the [PX4 Developer Summit](https://events.linuxfoundation.org/px4-developer-summit) by Niklas Hauser on 2023-10-22.
+
+[![](https://i.ytimg.com/vi/1c4TqEn3MZ0/maxresdefault.jpg)](https://www.youtube.com/watch?v=1c4TqEn3MZ0)
+
+[Slides with Notes](https://salkinium.com/talks/px4summit23_debugging_px4.pdf).
 
 ### Debugging and Profiling NuttX and PX4
 
-Presented at the NuttX International Workshop by Niklas Hauser on 2023-09-29.
+Presented at the [NuttX International Workshop](https://events.nuttx.apache.org/index.php/nuttx-international-workshop-2023) by Niklas Hauser on 2023-09-29.
 
 [![](https://i3.ytimg.com/vi/_k1f4F2JVBA/maxresdefault.jpg)](https://www.youtube.com/watch?v=_k1f4F2JVBA)
+
+### Debugging Microcontrollers
+
+Presented at [Chaos Communication Camp](https://events.ccc.de/camp/2023/) by Niklas Hauser on 2023-08-18.
+
+[![](https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg)](https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers)
+
+[Slides with Notes](https://salkinium.com/talks/cccamp23_debugging_microcontrollers.pdf).
 
 ## Installation
 
