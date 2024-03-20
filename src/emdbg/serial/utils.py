@@ -21,7 +21,7 @@ def find_serial_port(identifier=None):
     :raises `SerialException`: if no serial port matches `identifier`.
     :return:
     - The serial port whose serial number matches the `identifier`, or
-    - A list of all serial ports if `identifier` is `None`.
+    - A list of all serial ports if `identifier` is not `None`.
     """
     serials = []
     for port in list_ports.comports():
@@ -32,10 +32,13 @@ def find_serial_port(identifier=None):
             return port
         serials.append(port)
 
-    if identifier is None:
-        serials = "\n\t- ".join(s.serial_number for s in serials)
-        msg = f"Unable to find '{identifier or 'any'}' serial port!\n"
-        msg += f"Available identifiers are:\n\t- {serials}\n"
+    if not serials:
+        raise SerialException("Unable to find any serial ports!")
+
+    if identifier is not None:
+        msg = f"Unable to find '{identifier}' serial port!\n"
+        serials = "\n\t- ".join(f"{s}: serial={s.serial_number}" for s in serials)
+        msg += f"Available serial ports are:\n\t- {serials}\n"
         raise SerialException(msg)
 
     return serials

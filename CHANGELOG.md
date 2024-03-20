@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Fix error handling in `find_serial_port`.
+
 ## 1.4.0
 
 - Return string from Nsh protocol instead of list of lines.
