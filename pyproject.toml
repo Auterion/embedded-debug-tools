@@ -27,15 +27,15 @@ classifiers = [
     "Topic :: System :: Operating System Kernels",
 ]
 dependencies = [
-    "pyserial",
-    "graphviz",
-    "pygdbmi",
-    "cmsis-svd",
-    "arm-gdb",
-    "pydwf",
-    "yoctopuce<2.0",
-    "rpyc",
-    "rich",
+    "pyserial>=3.5,<4",
+    "graphviz>=0.20.1,<0.21",
+    "pygdbmi>=0.11.0.0,<0.12",
+    "cmsis-svd==0.4",
+    "arm-gdb>=0.9.9,<1",
+    "pydwf>=1.1.19,<2",
+    "yoctopuce>=1.10.57762,<2.0",
+    "rpyc>=5.3.1,<6",
+    "rich>=13.7.0,<14",
 ]
 dynamic = ["version"]
 
