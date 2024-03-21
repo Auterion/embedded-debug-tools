@@ -31,22 +31,24 @@ class OpenOcdBackend(ProbeBackend):
     See `call()` for additional information.
     """
     def __init__(self, commands: list[str] = None, config: list[Path] = None,
-                 search: list[Path] = None):
+                 search: list[Path] = None, serial: str = None):
         """
         :param commands: list of commands to execute on launch.
         :param config: list of configuration files to execute on launch.
         :param search: list of directories to search configuration files in.
+        :param serial: serial number of debug probe.
         """
         super().__init__(":3333")
         self.commands = utils.listify(commands)
         self.config = utils.listify(config)
         self.search = utils.listify(search)
+        self.serial = serial
         self.process = None
         self.name = "openocd"
 
     def start(self):
         self.process = call(self.commands, self.config, self.search,
-                            blocking=False, log_output=False)
+                            blocking=False, log_output=False, serial=self.serial)
         LOGGER.info(f"Starting {self.process.pid}...")
 
     def stop(self):
@@ -59,7 +61,7 @@ class OpenOcdBackend(ProbeBackend):
 
 def call(commands: list[str] = None, config: list[Path] = None,
          search: list[Path] = None, log_output: Path | bool = None,
-         flags: str = None, blocking: bool = True)  -> "int | subprocess.Popen":
+         flags: str = None, blocking: bool = True, serial: str = None) -> "int | subprocess.Popen":
     """
     Starts `openocd` and connects to the microcontroller without resetting the
     device. You can overwrite the default binary by exporting an alternative in
@@ -77,11 +79,13 @@ def call(commands: list[str] = None, config: list[Path] = None,
     :param flags: Additional flags
     :param blocking: Run in current process as a blocking call.
                      Set to `False` to run in a new subprocess.
+    :param serial: serial number of debug probe.
 
     :return: The process return code if `blocking` or the Popen object.
     """
     if log_output == False: log_output = "/dev/null"
     cmds = [f"log_output {log_output}"] if log_output is not None else []
+    cmds += [f"adapter serial {serial}"] if serial is not None else []
     cmds += ["init"] + utils.listify(commands)
     config = utils.listify(config)
     search = utils.listify(search)
@@ -174,7 +178,7 @@ def rtt(backend, channel: int = 0) -> int:
 
 # -----------------------------------------------------------------------------
 def program(source: Path, commands: list[str] = None, config: list[Path] = None,
-            search: list[Path] = None) -> int:
+            search: list[Path] = None, serial: str = None) -> int:
     """
     Loads the source file into the microcontroller and resets the device.
 
@@ -182,13 +186,14 @@ def program(source: Path, commands: list[str] = None, config: list[Path] = None,
     :param config: list of configuration files to execute on launch.
     :param search: list of directories to search configuration files in.
     :param source: path to a `.elf` file to upload.
+    :param serial: serial number of debug probe.
 
     :return: the process return code of openocd
     """
     from .gdb import call as gdb_call
-    backend = OpenOcdBackend(commands, config, search)
+    backend = OpenOcdBackend(commands, config, search, serial)
     gdb_cmds = ["monitor reset halt", "load", "monitor reset run", "quit"]
-    return gdb_call(backend, source, ui="batch", commands=gdb_cmds)
+    return gdb_call(backend, source, ui="batch", commands=gdb_cmds, with_python=False)
     # Unfortunately, the OpenOCD program command seems to erase Flash sector 0
     # even if the ELF file has an offset. This overwrites the bootloader and
     # bricks the FMU, so we use GDB instead.
@@ -198,18 +203,19 @@ def program(source: Path, commands: list[str] = None, config: list[Path] = None,
 
 
 def reset(commands: list[str] = None, config: list[Path] = None,
-          search: list[Path] = None) -> int:
+          search: list[Path] = None, serial: str = None) -> int:
     """
     Resets the device via OpenOCD.
 
     :param commands: list of commands to execute on launch.
     :param config: list of configuration files to execute on launch.
     :param search: list of directories to search configuration files in.
+    :param serial: serial number of debug probe.
 
     :return: the process return code of OpenOCD
     """
     commands = utils.listify(commands) + ["reset", "shutdown"]
-    return call(commands=commands, config=config, search=search)
+    return call(commands, config, search, serial=serial)
 
 
 # -----------------------------------------------------------------------------
@@ -237,10 +243,15 @@ def _add_subparser(subparser):
         default=8000,
         choices=[24000, 8000, 3300, 1000, 200, 50, 5],
         help="SWD baudrate in kHz.")
+    parser.add_argument(
+        "--serial",
+        dest="oserial",
+        default=None,
+        help="Serial number of debug probe.")
     parser.set_defaults(backend=lambda args:
         OpenOcdBackend([f"adapter speed {args.ospeed}"] +
                        utils.listify(args.ocommands),
-                       args.oconfig, args.osearch))
+                       args.oconfig, args.osearch, args.oserial))
     return parser
 
 
@@ -273,6 +284,10 @@ if __name__ == "__main__":
         choices=[24000, 8000, 3300, 1000, 200, 50, 5],
         help="SWD baudrate in kHz.")
     parser.add_argument(
+        "--serial",
+        default=None,
+        help="Serial number of debug probe.")
+    parser.add_argument(
         "-v",
         dest="verbosity",
         action="count",
@@ -298,13 +313,13 @@ if __name__ == "__main__":
         config = ["interface/stlink.cfg", "target/stm32f7x.cfg"]
 
     if args.command == "reset":
-        exit(reset(commands, config, args.searchdirs))
+        exit(reset(commands, config, args.searchdirs, args.serial))
 
     if args.command == "run":
-        exit(call(commands, config, args.searchdirs, blocking=True))
+        exit(call(commands, config, args.searchdirs, blocking=True, serial=args.serial))
 
     if args.command == "upload":
-        exit(program(args.source, commands, config, args.searchdirs))
+        exit(program(args.source, commands, config, args.searchdirs, args.serial))
 
     LOGGER.error("Unknown command!")
     exit(1)

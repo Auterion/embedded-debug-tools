@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0
+
+- Add serial number support for selecting J-Link and Openocd debug probes.
+
 ## 1.4.1
 
 - Fix error handling in `find_serial_port`.
