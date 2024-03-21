@@ -81,8 +81,8 @@ def call(commands: list[str] = None, config: list[Path] = None,
     :return: The process return code if `blocking` or the Popen object.
     """
     if log_output == False: log_output = "/dev/null"
-    commands = [f"log_output {log_output}"] if log_output is not None else []
-    commands += ["init"] + utils.listify(commands)
+    cmds = [f"log_output {log_output}"] if log_output is not None else []
+    cmds += ["init"] + utils.listify(commands)
     config = utils.listify(config)
     search = utils.listify(search)
 
@@ -97,7 +97,7 @@ def call(commands: list[str] = None, config: list[Path] = None,
         binary, flags or "",
         " ".join(map('-s "{}"'.format, search)),
         " ".join(map('-f "{}"'.format, config)),
-        " ".join(map('-c "{}"'.format, commands))
+        " ".join(map('-c "{}"'.format, cmds))
     )
     LOGGER.debug(command_openocd)
 

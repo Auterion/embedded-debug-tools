@@ -3,6 +3,7 @@
 ## 1.4.1
 
 - Fix error handling in `find_serial_port`.
+- Fix ignoring commands argument in openocd `call()`.
 
 ## 1.4.0
 
