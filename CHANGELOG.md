@@ -4,6 +4,7 @@
 
 - Fix NSH protocol closing port when device is not ready for reading.
 - Fix wrapping memory read for buffers.
+- Use up-to-date OpenOCD for uploading firmware instead of GDB.
 
 ## 1.5.0
 

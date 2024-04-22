@@ -189,16 +189,17 @@ def program(source: Path, commands: list[str] = None, config: list[Path] = None,
 
     :return: the process return code of openocd
     """
-    from .gdb import call as gdb_call
-    backend = OpenOcdBackend(commands, config, search, serial)
-    gdb_cmds = ["monitor reset halt", "load", "monitor reset run", "quit"]
-    return gdb_call(backend, source, ui="batch", commands=gdb_cmds, with_python=False)
-    # Unfortunately, the OpenOCD program command seems to erase Flash sector 0
+    commands = utils.listify(commands) + \
+        [f"program {Path(source).absolute()} verify reset exit"]
+    return call(commands=commands, config=config, search=search)
+
+    # Unfortunately, some older OpenOCD versions seems to erase Flash sector 0
     # even if the ELF file has an offset. This overwrites the bootloader and
-    # bricks the FMU, so we use GDB instead.
-    # commands = utils.listify(commands) + \
-    #     [f"program {Path(source).absolute()} preverify verify reset exit"]
-    # return call(commands=commands, config=config, search=search)
+    # bricks the FMU, so we must use GDB instead.
+    # from .gdb import call as gdb_call
+    # backend = OpenOcdBackend(commands, config, search, serial)
+    # gdb_cmds = ["monitor reset halt", "load", "monitor reset run", "quit"]
+    # return gdb_call(backend, source, ui="batch", commands=gdb_cmds, with_python=False)
 
 
 def reset(commands: list[str] = None, config: list[Path] = None,
