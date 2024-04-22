@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- Fix NSH protocol closing port when device is not ready for reading.
+
 ## 1.5.0
 
 - Add serial number support for selecting J-Link and Openocd debug probes.

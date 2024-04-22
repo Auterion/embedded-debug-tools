@@ -33,9 +33,6 @@ class _NshReader(Protocol):
         *packets, self.stream = self.stream.split(separator)
         return packets
 
-    def write_line(self, line: str):
-        self.device.write((line + "\n").encode("utf-8"))
-
     def clear_input(self):
         self.device.reset_input_buffer()
         self.stream = ""
@@ -65,13 +62,15 @@ class Nsh:
     _PROMPT = "nsh> "
     _TIMEOUT = 3
 
-    def __init__(self, reader: Protocol):
+    def __init__(self, reader_thread: ReaderThread, protocol: _NshReader):
         """
         Use the `nsh` context manager to build this class correctly.
 
-        :param reader: The background thread reader protocol.
+        :param reader_thread: The background reader thread.
+        :param protocol: The NSH protocol.
         """
-        self._serial = reader
+        self._serial = protocol
+        self._reader_thread = reader_thread
         self._serial._data_received = self._print
         self._print_data = ""
         self.filter_ansi_escapes = True
@@ -79,7 +78,7 @@ class Nsh:
         self.clear()
 
     def _write_line(self, line):
-        self._serial.write_line(line)
+        self._reader_thread.write((line + "\n").encode("utf-8"))
 
     def _print(self, data: str):
         self._print_data += data
@@ -269,10 +268,50 @@ def nsh(serial: str, baudrate: int = 57600):
     port = find_serial_port(serial)
     try:
         LOGGER.info(f"Starting on port '{serial}'..." if serial else "Starting...")
-        device = Serial(port.device, baudrate=baudrate, timeout=0.01)
-        with ReaderThread(device, lambda: _NshReader(device)) as reader:
-            nsh = Nsh(reader)
+        device = Serial(port.device, baudrate=baudrate)
+        reader_thread = ReaderThread(device, lambda: _NshReader(device))
+        with reader_thread as reader:
+            nsh = Nsh(reader_thread, reader)
             yield nsh
     finally:
         if nsh is not None: nsh.log_to_file(None)
         LOGGER.debug("Stopping.")
+
+
+# -----------------------------------------------------------------------------
+# We need to monkey patch the ReaderThread.run() function to prevent a
+# "device not ready" error to abort the reader thread.
+def patched_run(self):
+    from serial import SerialException
+    self.serial.timeout = 0.1
+    self.protocol = self.protocol_factory()
+    try:
+        self.protocol.connection_made(self)
+    except Exception as e:
+        self.alive = False
+        self.protocol.connection_lost(e)
+        self._connection_made.set()
+        return
+    error = None
+    self._connection_made.set()
+    while self.alive and self.serial.is_open:
+        try:
+            data = self.serial.read(self.serial.in_waiting or 1)
+        except SerialException as e:
+            if self.alive and "readiness" in str(e):
+                # LOGGER.debug(e)
+                continue
+            error = e
+            break
+        else:
+            if data:
+                try:
+                    self.protocol.data_received(data)
+                except Exception as e:
+                    error = e
+                    break
+    self.alive = False
+    self.protocol.connection_lost(error)
+    self.protocol = None
+
+ReaderThread.run = patched_run
