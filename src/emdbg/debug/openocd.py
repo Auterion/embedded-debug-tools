@@ -13,7 +13,6 @@ import signal
 import logging
 import tempfile
 import platform
-import telnetlib
 import subprocess
 from pathlib import Path
 
