@@ -3,6 +3,7 @@
 ## 1.5.1
 
 - Fix NSH protocol closing port when device is not ready for reading.
+- Fix wrapping memory read for buffers.
 
 ## 1.5.0
 

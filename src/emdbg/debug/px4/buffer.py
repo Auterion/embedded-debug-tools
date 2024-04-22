@@ -26,14 +26,15 @@ class UartBuffer(Base):
         if used:
             if (tail < head):
                 # [tail, head]
-                content = self.read_memory(self._buf['buffer'] + tail, used)
+                memories = [self.read_memory(self._buf['buffer'] + tail, used)]
             else:
                 # head], [tail
-                content = self.read_memory(self._buf['buffer'] + tail, size - tail)
-                content += self.read_memory(self._buf['buffer'], head)
+                memories = [self.read_memory(self._buf['buffer'] + tail, size - tail),
+                            self.read_memory(self._buf['buffer'], head)]
             # Convert to Prints else \hh hex values
             content = "".join(chr(v) if chr(v).isprintable() else f"\\{v:02x}"
-                              for v in content.tobytes())
+                              for memory in memories
+                              for v in memory.tobytes())
             yield ("content", content)
 
 
@@ -56,10 +57,12 @@ class ConsoleBuffer(Base):
         if used:
             if (tail <= head):
                 # [tail, head]
-                content = self.read_memory(ptr + tail, used).tobytes()
+                memories = [self.read_memory(ptr + tail, used).tobytes()]
             else:
                 # head], [tail
-                content = self.read_memory(ptr + tail, size - tail).tobytes()
-                content += self.read_memory(ptr, head).tobytes()
-            header += "".join(chr(v) for v in content)
+                memories = [self.read_memory(ptr + tail, size - tail).tobytes(),
+                            self.read_memory(ptr, head).tobytes()]
+            header += "".join(chr(v) if chr(v).isprintable() else f"\\{v:02x}"
+                              for memory in memories
+                              for v in memory.tobytes())
         return header
