@@ -30,6 +30,7 @@ using namespace std::string_literals;
 #include "stream.h"
 #include "loadelf.h"
 #include "device.hpp"
+//#include "mortrall.hpp"
 
 // To get the ITM channel list
 #include "../../src/emdbg/patch/data/itm.h"
@@ -67,6 +68,8 @@ static Device device;
 
 static perfetto::protos::Trace *perfetto_trace;
 static perfetto::protos::FtraceEventBundle *ftrace;
+//Mortrall mortrall;
+
 // ====================================================================================================
 
 static constexpr uint32_t PID_TSK{0};
@@ -806,6 +809,7 @@ static void _itmPumpProcess( char c )
 
         if ( h[pp->genericMsg.msgtype] )
         {
+
             ( h[pp->genericMsg.msgtype] )( pp, &_r.i );
         }
     }
@@ -817,7 +821,7 @@ static void _itmPumpProcess( char c )
 // ====================================================================================================
 // ====================================================================================================
 // ====================================================================================================
-static void _protocolPump( uint8_t c )
+static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ))
 {
     if ( options.useTPIU )
     {
@@ -844,15 +848,16 @@ static void _protocolPump( uint8_t c )
 
                 for ( uint32_t g = 0; g < _r.p.len; g++ )
                 {
-                    if ( _r.p.packet[g].s == options.tpiuChannel )
-                    {
-                        _itmPumpProcess( _r.p.packet[g].d );
-                        continue;
-                    }
-
-                    if  ( _r.p.packet[g].s != 0 )
+                    if  ( _r.p.packet[g].s == 2 )
                     {
                         genericsReport( V_DEBUG, "Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
+                        //mortrall.dumpElement(_r.p.packet[g].d);
+                        continue;
+                    }
+                    else if ( _r.p.packet[g].s == 1 )
+                    {
+                        //_itmPumpProcess( _r.p.packet[g].d );
+                        _pumpITMProcessGeneric( (char)_r.p.packet[g].d );
                     }
                 }
 
@@ -861,11 +866,14 @@ static void _protocolPump( uint8_t c )
             case TPIU_EV_ERROR:
                 genericsReport( V_WARN, "****ERROR****" EOL );
                 break;
+            default:
+                break;
         }
     }
     else
     {
-        _itmPumpProcess( c );
+        //_itmPumpProcess( c );
+        _pumpITMProcessGeneric( c );
     }
 }
 // ====================================================================================================
@@ -1011,7 +1019,10 @@ int main(int argc, char *argv[])
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
 
+    //mortrall.init(perfetto_trace,ftrace,options.cps);
+
     struct Stream *stream = streamCreateFile( options.file.c_str() );
+    genericsReport( V_INFO, "PreProcess Stream" EOL );
     while ( true )
     {
         size_t receivedSize;
@@ -1024,11 +1035,12 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _itmPumpProcessPre(*c++);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcessPre); //_itmPumpProcessPre(*c++);
         fflush(stdout);
     }
     stream->close(stream);
     free(stream);
+
 
     printf("Loading ELF file %s with%s source lines\n", options.elfFile.c_str(), has_pc_samples ? "" : "out");
     _r.symbols = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
@@ -1041,6 +1053,7 @@ int main(int argc, char *argv[])
     }
 
     stream = streamCreateFile( options.file.c_str() );
+    genericsReport( V_INFO, "Process Stream" EOL );
     while ( true )
     {
         size_t receivedSize;
@@ -1053,7 +1066,7 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _protocolPump(*c++);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcess);
         fflush(stdout);
     }
     stream->close(stream);
@@ -1182,6 +1195,8 @@ int main(int argc, char *argv[])
             // }
         }
     }
+
+    //mortrall.finalize();
 
 
     if ( options.outputDebugFile )

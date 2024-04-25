@@ -83,13 +83,13 @@ define px4_configure_orbuculum
     # enable the CYCCNT
     dwtCycEna 1
     # enable exception tracing
-    dwtTraceException 1
+    dwtTraceException 0
     # Set POSTCNT source to CYCCNT[10] /1024
-    dwtPostTap 1
+    dwtPostTap 0
     # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 2
+    dwtPostReset 0
     # enable PC sampling
-    dwtSamplePC 0
+    dwtSamplePC 1
 
     # Set the ITM ID to 1
     ITMId 1
@@ -126,6 +126,38 @@ define px4_configure_orbuculum
     ITMTER 0 $TER
     # Enable the ITM
     ITMEna 1
+
+end
+
+define test
+
+    # enableSTM32TRACE 4 3
+    # send out sync packets every CYCCNT[28] ~268M cycles
+    # dwtSyncTap 3
+    # enable the CYCCNT
+    # dwtCycEna 1
+    # enable exception tracing
+    dwtTraceException 0
+    # Set POSTCNT source to CYCCNT[10] /1024
+    dwtPostTap 1
+    # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
+    dwtPostReset 2
+    # enable PC sampling
+    dwtSamplePC 0
+
+    # ITMSWOEna 0 disable SWV clock behavior -> clocks should be counted by cpu
+    #ITMTSEna 1
+    #ITMId 1
+    #ITMGTSFreq 3
+    #ITMTSPrescale 3
+    #ITMTXEna 1
+    #ITMSYNCEna 1
+    #ITMEna 1
+
+    #ITMTER 0 0xFFFFFFFF
+    #ITMTPR 0xFFFFFFFF
+
+    #startETM 1
 end
 
 define px4_enable_swo_stm32h7
@@ -187,6 +219,25 @@ define px4_enable_trace_stm32h7
     set *($TPIUBASE+0x004) = (1 << ($arg0 - 1))
     # Set ENFCONT and TRIGIN in TPIU_FFCR
     set *($TPIUBASE+0x304) = 0x00000102
+end
+
+define px4_etm_trace_tpiu_swo_stm32f7
+    px4_reset
+    stopETM
+    startETM 1
+    tbreak nx_start
+    continue
+
+    enableSTM32TRACE 4 3
+
+    px4_configure_orbuculum
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    !orbtrace -T4
+    shell orbuculum &
+    shell sleep 1
+    shell nc localhost 3443 > etm_trace.swo &
 end
 
 define px4_trace_tpiu_swo_stm32f7

@@ -257,6 +257,61 @@ define _startETMv4
   end
 end
 # ====================================================================
+define _startETMv4_modified
+  echo ETMv4 Tracing is enabled\n
+  # Enable the return stack, global timestamping, Context ID, and Virtual context identifier tracing.
+  # Disabled global timestamp to not interfere with cycle count
+  set *($TRCCONFIGR) = 0x000010C1
+
+  # Disable all event tracing.
+  set *($TRCEVENTCTL0R) = 0
+  set *($TRCEVENTCTL1R) = 0
+
+  # Disable or enable stalling for instructions, if implemented
+  if ($stall!=0)
+    set *($TRCSTALLCTLR) = 0
+  else
+    set *($TRCSTALLCTLR) = (1<<13)|(1<<8)|(0x0f<<0)
+  end
+
+  # Trace sync every 256 bytes of trace
+  set *($TRCSYNCPR) = 0x0c
+
+  # Do we want branch broadcasting?
+  set *$TRCACVR0=0
+  set *$TRCACVR1=0xFFFFFFFF
+  set *$TRCACATR0=0
+  set *$TRCACATR1=0
+  set *($TRCCONFIGR) |= ($br_out<<3)
+  set *($TRCBBCTLR) = ($br_out<<8)|0x03
+
+  # enable cycle count
+  set *($TRCCONFIGR) |= 0x10
+  set *($TRCCCCTLR) |= 0x0a
+
+  # Trace on ID 2
+  set *($TRCTRACEIDR) = 2
+
+  # Disable timestamp event (This does not do anything)
+  set *($TRCTSCTLR) = 0
+
+  # Enable ViewInst to trace everything
+  set *($TRCVICTLR) = 0x201
+
+  # No address range filtering for ViewInst
+  set *($TRCVIIECTLR) = 0
+
+  # No start or stop points for ViewInst
+  set *($TRCVISSCTLR) = 0
+
+  # ...and start
+  set *($TRCPRGCTLR) |= (1<<0)
+
+  while (((*$TRCSTATR)&(1<<0))==1)
+  echo Wait for trace not idle\n
+  end
+end
+# ====================================================================
 define _startETMv35
 
   # Allow access to device
@@ -329,8 +384,10 @@ define startETM
 
 
   if (((*$TRCDEVARCH)&0xfff0ffff)  ==0x47704a13)
-    _startETMv4
+    echo ETMv4 version active \n
+    _startETMv4_modified
   else
+    echo ETMv3 version active \n
     _startETMv35
   end
 
