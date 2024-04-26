@@ -145,6 +145,35 @@ def rtt(backend: JLinkBackend, channel: int = 0) -> int:
     return 0
 
 # -----------------------------------------------------------------------------
+def erase(device: str, speed: int, address_range: tuple[int, int] = None,
+          serial: str = None) -> int:
+    """
+    Erases (part of) the device via JLink.
+
+    :param device: part name of the microcontroller to program. You can
+                   overwrite the default binary by exporting an alternative in
+                   your environment:
+                   ```sh
+                   export PX4_JLINK=path/to/JLinkExe
+                   ```
+    :param speed: SWD connection baudrate in kHz.
+    :param address_range: Optional [start, end] address to erase only part of device.
+    :param serial: Serial number of J-Link for selection.
+
+    :return: the process return code of JLink
+    """
+    binary = os.environ.get("PX4_JLINK", "JLinkExe")
+    if address_range is not None:
+        address_range = f"{address_range[0]} {address_range[1]}"
+    with tempfile.NamedTemporaryFile() as fcmd:
+        commands = f"Erase {address_range or ''}\nExit"
+        Path(fcmd.name).write_text(commands)
+        jcmd = f"{binary} -device {device} -speed {speed} -ExitOnError 1 " \
+               f"-if swd -autoconnect 1 -nogui 1 -commandfile {fcmd.name}"
+        if serial: jcmd += f" -SelectEmuBySN {serial}"
+        LOGGER.debug(f"{jcmd}\n{commands}")
+        return subprocess.call(jcmd, shell=True)
+
 def program(source: Path, device: str, speed: int, serial: str = None, load_addr: int = None) -> int:
     """
     Loads the source file into the microcontroller and resets the device. You can
@@ -254,6 +283,12 @@ if __name__ == "__main__":
 
     subparsers.add_parser("run", help="Run JLinkGDBServer.")
 
+    erase_parser = subparsers.add_parser("erase", help="Erase devices.")
+    erase_parser.add_argument(
+        "--range",
+        help="The range of addresses to erase as a tuple separated by comma. "
+             "For example: --range 0x0800_0000,0x0800_1000")
+
     upload_parser = subparsers.add_parser("upload", help="Upload firmware.")
     upload_parser.add_argument(
         "--source",
@@ -288,6 +323,10 @@ if __name__ == "__main__":
 
     if args.command == "run":
         exit(call(args.device, args.speed, args.serial, blocking=True))
+
+    if args.command == "erase":
+        addr_range = [int(a, 0) for a in args.range.split(",")] if args.range else None
+        exit(erase(args.device, args.speed, addr_range, args.serial))
 
     if args.command == "upload":
         exit(program(os.path.abspath(args.source), args.device, args.speed, args.serial))

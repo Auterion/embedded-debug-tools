@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+- Add erase command to JLink backend.
+
 ## 1.5.1
 
 - Fix NSH protocol closing port when device is not ready for reading.
