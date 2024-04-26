@@ -3,6 +3,7 @@
 ## 1.5.2
 
 - Add erase command to JLink backend.
+- Fix px4_dmesg command.
 
 ## 1.5.1
 
