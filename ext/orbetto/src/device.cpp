@@ -317,4 +317,10 @@ Device::Device(std::string_view hint)
         _max_irq = 16+149;
         _clock = 480'000'000;
     }
+    else if (hint.find("nuttx") != std::string_view::npos)
+    {
+        _irq_table = &irq_names_stm32f765;
+        _max_irq = 16+109;
+        _clock = 64'000'000;
+    }
 }

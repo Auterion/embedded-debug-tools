@@ -223,21 +223,17 @@ end
 
 define px4_etm_trace_tpiu_swo_stm32f7
     px4_reset
-    stopETM
+    enableSTM32TRACE 4 3
+    px4_configure_orbuculum
     startETM 1
     tbreak nx_start
     continue
 
-    enableSTM32TRACE 4 3
-
-    px4_configure_orbuculum
-
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
-    shell killall orbuculum
-    !orbtrace -T4
-    shell orbuculum &
-    shell sleep 1
-    shell nc localhost 3443 > etm_trace.swo &
+    #shell killall orbuculum
+    #shell orbuculum -O "-T4" &
+    #shell sleep 1
+    #shell nc localhost 3443 > etm_trace.swo &
 end
 
 define px4_trace_tpiu_swo_stm32f7

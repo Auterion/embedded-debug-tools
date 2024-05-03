@@ -874,6 +874,7 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ))
     {
         //_itmPumpProcess( c );
         _pumpITMProcessGeneric( c );
+        //printf("C: %u\n", c);
     }
 }
 // ====================================================================================================
