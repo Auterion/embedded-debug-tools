@@ -30,7 +30,7 @@ using namespace std::string_literals;
 #include "stream.h"
 #include "loadelf.h"
 #include "device.hpp"
-//#include "mortrall.hpp"
+#include "mortrall.hpp"
 
 // To get the ITM channel list
 #include "../../src/emdbg/patch/data/itm.h"
@@ -68,7 +68,7 @@ static Device device;
 
 static perfetto::protos::Trace *perfetto_trace;
 static perfetto::protos::FtraceEventBundle *ftrace;
-//Mortrall mortrall;
+Mortrall mortrall;
 
 // ====================================================================================================
 
@@ -141,6 +141,7 @@ static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_stat
         if (priority >= 0) sched_switch->set_next_prio(priority);
 
         prev_tid = tid;
+        mortrall.update_tid(tid);
     }
 }
 
@@ -627,6 +628,29 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             }
             break;
         }
+        case EMDBG_PRINT: // debug print
+        {
+            const uint8_t data = m->value & 0xff;
+            auto *event = ftrace->add_event();
+            event->set_timestamp(ns);
+            event->set_pid(100);
+            auto *print = event->mutable_print();
+            char buffer[100];
+            snprintf(buffer, sizeof(buffer), "I|0|%u", data);
+            print->set_buf(buffer);
+            break;
+        }
+        case EMDBG_TS: // timestamp
+        {
+            auto *event = ftrace->add_event();
+            event->set_timestamp(ns);
+            event->set_pid(100);
+            auto *print = event->mutable_print();
+            char buffer[100];
+            snprintf(buffer, sizeof(buffer), "I|0|Timestamp|%llu,%llu", m->value, (m->value * 1e9) / options.cps);
+            print->set_buf(buffer);
+            break;
+        }
     }
 }
 // ====================================================================================================
@@ -634,6 +658,7 @@ static void _handleTS( struct TSMsg *m, struct ITMDecoder *i )
 {
     _r.timeStamp += m->timeInc;
     _r.ns = (_r.timeStamp * 1e9) / options.cps;
+    mortrall.update_itm_timestamp(_r.ns);
 }
 
 // ====================================================================================================
@@ -702,6 +727,7 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
             exit->set_depth(0);
             exit->set_func(prev_function_addr);
             prev_function_addr = 0;
+            printf("Last function in thread: %i\n", prev_prev_tid);
         }
         return;
     }
@@ -731,6 +757,9 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
             auto *exit = event->mutable_funcgraph_exit();
             exit->set_depth(0);
             exit->set_func(prev_function_addr);
+        }else
+        {
+            printf("First function in thread: %i\n", prev_tid);
         }
         // start the current function sample
         {
@@ -821,7 +850,8 @@ static void _itmPumpProcess( char c )
 // ====================================================================================================
 // ====================================================================================================
 // ====================================================================================================
-static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ))
+int counter = 0;
+static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),void ( *_pumpETMProcessGeneric )( char ))
 {
     if ( options.useTPIU )
     {
@@ -850,14 +880,26 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ))
                 {
                     if  ( _r.p.packet[g].s == 2 )
                     {
-                        genericsReport( V_DEBUG, "Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
-                        //mortrall.dumpElement(_r.p.packet[g].d);
+                        // genericsReport( V_DEBUG, "Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
+                        if ( _pumpETMProcessGeneric )
+                        {
+                            //printf("ETM\n");
+                            _pumpETMProcessGeneric( _r.p.packet[g].d );
+                        }
                         continue;
                     }
                     else if ( _r.p.packet[g].s == 1 )
                     {
+                        // print counter
+                        // printf("Packet count: %u\n", counter++);
+                        counter ++;
                         //_itmPumpProcess( _r.p.packet[g].d );
                         _pumpITMProcessGeneric( (char)_r.p.packet[g].d );
+                        //if ( _pumpETMProcessGeneric ) printf("ITM\n");
+                    }
+                    else
+                    {
+                        printf("Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
                     }
                 }
 
@@ -1020,8 +1062,6 @@ int main(int argc, char *argv[])
     ftrace = ftrace_packet->mutable_ftrace_events();
     ftrace->set_cpu(0);
 
-    //mortrall.init(perfetto_trace,ftrace,options.cps);
-
     struct Stream *stream = streamCreateFile( options.file.c_str() );
     genericsReport( V_INFO, "PreProcess Stream" EOL );
     while ( true )
@@ -1036,7 +1076,7 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _protocolPump(*c++,_itmPumpProcessPre); //_itmPumpProcessPre(*c++);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcessPre,NULL); //_itmPumpProcessPre(*c++);
         fflush(stdout);
     }
     stream->close(stream);
@@ -1046,6 +1086,8 @@ int main(int argc, char *argv[])
     printf("Loading ELF file %s with%s source lines\n", options.elfFile.c_str(), has_pc_samples ? "" : "out");
     _r.symbols = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
     assert( _r.symbols );
+    mortrall.init(perfetto_trace,ftrace,options.cps,_r.symbols);
+    
     printf("Loaded ELF with %u sections:\n", _r.symbols->nsect_mem);
     for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)
     {
@@ -1067,7 +1109,7 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _protocolPump(*c++,_itmPumpProcess);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcess,mortrall.dumpElement);
         fflush(stdout);
     }
     stream->close(stream);
@@ -1109,6 +1151,9 @@ int main(int argc, char *argv[])
                 thread->set_tid(tid);
                 thread->set_tgid(PID_TSK);
             }
+            auto *thread = process_tree->add_threads();
+            thread->set_tid(100);
+            thread->set_tgid(PID_TSK);
         }
         {
             auto *process = process_tree->add_processes();
@@ -1195,9 +1240,8 @@ int main(int argc, char *argv[])
             //     thread->set_name(buffer);
             // }
         }
+        mortrall.finalize(process_tree);
     }
-
-    //mortrall.finalize();
 
 
     if ( options.outputDebugFile )

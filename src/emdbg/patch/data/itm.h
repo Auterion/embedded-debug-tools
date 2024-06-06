@@ -33,6 +33,10 @@ enum
     EMDBG_DMA_CONFIG = 12,
     EMDBG_DMA_START = 13,
     EMDBG_DMA_STOP = 14,
+    
+    // DEBUG PRINT
+    EMDBG_PRINT = 15,
+    EMDBG_TS = 16,
 
     // the rest are optional user channels
     EMDBG_UART4_TX = 30,

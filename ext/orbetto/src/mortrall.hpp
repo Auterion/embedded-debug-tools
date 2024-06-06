@@ -3,6 +3,8 @@
 #include <vector>
 #include <protos/perfetto/trace/trace.pb.h>
 
+#include <stdlib.h>
+#include <unistd.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <ctype.h>
@@ -14,6 +16,8 @@
 #include <string.h>
 #include <signal.h>
 #include <getopt.h>
+#include <iostream>
+#include <fstream>
 
 #include "git_version_info.h"
 #include "generics.h"
@@ -79,7 +83,6 @@ struct RunTime
     bool resentStackDel;               /* Possibility to remove an entry from the stack, if address not given */
     bool exceptionEntry{false};
     uint16_t instruction_count{0};
-    uint64_t cc{0};
     uint32_t returnAddress{0};
     bool committed{true};
     void (*protobuffCallback)();
@@ -110,8 +113,8 @@ class Mortrall
         // Data Struct to store information about the current decoding process
         static inline RunTime *r;
         // Parameter to store the PID at which the callstack is added to the perfetto trace
-        static constexpr uint32_t PID_CALLSTACK = 50000;
-        static constexpr uint32_t PID_INTERRUPTS = 51000;
+        static constexpr uint32_t PID_CALLSTACK = 400000;
+        static constexpr uint32_t PID_INTERRUPTS = 500000;
         static inline uint32_t activeCallStackThread = 5000;
         // Store interrupt names to give each a unique perfetto thread
         static inline std::unordered_map<uint32_t, char *> interrupt_names;
@@ -119,32 +122,42 @@ class Mortrall
         static inline bool initialized = false;
         // Clocks per second
         static inline uint64_t cps;
+        // itm timestamp
+        static inline uint64_t itm_timestamp_ns;
+        // current running thread id
+        static inline uint16_t tid;
         // Default Constructor
         constexpr Mortrall()
         {
             ;
         }
         // initialization
-        void inline init(perfetto::protos::Trace *perfetto_trace,perfetto::protos::FtraceEventBundle *ftrace,uint64_t cps)
+        void inline init(perfetto::protos::Trace *perfetto_trace,perfetto::protos::FtraceEventBundle *ftrace,uint64_t cps,struct symbol *s)
         {
             Mortrall::perfetto_trace = perfetto_trace;
             Mortrall::ftrace = ftrace;
             Mortrall::cps = cps;
             Mortrall::r = new RunTime();
+            Mortrall::r->protobuffCallback = Mortrall::_generate_protobuf_entries_single;
+            Mortrall::r->protobuffCycleCount = Mortrall::_generate_protobuf_cycle_counts;
+            Mortrall::r->flushprotobuff = Mortrall::_flush_proto_buffer;
+            Mortrall::r->s = s;
             Mortrall::_init();
             Mortrall::initialized = true;
+            Mortrall::itm_timestamp_ns = 0;
             _traceReport( V_DEBUG, "Mortrall initialized" EOL);
         }
         // Process Trace element
-        void inline dumpElement(uint8_t element)
+        static void inline dumpElement(char element)
         {
             if(Mortrall::initialized)
             {
-                TRACEDecoderPump( &r->i, &element, 1, _traceCB, r );
+                uint8_t byte = (uint8_t)element;
+                TRACEDecoderPump( &r->i, &byte, 1, _traceCB, r );
             }
         }
         // Close all remaining threads
-        void inline finalize()
+        void inline finalize(auto *process_tree)
         {
             if(Mortrall::initialized)
             {
@@ -155,8 +168,18 @@ class Mortrall
                     Mortrall::_generate_protobuf_entries_single();
                 }
             }
-            Mortrall::_init_protobuf();
+            Mortrall::_init_protobuf(process_tree);
             delete Mortrall::r;
+        }
+
+        void inline update_itm_timestamp(uint64_t timestamp)
+        {
+            Mortrall::itm_timestamp_ns = timestamp;
+        }
+
+        void inline update_tid(uint16_t tid)
+        {
+            Mortrall::tid = tid;
         }
     private:
 
@@ -184,7 +207,7 @@ class Mortrall
                 Mortrall::r->protobuffCycleCount();
                 Mortrall::r->flushprotobuff();
                 Mortrall::r->instruction_count = 0;
-                //printf("Cycle count reset with: %lu\n",cpu->cycleCount);
+                //printf("Cc: %lu\n",cpu->cycleCount);
             }
             
 
@@ -337,7 +360,8 @@ class Mortrall
                 {
                     const char *v = symbolSource( Mortrall::r->s, l->filename, l->startline - 1 );
                     Mortrall::r->op.currentLine = l->startline;
-                    _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_SOURCE, v );
+                    //if ( v )
+                    //    _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_SOURCE, v );
                 }
 
                 /* Now output the matching assembly, and location updates */
@@ -468,19 +492,15 @@ class Mortrall
             Mortrall::Mortrall::r->pmBuffer = ( uint8_t * )calloc( 1, Mortrall::Mortrall::r->pmBufferLen );
             TRACEDecoderInit( &Mortrall::Mortrall::r->i, trp, true, _traceReport );
         }
-        static void inline _init_protobuf()
+        static void inline _init_protobuf(auto *process_tree)
         {
-            // Init Perfetto Threads
-            auto *packet = Mortrall::perfetto_trace->add_packet();
-            packet->set_trusted_packet_sequence_id(42);
-            auto *process_tree = packet->mutable_process_tree();
             {
                 auto *process = process_tree->add_processes();
                 process->set_pid(PID_CALLSTACK);
                 process->add_cmdline("CallStack");
                 // TODO: add more Callstacks 
                 auto *thread = process_tree->add_threads();
-                thread->set_tid(0);
+                thread->set_tid(PID_CALLSTACK);
                 thread->set_tgid(PID_CALLSTACK);
             }
             {
@@ -488,12 +508,12 @@ class Mortrall
                 process->set_pid(PID_INTERRUPTS);
                 process->add_cmdline("INTERRUPTS");
                 char buffer[100];
-                auto p = interrupt_names.begin();
-                for(int i=0; i < interrupt_names.size(); i++)
+                auto p = Mortrall::interrupt_names.begin();
+                for(int i=0; i < Mortrall::interrupt_names.size(); i++)
                 {
                     snprintf(buffer, sizeof(buffer), "%s", p->second);
                     auto *thread = process_tree->add_threads();
-                    thread->set_tid(PID_INTERRUPTS + interrupt_names.size() - i -1);
+                    thread->set_tid(PID_INTERRUPTS + Mortrall::interrupt_names.size() - i -1);
                     thread->set_tgid(PID_INTERRUPTS);
                     thread->set_name(buffer);
                     p++;
@@ -544,59 +564,63 @@ class Mortrall
 
         static void inline _generate_protobuf_entries_single()
         {
-            if(Mortrall::r->cc <= 0) return;
-            if(((int)Mortrall::r->stackDepth != csb.lastStackDepth) && Mortrall::r->committed)
-            {
-                // create Ftrace event
-                auto *event = ftrace->add_event();
-                auto *print = event->mutable_print();
-                char buffer[80];
-                if(((int)Mortrall::r->stackDepth > csb.lastStackDepth))
-                {
-                    // get the function at the current address
-                    struct symbolFunctionStore *running_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack[Mortrall::r->stackDepth] );
-                    // check on which thread the event has been received
-                    _switchThread(running_func);
-                    // set the pid of the event
-                    event->set_pid(activeCallStackThread);
-                    if (running_func)
-                    {
-                        snprintf(buffer, sizeof(buffer), "B|0|%s", running_func->funcname);
-                    }else
-                    {
-                        snprintf(buffer, sizeof(buffer), "B|0|0x%08x", Mortrall::r->op.workingAddr);
-                    }
-                }
-                else if(((int)Mortrall::r->stackDepth < csb.lastStackDepth))
-                {
-                    // set the pid of the event
-                    event->set_pid(activeCallStackThread);
-                    // check return to previous thread
-                    _returnThread();
-                    snprintf(buffer, sizeof(buffer), "E|0");
-                }
-                print->set_buf(buffer);
-                // as the instruction count interpolation cannot be applied before the next cycle count is received
-                // store the event in the buffer
-                csb.proto_buffer[csb.proto_buffer_index] = event;
-                csb.instruction_counts[csb.proto_buffer_index] = Mortrall::r->instruction_count;
-                csb.global_interpolations[csb.proto_buffer_index] = Mortrall::r->i.cpu.cycleCount;
-                csb.proto_buffer_index++;
-                csb.lastStackDepth = Mortrall::r->stackDepth;
-            }
+            ;
+            // if(((int)Mortrall::r->stackDepth != csb.lastStackDepth) && Mortrall::r->committed)
+            // {
+            //     // create Ftrace event
+            //     auto *event = ftrace->add_event();
+            //     auto *print = event->mutable_print();
+            //     char buffer[80];
+            //     if(((int)Mortrall::r->stackDepth > csb.lastStackDepth))
+            //     {
+            //         // get the function at the current address
+            //         struct symbolFunctionStore *running_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack[Mortrall::r->stackDepth] );
+            //         // check on which thread the event has been received
+            //         _switchThread(running_func);
+            //         // set the pid of the event
+            //         event->set_pid(activeCallStackThread);
+            //         if (running_func)
+            //         {
+            //             snprintf(buffer, sizeof(buffer), "B|0|%s", running_func->funcname);
+            //         }else
+            //         {
+            //             snprintf(buffer, sizeof(buffer), "B|0|0x%08x", Mortrall::r->op.workingAddr);
+            //         }
+            //     }
+            //     else if(((int)Mortrall::r->stackDepth < csb.lastStackDepth))
+            //     {
+            //         // set the pid of the event
+            //         event->set_pid(activeCallStackThread);
+            //         // check return to previous thread
+            //         _returnThread();
+            //         snprintf(buffer, sizeof(buffer), "E|0");
+            //     }
+            //     print->set_buf(buffer);
+            //     // as the instruction count interpolation cannot be applied before the next cycle count is received
+            //     // store the event in the buffer
+            //     csb.proto_buffer[csb.proto_buffer_index] = event;
+            //     csb.instruction_counts[csb.proto_buffer_index] = Mortrall::r->instruction_count;
+            //     csb.global_interpolations[csb.proto_buffer_index] = Mortrall::r->i.cpu.cycleCount;
+            //     csb.proto_buffer_index++;
+            //     csb.lastStackDepth = Mortrall::r->stackDepth;
+            //     if (csb.proto_buffer_index == MAX_BUFFER_SIZE)
+            //     {
+            //         Mortrall::r->flushprotobuff();
+            //     }
+            // }
         }
 
         static void inline _generate_protobuf_cycle_counts()
         {
-            if(Mortrall::r->cc <= 0) return;
             // create Ftrace event
             auto *event = ftrace->add_event();
-            uint64_t ns = (uint64_t)(((Mortrall::r->i.cpu.cycleCount * 10e9) / cps)-1);
-            event->set_timestamp(ns);
+            uint64_t ns = (uint64_t)(((Mortrall::r->i.cpu.cycleCount * 1'000'000'000)/ Mortrall::cps)-1);
+            // event->set_timestamp(ns);
+            event->set_timestamp(Mortrall::itm_timestamp_ns);
             event->set_pid(PID_CALLSTACK);
             auto *print = event->mutable_print();
             char buffer[40];
-            snprintf(buffer, sizeof(buffer), "I|0|CC: %llu, LC: %llu",Mortrall::r->i.cpu.cycleCount, Mortrall::r->cc);
+            snprintf(buffer, sizeof(buffer), "I|0|CC: %llu",Mortrall::r->i.cpu.cycleCount);
             print->set_buf(buffer);
         }
 
@@ -613,17 +637,18 @@ class Mortrall
 
         static void inline _flush_proto_buffer()
         {
-            // create Ftrace event
-            for (int i = 0; i < csb.proto_buffer_index; i++)
-            {
-                auto *event = csb.proto_buffer[i];
-                uint64_t interpolation = csb.global_interpolations[i] + (uint64_t)_get_ic_percentage(i);
-                uint64_t ns = (uint64_t)((interpolation * 10e9) / cps);
-                event->set_timestamp(ns);  
-            }
-            // clear buffer after flushing
-            csb.proto_buffer_index = 0;
-            csb.lastCycleCount = Mortrall::r->i.cpu.cycleCount;
+            ;
+            // // create Ftrace event
+            // for (int i = 0; i < csb.proto_buffer_index; i++)
+            // {
+            //     auto *event = csb.proto_buffer[i];
+            //     uint64_t interpolation = csb.global_interpolations[i] + (uint64_t)_get_ic_percentage(i);
+            //     uint64_t ns = (uint64_t)((interpolation * 1'000'000'000) / Mortrall::cps);
+            //     event->set_timestamp(ns);  
+            // }
+            // // clear buffer after flushing
+            // csb.proto_buffer_index = 0;
+            // csb.lastCycleCount = Mortrall::r->i.cpu.cycleCount;
         }
 
 //--------------------------------------------------------------------------------------//
@@ -696,7 +721,7 @@ class Mortrall
             va_list va;
             char *p;
 
-            va_start( va, fmt );
+            va_start( va , fmt );
             vsnprintf( construct, SCRATCH_STRING_LEN, fmt, va );
             va_end( va );
 
@@ -737,7 +762,6 @@ class Mortrall
                 for ( int i = 0; i < Mortrall::r->stackDepth+1; i++ )
                 {
                     struct symbolFunctionStore *running_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack[i] );
-                    Mortrall::strfcat(CallStack,  "Stack %d: %08x" EOL, i, Mortrall::r->callStack[i] );
                     if(running_func)
                     {
                         Mortrall::strfcat(CallStack,  "Stack %d: %08x %s" EOL, i, Mortrall::r->callStack[i], running_func->funcname);
@@ -753,7 +777,7 @@ class Mortrall
         }
         static void inline strfcat(char *str, const char *format, ...)
         {
-            char buffer[30];
+            char buffer[60];
             va_list args;
             va_start(args, format);
             vsprintf(buffer, format, args);

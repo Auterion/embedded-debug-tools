@@ -321,6 +321,6 @@ Device::Device(std::string_view hint)
     {
         _irq_table = &irq_names_stm32f765;
         _max_irq = 16+109;
-        _clock = 64'000'000;
+        _clock = 48'000'000;
     }
 }

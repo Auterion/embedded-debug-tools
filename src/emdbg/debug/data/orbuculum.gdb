@@ -986,9 +986,10 @@ define enableSTM32TRACE
   end
 
   if ($bits>1)
-     # Setup PE5 & PC12
+     # Setup PE5 & PC12 
      enableSTM32Pin 4 5 $drive
-     enableSTM32Pin 2 12 $drive
+     enableSTM32Pin 4 6 $drive
+     #enableSTM32Pin 2 12 $drive
   end
 
   # Set number of bits in DBGMCU_CR

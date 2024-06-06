@@ -47,6 +47,7 @@ class Device(Base):
         return {
             0x0415: "STM32L47/L48xx",
             0x0451: "STM32F76xx, STM32F77xx",
+            0x0452: "STM32F72xx, STM32F73xx",
             0x0450: "STM32H742, STM32H743/753, STM32H750",
             0x0483: "STM32H723/733, STM32H725/735, STM32H730",
         }.get(self.devid, "Unknown")
@@ -57,6 +58,7 @@ class Device(Base):
             0x0415: list(range(0x4800_0000, 0x4800_2000, 0x400)),
             # FMUv5x/v6x don't use ports J and K
             0x0451: list(range(0x4002_0000, 0x4002_2001, 0x400)),
+            0x0452: list(range(0x4002_0000, 0x4002_2001, 0x400)),
             0x0450: list(range(0x5802_0000, 0x5802_2001, 0x400)),
             0x0483: list(range(0x5802_0000, 0x5802_2C01, 0x400)),
         }.get(self.devid, [])
@@ -67,6 +69,7 @@ class Device(Base):
         mems += {
             0x0415: [(0x1FFF_7500, 0x100)],
             0x0451: [(0x1FF0_F420, 0x100), (0x1FFF_7B00, 0x100)],
+            0x0452: [(0x1FF0_F420, 0x100), (0x1FFF_7B00, 0x100)],
             **dict.fromkeys([0x0450, 0x0483],
                     [(0x1FF1_E800, 0x100), (0x58000524, 4)])
         }.get(self.devid, [])
@@ -104,6 +107,10 @@ class Device(Base):
                 # (0x0000_0000, 0x04000), # ITCM
                 (0x2000_0000, 0x80000), # DTCM, SRAM1, SRAM2
             ],
+            0x0452: [
+                # (0x0000_0000, 0x04000), # ITCM
+                (0x2000_0000, 0x80000), # DTCM, SRAM1, SRAM2
+            ],
             **dict.fromkeys([0x0450, 0x0483], [
                 # (0x0000_0000, 0x10000), # ITCM
                 (0x2000_0000, 0x20000), # DTCM
@@ -124,6 +131,7 @@ class Device(Base):
             # 0x0415: Path(__file__).parents[1] / "data/STM32L4x6.svd",
             0x0451: Path(__file__).parents[1] / "data/STM32F765.svd",
             0x0450: Path(__file__).parents[1] / "data/STM32H753.svd",
+            0x0452: Path(__file__).parents[1] / "data/STM32F765.svd",
             # 0x0483: Path(__file__).parents[1] / "data/STM32H7x3.svd",
         }.get(self.devid)
 

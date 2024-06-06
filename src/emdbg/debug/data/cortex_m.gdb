@@ -85,11 +85,11 @@ define px4_configure_orbuculum
     # enable exception tracing
     dwtTraceException 0
     # Set POSTCNT source to CYCCNT[10] /1024
-    dwtPostTap 0
+    dwtPostTap 10
     # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 0
+    dwtPostReset 10
     # enable PC sampling
-    dwtSamplePC 1
+    dwtSamplePC 0
 
     # Set the ITM ID to 1
     ITMId 1
@@ -223,17 +223,19 @@ end
 
 define px4_etm_trace_tpiu_swo_stm32f7
     px4_reset
-    enableSTM32TRACE 4 3
-    px4_configure_orbuculum
-    startETM 1
     tbreak nx_start
     continue
 
+    enableSTM32TRACE 4 3
+    startETM 1
+
+    px4_configure_orbuculum
+
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
-    #shell killall orbuculum
-    #shell orbuculum -O "-T4" &
-    #shell sleep 1
-    #shell nc localhost 3443 > etm_trace.swo &
+    shell killall orbuculum
+    shell orbuculum -O "-T4" &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
 end
 
 define px4_trace_tpiu_swo_stm32f7
@@ -267,4 +269,10 @@ define px4_trace_tpiu_swo_stm32h7
     shell orbuculum -O "-T4" -t1 &
     shell sleep 1
     shell nc localhost 3443 > trace.swo &
+end
+
+
+define px4_reset
+    monitor reset halt
+    px4_enable_vector_catch
 end
