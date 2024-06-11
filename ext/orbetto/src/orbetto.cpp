@@ -279,6 +279,16 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             const uint8_t priority = m->value >> 16;
             const uint8_t prev_state = m->value >> 24;
             _switchTo(tid, true, priority, prev_state);
+            if(prev_tid < PID_STOP && prev_tid != 0)
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(PID_TSK + prev_tid);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "C|%u|Priorities %s|%u",PID_TSK,thread_names[prev_tid].c_str() ,priority);
+                print->set_buf(buffer);
+            }
             break;
         }
         case EMDBG_TASK_RUNNABLE: // ready
@@ -658,7 +668,7 @@ static void _handleTS( struct TSMsg *m, struct ITMDecoder *i )
 {
     _r.timeStamp += m->timeInc;
     _r.ns = (_r.timeStamp * 1e9) / options.cps;
-    mortrall.update_itm_timestamp(_r.ns);
+    mortrall.update_itm_timestamp(_r.timeStamp,_r.ns);
 }
 
 // ====================================================================================================
