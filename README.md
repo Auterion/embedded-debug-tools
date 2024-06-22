@@ -61,6 +61,8 @@ Sorted in reverse chronological order.
 
 Presented at [emBO++](http://embo.io) by Niklas Hauser on 2024-03-15.
 
+[![](https://i.ytimg.com/vi/FIStxUz2ERY/maxresdefault.jpg)](https://www.youtube.com/watch?v=FIStxUz2ERY&t=108s)
+
 [Slides with Notes](https://salkinium.com/talks/embo24_perfetto.pdf).
 
 ### Debugging PX4
