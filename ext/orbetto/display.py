@@ -10,13 +10,10 @@ from queries import *
 app = Dash(__name__)
 
 widgets = []
-active_threads = None
-data = {}
+active_thread = None
+df_functions = None
 hist_data = {}
-df_thread_waiting_time_aggregated = None
-df_thread_running_time_aggregated = None
-df_thread_waiting_time = None
-df_thread_running_time = None
+df_detailed_thread_state = None
 
 def _find_outliers(thread_intervals,thread_ids):
     outlier_id = []
@@ -87,32 +84,6 @@ def _add_slider_for_bin_size(fig,arr,title,unit):
         sliders=sliders
     )
 
-def _add_dropdown_menu(fig):
-    # Add dropdown
-    fig.update_layout(
-        updatemenus=[
-            dict(
-                buttons=list([
-                    dict(label="Count",
-                        method="update",
-                        args=[{"visible": [True,False]},{'yaxis': {'title': 'Appearence'}}]
-                    ),
-                    dict(label="Percentage",
-                        method="update",
-                        args=[{"visible": [False, True]},{'yaxis': {'title': 'CPU Share in Thread (%)'}}]
-                    ),
-                ]),
-                direction="down",
-                pad={"r": 10, "t": 10},
-                showactive=True,
-                x=0,
-                xanchor="left",
-                y=1.2,
-                yanchor="top"
-            ),
-        ]
-    )
-
 def _add_dropdown_menu_bar_chart(fig):
     # Add dropdown
     fig.update_layout(
@@ -161,7 +132,7 @@ def _add_dropdown_menu_threads(thread_list):
     widgets.append(html.H4("Select Threads:",style={'margin-bottom': '10px'}))
     dropdown = dcc.Dropdown(id='thread-select',
                           options=thread_list,
-                          multi= True,
+                          multi= False,
                           clearable=True,
                           value=[])
     widgets.append(dropdown)
@@ -177,10 +148,10 @@ def _add_dropdown_menu_functions():
     widgets.append(dropdown)
 
 
-def custom_data_bar_chart(dict):
-    global data
-    data = dict
-    _add_dropdown_menu_threads(list(dict.keys()))
+def custom_data_bar_chart(df):
+    global df_functions
+    df_functions = df
+    _add_dropdown_menu_threads(df['thread_name'].unique())
     _add_dropdown_menu_functions()
     widgets.append(dcc.Graph(id='thread-graph',figure={}))
     return
@@ -215,15 +186,16 @@ def _add_dropdown_menu_threads_runtime(thread_list):
                           value=[])
     widgets.append(dropdown)
 
-def pie_chart(thread_waiting_time_aggregated,thread_running_time_aggregated,thread_waiting_time,thread_running_time):
-    global df_thread_waiting_time_aggregated,df_thread_running_time_aggregated,df_thread_waiting_time,df_thread_running_time
-    df_thread_waiting_time_aggregated,df_thread_running_time_aggregated,df_thread_waiting_time,df_thread_running_time = thread_waiting_time_aggregated,thread_running_time_aggregated,thread_waiting_time,thread_running_time
+def pie_chart(df):
+    global df_detailed_thread_state
+    df_detailed_thread_state = df
     widgets.append(html.H1("Thread CPU Time Detailed",style={'textAlign': 'center'}))
-    _add_dropdown_menu_threads_runtime(df_thread_waiting_time['thread_name'].unique())
+    _add_dropdown_menu_threads_runtime(df['thread_name'].unique())
     widgets.append(html.Button('Toggle Normalization', id='toggle-normalization', n_clicks=0,style={'font-size': '15px','margin-top': '10px'}))
     widgets.append(dcc.Graph(id='aggr-thread-overview-graph',figure={}))
     widgets.append(dcc.Graph(id='thread-overview-graph-runnable',figure={}))
     widgets.append(dcc.Graph(id='thread-overview-graph-running',figure={}))
+    widgets.append(dcc.Graph(id='thread-overview-graph-sleeping',figure={}))
 
 def show(debug):
     app.layout = html.Div(widgets)
@@ -234,14 +206,12 @@ def show(debug):
     Output('function-select', 'options'),
     Input('thread-select', 'value'),
 )
-def update_function_callback(threads):
-    global active_threads
-    active_threads = threads
-    options = []
-    for t in threads:
-        for _,f in data[t].iterrows():
-            options.append(f"{f['slice_name']}({t}, {f['count']}, {f['percentage']:.2f}%)")
-    return options
+def update_function_callback(thread):
+    if thread is None:
+        return []
+    global active_thread
+    active_thread = str(thread)
+    return df_functions[df_functions['thread_name'] == active_thread]['slice_name'].unique().tolist()
 
 @callback(
     Output('thread-graph', 'figure'),
@@ -249,19 +219,21 @@ def update_function_callback(threads):
 )
 def update_graph(selected_functions):
     fig = go.Figure()
-    if active_threads is None:
+    if active_thread is None:
         return fig
-    for thread in active_threads:
-        df = data[thread]
-        split = lambda x:x.split("(")[0]
-        df = df[df['slice_name'].isin(list(map(split, selected_functions)))]
-        fig.add_trace(go.Bar(x=df['slice_name'], y=df['count'],visible=True,name=thread))
-        fig.add_trace(go.Bar(x=df['slice_name'], y=df['percentage'],visible=False,name=thread))
+    df = df_functions[df_functions['thread_name'] == active_thread]
+    for function in selected_functions:
+        x_axis = np.sort(np.array(df[df['slice_name'] == function]['tss'].iloc[0].split(',')).astype(int)) / 1e6
+        count = df[df['slice_name'] == function]['count'].iloc[0]
+        y_axis = [i for i in range(1,count + 1)]
+        fig.add_trace(go.Scatter(x=x_axis,
+                                 y=y_axis,
+                                 mode='lines+markers',
+                                 name=function))
     fig.update_layout(
-        xaxis_title='Function Name',
+        xaxis_title='Time [ms]',
         yaxis_title='Appearence',
-    )   
-    _add_dropdown_menu(fig)
+    )
     return fig
 
 @callback(
@@ -321,46 +293,54 @@ def update_reg_graph(selected_function,reciprocal):
     Output('aggr-thread-overview-graph', 'figure'),
     Output('thread-overview-graph-running', 'figure'),
     Output('thread-overview-graph-runnable', 'figure'),
+    Output('thread-overview-graph-sleeping', 'figure'),
     Input('thread-overview-select', 'value'),
     Input('toggle-normalization', 'n_clicks')
 )
 def update_thread_overview(selected_thread,n_clicks):
-    fig = make_subplots(rows=1, cols=2, specs=[[{'type':'domain'}, {'type':'domain'}]])
+    fig = make_subplots(rows=1, cols=3, specs=[[{'type':'domain'}, {'type':'domain'}, {'type':'domain'}]])
     fig2 = go.Figure()
     fig3 = go.Figure()
+    fig4 = go.Figure()
     if selected_thread is None:
-        return fig,fig2,fig3
-    df1_aggr = df_thread_waiting_time_aggregated[df_thread_waiting_time_aggregated['thread_name'] == selected_thread]
-    df2_aggr = df_thread_running_time_aggregated[df_thread_running_time_aggregated['thread_name'] == selected_thread]
-    df1 = df_thread_waiting_time[df_thread_waiting_time['thread_name'] == selected_thread]
-    df2 = df_thread_running_time[df_thread_running_time['thread_name'] == selected_thread]
-    df1['thread_dur'] = df1['thread_dur']/1e6
-    df2['thread_dur'] = df2['thread_dur']/1e6
-    if len(df1_aggr) == 0:
-        return fig,fig2,fig3
-    y1 = 'waiting_time'
-    y2 = 'running_time'
+        return fig,fig2,fig3,fig4
+    df = df_detailed_thread_state[df_detailed_thread_state['thread_name'] == str(selected_thread)]
+    if len(df) == 0:
+        return fig,fig2,fig3,fig4
+    df['runnable_interval'] = df['runnable_interval']/1e6
+    df['running_interval'] = df['running_interval']/1e6
+    df['sleeping_interval'] = df['sleeping_interval']/1e6
+    df_aggr = df.groupby('slice_name').agg({'runnable_interval': 'sum', 'running_interval': 'sum', 'sleeping_interval': 'sum'}).reset_index()
     title1 = 'Runnable'
     title2 = 'Running'
+    title3 = 'Sleeping'
     if n_clicks % 2 == 1:
-        y1 = 'avg_waiting_time'
-        y2 = 'avg_running_time'
+        df_aggr = df.groupby('slice_name').agg({'runnable_interval': 'mean', 'running_interval': 'mean', 'sleeping_interval': 'mean'}).reset_index()
         title1 = 'Average Runnable'
         title2 = 'Average Running'
-    fig.add_trace(go.Pie(labels=df1_aggr['slice_name'],
-                        values=df1_aggr[y1]/1e6,
+        title3 = 'Average Sleeping'
+    fig.add_trace(go.Pie(labels=df_aggr['slice_name'],
+                        values=df_aggr['runnable_interval'],
                         title=title1),
                 row = 1, col = 1)
-    fig.add_trace(go.Pie(labels=df2_aggr['slice_name'],
-                        values=df2_aggr[y2]/1e6,
+    fig.add_trace(go.Pie(labels=df_aggr['slice_name'],
+                        values=df_aggr['running_interval'],
                         title=title2),
                 row = 1, col = 2 )
-    fig2 = px.histogram(df1, x='thread_dur',color = 'slice_name', marginal="rug", hover_data=df1.columns, title='Runnable')
+    fig.add_trace(go.Pie(labels=df_aggr['slice_name'],
+                        values=df_aggr['sleeping_interval'],
+                        title=title3),
+                row = 1, col = 3 )
+    fig2 = px.histogram(df, x='runnable_interval',color = 'slice_name', marginal="rug", hover_data=['slice_id','slice_name'], title='Runnable')
     fig2.update_layout(
         xaxis_title='Duration [ms]'
     )
-    fig3 = px.histogram(df2, x='thread_dur',color = 'slice_name', marginal="rug", hover_data=df2.columns, title='Running')
+    fig3 = px.histogram(df, x='running_interval',color = 'slice_name', marginal="rug", hover_data=['slice_id','slice_name'], title='Running')
     fig3.update_layout(
         xaxis_title='Duration [ms]'
     )
-    return fig,fig2,fig3
+    fig4 = px.histogram(df, x='sleeping_interval',color = 'slice_name', marginal="rug", hover_data=['slice_id','slice_name'], title='Sleeping')
+    fig4.update_layout(
+        xaxis_title='Duration [ms]'
+    )
+    return fig,fig2,fig3,fig4

@@ -52,20 +52,12 @@ def cpu_time():
     bar_chart(cpu_running,cpu_runnable,'thread_name','percentage','cpu_time')
 
 def cpu_waiting_time():
-    thread_waiting_time_aggregated,thread_waiting_time = get_thread_waiting_time('R')
-    thread_running_time_aggregated,thread_running_time = get_thread_running_time('Running')
-    pie_chart(thread_waiting_time_aggregated,thread_running_time_aggregated,thread_waiting_time,thread_running_time)
+    df = get_detailed_thread_state_perfetto()
+    pie_chart(df)
 
 def function_distribution():
     functions = get_function_distribution()
-    threads = functions['thread_name'].unique()
-    thread_functions_dict = {}
-    for thread in threads:
-        data = functions[functions['thread_name'] == thread].sort_values(by='count',ascending=False)
-        total_cpu_time = data['cpu_time'].sum()
-        data['percentage'] = data['cpu_time']/total_cpu_time * 100
-        thread_functions_dict.update([(thread,data)])
-    custom_data_bar_chart(thread_functions_dict)
+    custom_data_bar_chart(functions)
 
 def regularity():
     df = get_function_intervals()
@@ -95,4 +87,5 @@ if __name__ == "__main__":
     if args.semaphore_deadlocks:
         semaphore_deadlocks()
     show(args.debug)
+
 
