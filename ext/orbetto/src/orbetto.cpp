@@ -141,7 +141,6 @@ static void _switchTo(uint16_t tid, bool begin, int priority = -1, int prev_stat
         if (priority >= 0) sched_switch->set_next_prio(priority);
 
         prev_tid = tid;
-        mortrall.update_tid(tid);
     }
 }
 
@@ -800,6 +799,11 @@ static void _itmPumpProcessPre( char c )
                 {
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
+                }
+                // List all thread switches to construct call graph from instruction (etm) data later
+                if(m->srcAddr== EMDBG_TASK_RESUME)
+                {
+                    mortrall.add_thread_switch(m->value & 0xfffful);
                 }
             }
             else if (p.genericMsg.msgtype == MSG_PC_SAMPLE)

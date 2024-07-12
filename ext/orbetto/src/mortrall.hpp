@@ -18,6 +18,7 @@
 #include <getopt.h>
 #include <iostream>
 #include <fstream>
+#include <deque>
 
 #include "git_version_info.h"
 #include "generics.h"
@@ -27,6 +28,7 @@
 #include "loadelf.h"
 #include "sio.h"
 #include "stream.h"
+
 
 
 //--------------------------------------------------------------------------------------//
@@ -136,10 +138,14 @@ class Mortrall
         static inline uint64_t itm_timestamp_ns;
         // current running thread id
         static inline uint16_t tid;
+        static inline uint16_t pending_tid;
         // Callstack map to store the callstacks of the different threads
         static inline std::map<uint16_t, CallStack> callstacks;
         // pending thread switch
         static inline bool pending_thread_switch;
+        // array which lists thread switches from software Pre-Pump
+        // The value always indicates the the thread id to switch to (next tid)
+        static inline std::deque<uint16_t> thread_switches;
 
         // Default Constructor
         constexpr Mortrall()
@@ -202,16 +208,9 @@ class Mortrall
             Mortrall::r->instruction_count = 0;
         }
 
-        void inline update_tid(uint16_t tid)
+        void inline add_thread_switch(uint16_t tid)
         {
-            printf("Thread Switch to Id: %d\n",tid);
-            Mortrall::tid = tid;
-            // check if the thread is already in the callstack map if not add it
-            if (!Mortrall::callstacks.contains(tid))
-            {
-                Mortrall::callstacks[tid] = CallStack();
-            }
-            Mortrall::pending_thread_switch = true;
+            Mortrall::thread_switches.push_back(tid);
         }
     private:
 
@@ -281,12 +280,6 @@ class Mortrall
                                 Mortrall::r->returnAddress = cpu->addr;
                                 revertStack = (cpu->addr != Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth]);
                                 Mortrall::r->exceptionEntry = true;
-                                /* When using the decoder with NuttX a hardfault exception can initiate a context switch. It is only an exit when there has not been called a context switch by software packets*/
-                                /* This is a really hacky solution */
-                                if(cpu->exception == 3 && !Mortrall::pending_thread_switch){
-                                    Mortrall::pending_thread_switch = true;
-                                    Mortrall::tid = 0;
-                                }
                             }
                             else
                             {
@@ -334,22 +327,7 @@ class Mortrall
                     {
                         _addTopToStack(Mortrall::r,cpu->addr);
                     }
-                    /* After a A-sync sometimes packets seem to be missed to catch that check if there might be a missed return*/
-                    if (inconsistent && resent_async){
-                        // check if function in stack
-                        if(Mortrall::r->callStack->stackDepth > 0)
-                        {
-                            // check if function name address is the same as the new address
-                            struct symbolFunctionStore *current_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth-1]);
-                            struct symbolFunctionStore *new_func = symbolFunctionAt( Mortrall::r->s, cpu->addr);
-                            if(current_func != NULL && new_func != NULL && strcmp(current_func->funcname,new_func->funcname) == 0)
-                            {
-                                _traceReport( V_DEBUG, "Inconsistency has been caught and reverted" );
-                                _removeRetFromStack(Mortrall::r);
-                                _stackReport(Mortrall::r);
-                            }
-                        }
-                    }
+                    _catch_inconsistencies(inconsistent,cpu->addr);
                     resent_async = false;
                     Mortrall::r->resentStackDel = false;
                     // after reverting add the return address of before the exception to the stack
@@ -361,21 +339,10 @@ class Mortrall
                     _stackReport(Mortrall::r);
                 }
                 /* Whatever the state was, this is an explicit setting of an address, so we need to respect it */
+                _detect_thread_switch_pattern(cpu->addr);
+                _switch_thread(Mortrall::r->op.workingAddr,cpu->addr);
                 Mortrall::r->op.workingAddr = cpu->addr;
                 Mortrall::r->protobuffCallback();
-                if( Mortrall::r->exceptionEntry && Mortrall::pending_thread_switch)
-                {
-                    _traceReport( V_DEBUG, "Thread switch with first address: %08x" ,cpu->addr);
-                    // set the current callstack in runtime
-                    Mortrall::r->callStack = &Mortrall::callstacks[Mortrall::tid];
-                    Mortrall::activeCallStackThread = Mortrall::PID_CALLSTACK+Mortrall::tid;
-                    Mortrall::last_stack_depth = Mortrall::r->callStack->stackDepth;
-                    csb.proto_buffer_index = 0;
-                    csb.lastStackDepth = Mortrall::r->callStack->stackDepth;
-                    Mortrall::pending_thread_switch = false;
-                    // _addRetToStack( Mortrall::r, cpu->addr ,FUNCTION);
-                    _stackReport(Mortrall::r);
-                }
                 Mortrall::r->exceptionEntry = false;
             }
 
@@ -449,20 +416,11 @@ class Mortrall
                     //if ( v )
                     //    _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_SOURCE, v );
                 }
-                //printf("Count: %d\n",Mortrall::count);
+
                 /* Now output the matching assembly, and location updates */
                 char *a = symbolDisassembleLine( Mortrall::r->s, &ic, Mortrall::r->op.workingAddr, &newaddr );
-
-                //printf("Compare: %i\n",strcmp(a,Mortrall::line));
-                // print a and line
-                //printf("A: %s\n",a);
-                //printf("Line: %s\n",Mortrall::line);
                 if ( a )
                 {
-                    int compare = strcmp(a,Mortrall::line);
-                    if (compare == 0){
-                        printf("Compare: %i\n",compare); 
-                    }
                     /* Calculate if this instruction was executed. This is slightly hairy depending on which protocol we're using;         */
                     /*   * ETM3.5: Instructions are executed based on disposition bit (LSB in disposition word)                            */
                     /*   * ETM4  : ETM4 everything up to a branch is executed...decision about that branch is based on disposition bit     */
@@ -568,50 +526,6 @@ class Mortrall
                 }
             }
             Mortrall::count ++;
-        }
-
-        static void inline _traceCBCallStackOnly( void *d )
-        /* Callback function for when valid TRACE decode is detected */
-        {
-            Mortrall::r = ( RunTime * )d;
-            struct TRACECPUState *cpu = TRACECPUState( &Mortrall::r->i );
-
-
-            if ( TRACEStateChanged( &Mortrall::r->i, EV_CH_ADDRESS ) || TRACEStateChanged( &Mortrall::r->i, EV_CH_EX_ENTRY ) )
-            {
-                uint32_t new_addr = cpu->addr;
-                struct symbolFunctionStore *new_func = symbolFunctionAt( Mortrall::r->s, new_addr );
-
-                if (new_func == NULL)
-                {
-                    return;
-                }
-
-                // check if the top of the stack is the same as the new address if yes skip
-                if(Mortrall::r->callStack->stackDepth > 0)
-                {
-                    struct symbolFunctionStore *current_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth-1]);
-                    if(strcmp(current_func->funcname,new_func->funcname) == 0)
-                    {
-                        _stackReport(Mortrall::r);
-                        return;
-                    }
-                }
-                // check if function changed
-                if(Mortrall::r->callStack->stackDepth > 1)
-                {
-                    struct symbolFunctionStore *prev_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth-2]);
-                    if(strcmp(prev_func->funcname,new_func->funcname) == 0)
-                    {
-                        Mortrall::r->callStack->stackDepth--;
-                        _stackReport(Mortrall::r);
-                        return;
-                    }
-                }
-                Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth] = new_addr;
-                Mortrall::r->callStack->stackDepth++;
-                _stackReport(Mortrall::r);
-            }
         }
 
 //--------------------------------------------------------------------------------------//
@@ -801,6 +715,64 @@ class Mortrall
 //--------------------------------------------------------------------------------------//
 //-------------------------------- BEGIN REGION CallStack ------------------------------//
 //--------------------------------------------------------------------------------------//
+
+        static void inline _catch_inconsistencies(bool inconsistent, uint32_t addr)
+        {
+            if (inconsistent){
+                    // check if function in stack
+                    if(Mortrall::r->callStack->stackDepth > 0)
+                    {
+                        // check if function name address is the same as the new address
+                        struct symbolFunctionStore *current_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth-1]);
+                        struct symbolFunctionStore *new_func = symbolFunctionAt( Mortrall::r->s, addr);
+                        if(current_func != NULL && new_func != NULL && strcmp(current_func->funcname,new_func->funcname) == 0)
+                        {
+                            _traceReport( V_DEBUG, "Inconsistency has been caught and reverted" );
+                            _removeRetFromStack(Mortrall::r);
+                            _stackReport(Mortrall::r);
+                        }
+                    }
+                }
+        }
+
+        static void inline _detect_thread_switch_pattern(uint64_t addr)
+        {
+            struct symbolFunctionStore *func = symbolFunctionAt( Mortrall::r->s, addr);
+            if(!Mortrall::pending_thread_switch && func && strcmp(func->funcname,"sched_note_resume") == 0)
+            {
+                printf("Debug Thread");
+                for (const uint16_t& elem : Mortrall::thread_switches) {
+                    printf("%d ",elem);
+                }
+                printf("\n");
+
+                Mortrall::pending_tid = Mortrall::thread_switches.front();
+                Mortrall::thread_switches.pop_front();
+
+                Mortrall::pending_thread_switch = true;
+                _traceReport( V_DEBUG, "Thread switch pattern detected with pending tid: %u" , Mortrall::pending_tid);
+            }
+        }
+
+        static void inline _switch_thread(uint64_t prev_addr, uint64_t addr)
+        {
+            struct symbolFunctionStore *prev_func = symbolFunctionAt( Mortrall::r->s, prev_addr);
+            struct symbolFunctionStore *func = symbolFunctionAt( Mortrall::r->s, addr);
+            // careful Hardcoded address for thread switch
+            if(Mortrall::pending_thread_switch && ((prev_func && strcmp(prev_func->funcname,"sys_call2") == 0 && (func == NULL || strcmp(func->funcname , "sys_call2") != 0)) || (addr==0x08000496)))
+            {
+                Mortrall::tid = Mortrall::pending_tid;
+                _traceReport( V_DEBUG, "Thread switch to tid: %u" , Mortrall::tid);
+                // set the current callstack in runtime
+                Mortrall::r->callStack = &Mortrall::callstacks[Mortrall::tid];
+                Mortrall::activeCallStackThread = Mortrall::PID_CALLSTACK+Mortrall::tid;
+                Mortrall::last_stack_depth = Mortrall::r->callStack->stackDepth;
+                csb.proto_buffer_index = 0;
+                csb.lastStackDepth = Mortrall::r->callStack->stackDepth;
+                Mortrall::pending_thread_switch = false;
+                _stackReport(Mortrall::r);
+            }
+        }
 
         static void inline _addRetToStack( RunTime *r, symbolMemaddr p ,CallStackProperties csp)
         {
