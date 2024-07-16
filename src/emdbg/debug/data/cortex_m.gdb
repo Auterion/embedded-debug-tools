@@ -226,7 +226,7 @@ define px4_etm_trace_tpiu_swo_stm32f7
     tbreak nx_start
     continue
 
-    enableSTM32TRACE 4 3
+    enableSTM32TRACE 4 3 1
     startETM 1
 
     px4_configure_orbuculum
@@ -243,7 +243,7 @@ define px4_trace_tpiu_swo_stm32f7
     tbreak nx_start
     continue
 
-    enableSTM32TRACE 4 3
+    enableSTM32TRACE 4 3 1
 
     px4_configure_orbuculum
 

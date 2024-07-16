@@ -268,11 +268,7 @@ define _startETMv4_modified
   set *($TRCEVENTCTL1R) = 0
 
   # Disable or enable stalling for instructions, if implemented
-  if ($stall!=0)
-    set *($TRCSTALLCTLR) = 0
-  else
-    set *($TRCSTALLCTLR) = (1<<13)|(1<<8)|(0x0f<<0)
-  end
+  set *($TRCSTALLCTLR) = (1<<13)|(1<<8)|(0x0f<<0)
 
   # Trace sync every 256 bytes of trace
   set *($TRCSYNCPR) = 0x0c
@@ -948,6 +944,7 @@ define enableSTM32TRACE
 
   set $bits=4
   set $drive=1
+  set $remap=0
 
   if $argc >= 1
     set $bits = $arg0
@@ -962,6 +959,10 @@ define enableSTM32TRACE
 
   if ($drive > 3)
     help enableSTM32TRACE
+  end
+
+  if $argc >= 3
+    set $remap = $arg2
   end
 
   set $bits = $bits-1
@@ -986,10 +987,14 @@ define enableSTM32TRACE
   end
 
   if ($bits>1)
-     # Setup PE5 & PC12 
-     enableSTM32Pin 4 5 $drive
-     enableSTM32Pin 4 6 $drive
-     #enableSTM32Pin 2 12 $drive
+    # Setup PE5 & PC12 
+    enableSTM32Pin 4 5 $drive
+    enableSTM32Pin 4 6 $drive
+    if ($remap)
+      enableSTM32Pin 2 12 $drive 
+    else
+      enableSTM32Pin 4 6 $drive
+    end
   end
 
   # Set number of bits in DBGMCU_CR
