@@ -3,6 +3,7 @@
 ## 1.5.3
 
 - Fix enabling vector catch with OpenOCD.
+- Substitute GitHub CI path with local path by default.
 
 ## 1.5.2
 

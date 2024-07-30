@@ -56,6 +56,7 @@ def command_string(backend: ProbeBackend, source: Path = None,
         "set filename-display absolute", "set disassemble-next-line on",
         "maintenance set internal-error backtrace on",
         "maintenance set internal-warning backtrace on",
+        "set substitute-path /__w/PX4_firmware_private/PX4_firmware_private/ .",
         f"source {debug_dir}/data/orbuculum.gdb",
         f"source {debug_dir}/data/cortex_m.gdb"]
     if (backend_gdb := debug_dir / f"data/{backend.name}.gdb").exists():
