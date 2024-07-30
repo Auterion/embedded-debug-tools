@@ -5,6 +5,7 @@
 - Fix enabling vector catch with OpenOCD.
 - Substitute GitHub CI path with local path by default.
 - Show stack overflow warning if stack usage >90%.
+- Do not attempt to load SVD file if target is unknown.
 
 ## 1.5.2
 

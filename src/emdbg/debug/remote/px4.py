@@ -274,7 +274,10 @@ class PX4_Watch_Peripheral(gdb.Command):
         self.last_report = {}
         self.all_report = {}
         self.watchpoints = {}
-        self.svd = px4.PeripheralWatcher(gdb, filename)
+        if filename is None:
+            filename = px4.device.Device(gdb)._SVD_FILE
+        if filename is not None:
+            self.svd = px4.PeripheralWatcher(gdb, filename)
         gdb.events.stop.connect(self.on_stop)
 
     @report_exception
@@ -360,7 +363,8 @@ class PX4_Show_Peripheral(gdb.Command):
         super().__init__("px4_pshow", gdb.COMMAND_USER)
         if filename is None:
             filename = px4.device.Device(gdb)._SVD_FILE
-        gdb.execute(f"arm loadfile st {filename}")
+        if filename is not None:
+            gdb.execute(f"arm loadfile st {filename}")
 
     @report_exception
     def invoke(self, argument, from_tty):
