@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- Fix enabling vector catch with OpenOCD.
+
 ## 1.5.2
 
 - Add erase command to JLink backend.

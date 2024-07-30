@@ -27,8 +27,15 @@ end
 define hookpost-backtrace
     set disassemble-next-line on
 end
+
+# Can be overwritten by the debug probe
+define px4_reset
+    monitor reset halt
+    px4_enable_vector_catch
+end
+# Can be overwritten by the debug probe
 define px4_enable_vector_catch
-    set *0xE000EDFC |= 0x07f0
+    monitor cortex_m vector_catch hard_err int_err bus_err state_err chk_err nocp_err mm_err
 end
 
 define px4_log_start
