@@ -345,7 +345,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
     table.add_column("CPU(ms)", justify="right")
     table.add_column("CPU(%)", justify="right")
     table.add_column("Stack\nUsage", justify="right")
-    table.add_column("Avail\nStack", justify="right")
+    table.add_column("Stack\nAvail", justify="right")
     table.add_column("Prio", justify="right")
     table.add_column("Base", justify="right")
     if with_file_names: table.add_column("Open File Names")
@@ -375,7 +375,7 @@ def all_tasks_as_table(gdb, sort_key: str = None, with_stack_usage: bool = True,
 
         # Add all the values per row
         relative = task.load.relative if interval_us else task.load.total / total_interval_us
-        stack_overflow = with_stack_usage and task.stack_used >= task.stack_limit
+        stack_overflow = with_stack_usage and task.stack_used >= (task.stack_limit - max(8, task.stack_limit * 0.1))
         row = [hex(task._tcb), task.pid, task.name,
                hex(task.location) if isinstance(task.location, int) else task.location.name,
                task.load.total//1000, f"{(relative * 100):.1f}",
