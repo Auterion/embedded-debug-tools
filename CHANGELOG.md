@@ -6,6 +6,7 @@
 - Substitute GitHub CI path with local path by default.
 - Show stack overflow warning if stack usage >90%.
 - Do not attempt to load SVD file if target is unknown.
+- Fix UartBuffer pointer address computation.
 
 ## 1.5.2
 

@@ -24,13 +24,14 @@ class UartBuffer(Base):
         yield ("buffer", self._buf['buffer'])
         yield ("tail -> head", f"{tail} -> {head}: {used} used, {free} free")
         if used:
+            ptr = int(self._buf['buffer'].address)
             if (tail < head):
                 # [tail, head]
-                memories = [self.read_memory(self._buf['buffer'] + tail, used)]
+                memories = [self.read_memory(ptr + tail, used)]
             else:
                 # head], [tail
-                memories = [self.read_memory(self._buf['buffer'] + tail, size - tail),
-                            self.read_memory(self._buf['buffer'], head)]
+                memories = [self.read_memory(ptr + tail, size - tail),
+                            self.read_memory(ptr, head)]
             # Convert to Prints else \hh hex values
             content = "".join(chr(v) if chr(v).isprintable() else f"\\{v:02x}"
                               for memory in memories
