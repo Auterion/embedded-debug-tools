@@ -2,13 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 
 """
-# Embedded Debug Tools
-
-The most important tools:
-
-- GDB: `emdbg.debug.gdb`.
-- FMU: `emdbg.bench.fmu`.
-- Patches: `emdbg.patch.set`.
+.. include:: ../../README.md
 """
 
 from importlib.metadata import version, PackageNotFoundError

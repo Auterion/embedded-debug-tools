@@ -32,7 +32,7 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
     - Automatic management of debug probe drivers.
     - Remote interfacing via [GDB/MI](https://github.com/cs01/pygdbmi) and RPyC.
     - Plugins via [GDB Python API](https://sourceware.org/gdb/onlinedocs/gdb/Python-API.html).
-    - [User commands for PX4 and NuttX](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/gdb.md#user-commands).
+    - [User commands for PX4 and NuttX](https://auterion.github.io/embedded-debug-tools/emdbg/debug/gdb.html#user-commands).
     - Hardfault trapping with immediate backtrace.
 - [Real-time instrumentation using ITM/DWT](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto).
     - Visualization of entire RTOS state via [perfetto](https://perfetto.dev).
@@ -59,9 +59,9 @@ Sorted in reverse chronological order.
 
 ### Analyzing Cortex-M Firmware with the Perfetto Trace Processor
 
-Presented at [emBO++](http://embo.io) by Niklas Hauser on 2024-03-15.
+Presented at [emBO++](https://embo.io) by Niklas Hauser on 2024-03-15.
 
-[![](https://i.ytimg.com/vi/FIStxUz2ERY/maxresdefault.jpg)](https://www.youtube.com/watch?v=FIStxUz2ERY&t=108s)
+<a href="https://www.youtube.com/watch?v=FIStxUz2ERY&t=108s"><img src="https://i.ytimg.com/vi/FIStxUz2ERY/maxresdefault.jpg" width="100%"/></a>
 
 [Slides with Notes](https://salkinium.com/talks/embo24_perfetto.pdf).
 
@@ -69,7 +69,7 @@ Presented at [emBO++](http://embo.io) by Niklas Hauser on 2024-03-15.
 
 Presented at the [PX4 Developer Summit](https://events.linuxfoundation.org/px4-developer-summit) by Niklas Hauser on 2023-10-22.
 
-[![](https://i.ytimg.com/vi/1c4TqEn3MZ0/maxresdefault.jpg)](https://www.youtube.com/watch?v=1c4TqEn3MZ0)
+<a href="https://www.youtube.com/watch?v=1c4TqEn3MZ0"><img src="https://i.ytimg.com/vi/1c4TqEn3MZ0/maxresdefault.jpg" width="100%"/></a>
 
 [Slides with Notes](https://salkinium.com/talks/px4summit23_debugging_px4.pdf).
 
@@ -77,13 +77,13 @@ Presented at the [PX4 Developer Summit](https://events.linuxfoundation.org/px4-d
 
 Presented at the [NuttX International Workshop](https://events.nuttx.apache.org/index.php/nuttx-international-workshop-2023) by Niklas Hauser on 2023-09-29.
 
-[![](https://i3.ytimg.com/vi/_k1f4F2JVBA/maxresdefault.jpg)](https://www.youtube.com/watch?v=_k1f4F2JVBA)
+<a href="https://www.youtube.com/watch?v=_k1f4F2JVBA"><img src="https://i3.ytimg.com/vi/_k1f4F2JVBA/maxresdefault.jpg" width="100%"/></a>
 
 ### Debugging Microcontrollers
 
 Presented at [Chaos Communication Camp](https://events.ccc.de/camp/2023/) by Niklas Hauser on 2023-08-18.
 
-[![](https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg)](https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers)
+<a href="https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers"><img src="https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg" width="100%"/></a>
 
 [Slides with Notes](https://salkinium.com/talks/cccamp23_debugging_microcontrollers.pdf).
 
@@ -97,11 +97,11 @@ pip3 install emdbg
 
 You also need to install other command line tools depending on what you use:
 
-- Debugger: [`arm-none-eabi-gdb-py3`](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/gdb.md#installation).
-- Debug probes: [J-Link](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/jlink.md#installation),
-                [OpenOCD](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/openocd.md#installation),
-                [CrashDebug](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/debug/crashdebug.md#installation).
-- Analysis: [graphviz](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/analyze/callgraph.md#installation)
+- Debugger: [`arm-none-eabi-gdb-py3`](https://auterion.github.io/embedded-debug-tools/emdbg/debug/gdb.html#installation).
+- Debug probes: [J-Link](https://auterion.github.io/embedded-debug-tools/emdbg/debug/jlink.html#installation),
+                [OpenOCD](https://auterion.github.io/embedded-debug-tools/emdbg/debug/openocd.html#installation),
+                [CrashDebug](https://auterion.github.io/embedded-debug-tools/emdbg/debug/crashdebug.html#installation).
+- Analysis: [graphviz](https://auterion.github.io/embedded-debug-tools/emdbg/analyze/callgraph.html#installation)
 
 
 ## Usage
@@ -121,12 +121,8 @@ python3 -m emdbg.debug.gdb --elf path/to/firmware.elf --ui=tui jlink -device STM
 ## Documentation
 
 Most important user guides are available as Markdown files in the repository.
-You can browse the API documentation locally using the `pdoc` library:
-
-```sh
-pdoc emdbg
-# pdoc server ready at http://localhost:8080
-```
+You can browse the latest API documentation online at
+[auterion.github.io/embedded-debug-tools](https://auterion.github.io/embedded-debug-tools).
 
 
 ## Development
@@ -137,4 +133,11 @@ flag, which symlinks the relevant files into the package path:
 ```sh
 cd embedded-debug-tools
 pip3 install -e ".[all]"
+```
+
+You can also work on the documentation locally via `pdoc`:
+
+```sh
+pdoc emdbg
+# pdoc server ready at http://localhost:8080
 ```
