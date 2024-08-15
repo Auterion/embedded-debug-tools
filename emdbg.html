@@ -39,7 +39,15 @@
 
             <h2>Contents</h2>
             <ul>
-  <li><a href="#embedded-debug-tools">Embedded Debug Tools</a></li>
+  <li><a href="#embedded-debug-tools">Embedded Debug Tools</a>
+  <ul>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#presentations">Presentations</a></li>
+    <li><a href="#installation">Installation</a></li>
+    <li><a href="#usage">Usage</a></li>
+    <li><a href="#documentation">Documentation</a></li>
+    <li><a href="#development">Development</a></li>
+  </ul></li>
 </ul>
 
 
@@ -72,13 +80,167 @@ emdbg    </h1>
 
                         <div class="docstring"><h1 id="embedded-debug-tools">Embedded Debug Tools</h1>
 
-<p>The most important tools:</p>
+<p>The emdbg library connects several software and hardware debugging tools
+together in a user friendly Python package to more easily enable advanced use
+cases for ARM Cortex-M microcontrollers and related devices.</p>
+
+<p>The library orchestrates the launch and configuration of hardware debug and
+trace probes, debuggers, logic analyzers, and waveform generators and provides
+analysis tools, converters, and plugins to provide significant insight into the
+software and hardware state during or after execution.</p>
+
+<p>The main focus of this project is the debugging of the PX4 Autopilot firmware
+running the NuttX RTOS on STM32 microcontrollers on the FMUv5x and FMUv6x
+hardware inside the Auterion Skynode. However, the library is modular and the
+tools are generic so that it can also be used for other firmware either
+out-of-box or with small adaptations.</p>
+
+<p>emdbg is maintained by <a href="https://github.com/niklaut">@niklaut</a> from
+<a href="https://auterion.com">Auterion</a>.</p>
+
+<h2 id="features">Features</h2>
 
 <ul>
-<li>GDB: <code><a href="emdbg/debug/gdb.html">emdbg.debug.gdb</a></code>.</li>
-<li>FMU: <code><a href="emdbg/bench/fmu.html">emdbg.bench.fmu</a></code>.</li>
-<li>Patches: <code><a href="emdbg/patch/set.html">emdbg.patch.set</a></code>.</li>
+<li>Debug Probes: SWD and ITM/DWT over SWO.
+<ul>
+<li><a href="https://www.segger.com/products/debug-probes/j-link/">SEGGER J-Link</a>: BASE Compact (3MB/s), EDU Mini.</li>
+<li><a href="https://www.st.com/en/development-tools/stlink-v3minie.html">STMicro STLink-v3 MINIE</a>: (2MB/s).</li>
+<li><a href="https://orbcode.org/orbtrace-mini">Orbcode ORBTrace mini</a>: SWO (6MB/s).</li>
+<li>Coredump via <a href="https://github.com/adamgreen/CrashDebug">CrashDebug</a> with support for PX4 Hardfault logs.</li>
+</ul></li>
+<li>Trace Probes: ITM/DWT/ETM over TRACE.
+<ul>
+<li><a href="https://orbcode.org/orbtrace-mini">Orbcode ORBTrace mini</a>: (50MB/s).</li>
+<li><a href="https://www.segger.com/products/debug-probes/j-trace/models/j-trace/">SEGGER J-Trace</a>: (&gt;100MB/s) (planned).</li>
+</ul></li>
+<li><a href="https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain">GDB Debugger</a>.
+<ul>
+<li>Automatic management of debug probe drivers.</li>
+<li>Remote interfacing via <a href="https://github.com/cs01/pygdbmi">GDB/MI</a> and RPyC.</li>
+<li>Plugins via <a href="https://sourceware.org/gdb/onlinedocs/gdb/Python-API.html">GDB Python API</a>.</li>
+<li><a href="https://auterion.github.io/embedded-debug-tools/emdbg/debug/gdb.html#user-commands">User commands for PX4 and NuttX</a>.</li>
+<li>Hardfault trapping with immediate backtrace.</li>
+</ul></li>
+<li><a href="https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto">Real-time instrumentation using ITM/DWT</a>.
+<ul>
+<li>Visualization of entire RTOS state via <a href="https://perfetto.dev">perfetto</a>.</li>
+<li>Nanosecond resolution with very little runtime overhead.</li>
+</ul></li>
+<li>Patch Manager for out-of-tree modifications.</li>
+<li>Power Switch.
+<ul>
+<li>Yocto USB Relay.</li>
+</ul></li>
+<li>Logic Analyzer and Waveform Generator.
+<ul>
+<li><a href="https://digilent.com/reference/test-and-measurement/analog-discovery-2/start">Digilent Analog Discovery 2</a> via Python API.</li>
+<li><a href="https://sigrok.org/wiki/Main_Page">Sigrok</a> (prototyped).</li>
+<li>Visualization via <a href="https://perfetto.dev">perfetto</a> (prototyped).</li>
+</ul></li>
+<li>Serial Protocols.
+<ul>
+<li>NuttX NSH command prompt.</li>
+</ul></li>
+<li>Hardware configuration.
+<ul>
+<li><a href="https://docs.px4.io/main/en/flight_controller/autopilot_pixhawk_standard.html">FMUv5x and FMUv6x</a>.</li>
+</ul></li>
 </ul>
+
+<p>A number of GDB and NSH scripting examples for test automation can be found in
+the <code>scripts</code> folder.</p>
+
+<h2 id="presentations">Presentations</h2>
+
+<p>Sorted in reverse chronological order.</p>
+
+<h3 id="analyzing-cortex-m-firmware-with-the-perfetto-trace-processor">Analyzing Cortex-M Firmware with the Perfetto Trace Processor</h3>
+
+<p>Presented at <a href="https://embo<a href="emdbg/io.html">emdbg.io</a>">emBO++</a> by Niklas Hauser on 2024-03-15.</p>
+
+<p><a href="https://www.youtube.com/watch?v=FIStxUz2ERY&amp;t=108s"><img src="https://i.ytimg.com/vi/FIStxUz2ERY/maxresdefault.jpg" width="100%"/></a></p>
+
+<p><a href="https://salkinium.com/talks/embo24_perfetto.pdf">Slides with Notes</a>.</p>
+
+<h3 id="debugging-px4">Debugging PX4</h3>
+
+<p>Presented at the <a href="https://events.linuxfoundation.org/px4-developer-summit">PX4 Developer Summit</a> by Niklas Hauser on 2023-10-22.</p>
+
+<p><a href="https://www.youtube.com/watch?v=1c4TqEn3MZ0"><img src="https://i.ytimg.com/vi/1c4TqEn3MZ0/maxresdefault.jpg" width="100%"/></a></p>
+
+<p><a href="https://salkinium.com/talks/px4summit23_debugging_px4.pdf">Slides with Notes</a>.</p>
+
+<h3 id="debugging-and-profiling-nuttx-and-px4">Debugging and Profiling NuttX and PX4</h3>
+
+<p>Presented at the <a href="https://events.nuttx.apache.org/index.php/nuttx-international-workshop-2023">NuttX International Workshop</a> by Niklas Hauser on 2023-09-29.</p>
+
+<p><a href="https://www.youtube.com/watch?v=_k1f4F2JVBA"><img src="https://i3.ytimg.com/vi/_k1f4F2JVBA/maxresdefault.jpg" width="100%"/></a></p>
+
+<h3 id="debugging-microcontrollers">Debugging Microcontrollers</h3>
+
+<p>Presented at <a href="https://events.ccc.de/camp/2023/">Chaos Communication Camp</a> by Niklas Hauser on 2023-08-18.</p>
+
+<p><a href="https://media.ccc.de/v/camp2023-57321-debugging_microcontrollers"><img src="https://static.media.ccc.de/media/conferences/camp2023/57321-4a4f8363-865f-52b7-b236-3b9b73aa2ad7_preview.jpg" width="100%"/></a></p>
+
+<p><a href="https://salkinium.com/talks/cccamp23_debugging_microcontrollers.pdf">Slides with Notes</a>.</p>
+
+<h2 id="installation">Installation</h2>
+
+<p>The latest version is hosted on PyPi and can be installed via pip:</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code>pip3<span class="w"> </span>install<span class="w"> </span>emdbg
+</code></pre>
+</div>
+
+<p>You also need to install other command line tools depending on what you use:</p>
+
+<ul>
+<li>Debugger: <a href="https://auterion.github.io/embedded-debug-tools/emdbg/debug/gdb.html#installation"><code>arm-none-eabi-gdb-py3</code></a>.</li>
+<li>Debug probes: <a href="https://auterion.github.io/embedded-debug-tools/emdbg/debug/jlink.html#installation">J-Link</a>,
+<a href="https://auterion.github.io/embedded-debug-tools/emdbg/debug/openocd.html#installation">OpenOCD</a>,
+<a href="https://auterion.github.io/embedded-debug-tools/emdbg/debug/crashdebug.html#installation">CrashDebug</a>.</li>
+<li>Analysis: <a href="https://auterion.github.io/embedded-debug-tools/emdbg/analyze/callgraph.html#installation">graphviz</a></li>
+</ul>
+
+<h2 id="usage">Usage</h2>
+
+<p>Most modules have their own command-line interface. This library therefore has
+many entry points which can be called using <code>python3 -m emdbg.{module}</code>.
+The individual command line usage is documented in each module.
+The most important modules are <code><a href="emdbg/debug/gdb.html">emdbg.debug.gdb</a></code> and <code><a href="emdbg/bench/fmu.html">emdbg.bench.fmu</a></code>:</p>
+
+<p>For example, launching GDB with TUI using a J-Link debug probe:</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code>python3<span class="w"> </span>-m<span class="w"> </span><a href="emdbg/debug/gdb.html">emdbg.debug.gdb</a><span class="w"> </span>--elf<span class="w"> </span>path/to/firmware.elf<span class="w"> </span>--ui<span class="o">=</span>tui<span class="w"> </span>jlink<span class="w"> </span>-device<span class="w"> </span>STM32F765II
+</code></pre>
+</div>
+
+<h2 id="documentation">Documentation</h2>
+
+<p>Most important user guides are available as Markdown files in the repository.
+You can browse the latest API documentation online at
+<a href="https://auterion.github.io/embedded-debug-tools">auterion.github.io/embedded-debug-tools</a>.</p>
+
+<h2 id="development">Development</h2>
+
+<p>For development, checkout the repository locally, then install with the <code>-e</code>
+flag, which symlinks the relevant files into the package path:</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code><span class="nb">cd</span><span class="w"> </span>embedded-debug-tools
+pip3<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[all]&quot;</span>
+</code></pre>
+</div>
+
+<p>You can also work on the documentation locally via <code>pdoc</code>:</p>
+
+<div class="pdoc-code codehilite">
+<pre><span></span><code>pdoc<span class="w"> </span>emdbg
+<span class="c1"># pdoc server ready at http://localhost:8080</span>
+</code></pre>
+</div>
 </div>
 
                         <input id="mod-emdbg-view-source" class="view-source-toggle-state" type="checkbox" aria-hidden="true" tabindex="-1">
@@ -89,37 +251,31 @@ emdbg    </h1>
 </span><span id="L-2"><a href="#L-2"><span class="linenos"> 2</span></a><span class="c1"># SPDX-License-Identifier: BSD-3-Clause</span>
 </span><span id="L-3"><a href="#L-3"><span class="linenos"> 3</span></a>
 </span><span id="L-4"><a href="#L-4"><span class="linenos"> 4</span></a><span class="sd">&quot;&quot;&quot;</span>
-</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a><span class="sd"># Embedded Debug Tools</span>
-</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a>
-</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a><span class="sd">The most important tools:</span>
-</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a>
-</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a><span class="sd">- GDB: `emdbg.debug.gdb`.</span>
-</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a><span class="sd">- FMU: `emdbg.bench.fmu`.</span>
-</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a><span class="sd">- Patches: `emdbg.patch.set`.</span>
-</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-5"><a href="#L-5"><span class="linenos"> 5</span></a><span class="sd">.. include:: ../../README.md</span>
+</span><span id="L-6"><a href="#L-6"><span class="linenos"> 6</span></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="L-7"><a href="#L-7"><span class="linenos"> 7</span></a>
+</span><span id="L-8"><a href="#L-8"><span class="linenos"> 8</span></a><span class="kn">from</span> <span class="nn">importlib.metadata</span> <span class="kn">import</span> <span class="n">version</span><span class="p">,</span> <span class="n">PackageNotFoundError</span>
+</span><span id="L-9"><a href="#L-9"><span class="linenos"> 9</span></a><span class="k">try</span><span class="p">:</span>
+</span><span id="L-10"><a href="#L-10"><span class="linenos">10</span></a>    <span class="n">__version__</span> <span class="o">=</span> <span class="n">version</span><span class="p">(</span><span class="s2">&quot;emdbg&quot;</span><span class="p">)</span>
+</span><span id="L-11"><a href="#L-11"><span class="linenos">11</span></a><span class="k">except</span> <span class="n">PackageNotFoundError</span><span class="p">:</span>
+</span><span id="L-12"><a href="#L-12"><span class="linenos">12</span></a>    <span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.0.0&quot;</span>
 </span><span id="L-13"><a href="#L-13"><span class="linenos">13</span></a>
-</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a><span class="kn">from</span> <span class="nn">importlib.metadata</span> <span class="kn">import</span> <span class="n">version</span><span class="p">,</span> <span class="n">PackageNotFoundError</span>
-</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="k">try</span><span class="p">:</span>
-</span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a>    <span class="n">__version__</span> <span class="o">=</span> <span class="n">version</span><span class="p">(</span><span class="s2">&quot;emdbg&quot;</span><span class="p">)</span>
-</span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a><span class="k">except</span> <span class="n">PackageNotFoundError</span><span class="p">:</span>
-</span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a>    <span class="n">__version__</span> <span class="o">=</span> <span class="s2">&quot;0.0.0&quot;</span>
-</span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a>
-</span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a>
-</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">analyze</span>
-</span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">bench</span>
-</span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">debug</span>
-</span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">power</span>
-</span><span id="L-25"><a href="#L-25"><span class="linenos">25</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serial</span>
-</span><span id="L-26"><a href="#L-26"><span class="linenos">26</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">io</span>
-</span><span id="L-27"><a href="#L-27"><span class="linenos">27</span></a>
-</span><span id="L-28"><a href="#L-28"><span class="linenos">28</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">logger</span>
-</span><span id="L-29"><a href="#L-29"><span class="linenos">29</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">utils</span>
-</span><span id="L-30"><a href="#L-30"><span class="linenos">30</span></a>
-</span><span id="L-31"><a href="#L-31"><span class="linenos">31</span></a><span class="c1"># Silence warnings about path import order when calling modules directly</span>
-</span><span id="L-32"><a href="#L-32"><span class="linenos">32</span></a><span class="kn">import</span> <span class="nn">sys</span>
-</span><span id="L-33"><a href="#L-33"><span class="linenos">33</span></a><span class="k">if</span> <span class="ow">not</span> <span class="n">sys</span><span class="o">.</span><span class="n">warnoptions</span><span class="p">:</span>
-</span><span id="L-34"><a href="#L-34"><span class="linenos">34</span></a>    <span class="kn">import</span> <span class="nn">warnings</span>
-</span><span id="L-35"><a href="#L-35"><span class="linenos">35</span></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">RuntimeWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s1">&#39;runpy&#39;</span><span class="p">)</span>
+</span><span id="L-14"><a href="#L-14"><span class="linenos">14</span></a>
+</span><span id="L-15"><a href="#L-15"><span class="linenos">15</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">analyze</span>
+</span><span id="L-16"><a href="#L-16"><span class="linenos">16</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">bench</span>
+</span><span id="L-17"><a href="#L-17"><span class="linenos">17</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">debug</span>
+</span><span id="L-18"><a href="#L-18"><span class="linenos">18</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">power</span>
+</span><span id="L-19"><a href="#L-19"><span class="linenos">19</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">serial</span>
+</span><span id="L-20"><a href="#L-20"><span class="linenos">20</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">io</span>
+</span><span id="L-21"><a href="#L-21"><span class="linenos">21</span></a>
+</span><span id="L-22"><a href="#L-22"><span class="linenos">22</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">logger</span>
+</span><span id="L-23"><a href="#L-23"><span class="linenos">23</span></a><span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">utils</span>
+</span><span id="L-24"><a href="#L-24"><span class="linenos">24</span></a>
+</span><span id="L-25"><a href="#L-25"><span class="linenos">25</span></a><span class="c1"># Silence warnings about path import order when calling modules directly</span>
+</span><span id="L-26"><a href="#L-26"><span class="linenos">26</span></a><span class="kn">import</span> <span class="nn">sys</span>
+</span><span id="L-27"><a href="#L-27"><span class="linenos">27</span></a><span class="k">if</span> <span class="ow">not</span> <span class="n">sys</span><span class="o">.</span><span class="n">warnoptions</span><span class="p">:</span>
+</span><span id="L-28"><a href="#L-28"><span class="linenos">28</span></a>    <span class="kn">import</span> <span class="nn">warnings</span>
+</span><span id="L-29"><a href="#L-29"><span class="linenos">29</span></a>    <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">RuntimeWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s1">&#39;runpy&#39;</span><span class="p">)</span>
 </span></pre></div>
 
 
