@@ -49,6 +49,7 @@ struct
     std::string file;
     std::string elfFile;
     bool outputDebugFile;
+    enum verbLevel verbose;
 } options;
 
 struct
@@ -665,9 +666,16 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
 // ====================================================================================================
 static void _handleTS( struct TSMsg *m, struct ITMDecoder *i )
 {
-    _r.timeStamp += m->timeInc;
+    // depreciated since we have better timestamp in etm
+    // _r.timeStamp += m->timeInc;
+    // _r.ns = (_r.timeStamp * 1e9) / options.cps;
+    // mortrall.update_itm_timestamp(_r.timeStamp,_r.ns);
+}
+
+static void _handleTSFromETM(uint64_t cc)
+{
+    _r.timeStamp = cc;
     _r.ns = (_r.timeStamp * 1e9) / options.cps;
-    mortrall.update_itm_timestamp(_r.timeStamp,_r.ns);
 }
 
 // ====================================================================================================
@@ -766,8 +774,7 @@ static void _handlePc( struct pcSampleMsg *m, struct ITMDecoder *i )
             auto *exit = event->mutable_funcgraph_exit();
             exit->set_depth(0);
             exit->set_func(prev_function_addr);
-        }else
-        {
+        }else{
             printf("First function in thread: %i\n", prev_tid);
         }
         // start the current function sample
@@ -1005,6 +1012,7 @@ bool _processOptions( int argc, char *argv[] )
                 }
 
                 genericsSetReportLevel( (enum verbLevel)atoi( optarg ) );
+                options.verbose = (enum verbLevel) atoi( optarg );
                 break;
 
             // ------------------------------------
@@ -1100,7 +1108,7 @@ int main(int argc, char *argv[])
     printf("Loading ELF file %s with%s source lines\n", options.elfFile.c_str(), has_pc_samples ? "" : "out");
     _r.symbols = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
     assert( _r.symbols );
-    mortrall.init(perfetto_trace,ftrace,options.cps,_r.symbols);
+    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols,_handleTSFromETM);
     
     printf("Loaded ELF with %u sections:\n", _r.symbols->nsect_mem);
     for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)

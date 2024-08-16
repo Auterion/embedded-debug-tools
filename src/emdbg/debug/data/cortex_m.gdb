@@ -129,37 +129,6 @@ define px4_configure_orbuculum
 
 end
 
-define test
-
-    # enableSTM32TRACE 4 3
-    # send out sync packets every CYCCNT[28] ~268M cycles
-    # dwtSyncTap 3
-    # enable the CYCCNT
-    # dwtCycEna 1
-    # enable exception tracing
-    dwtTraceException 0
-    # Set POSTCNT source to CYCCNT[10] /1024
-    dwtPostTap 1
-    # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 2
-    # enable PC sampling
-    dwtSamplePC 0
-
-    # ITMSWOEna 0 disable SWV clock behavior -> clocks should be counted by cpu
-    #ITMTSEna 1
-    #ITMId 1
-    #ITMGTSFreq 3
-    #ITMTSPrescale 3
-    #ITMTXEna 1
-    #ITMSYNCEna 1
-    #ITMEna 1
-
-    #ITMTER 0 0xFFFFFFFF
-    #ITMTPR 0xFFFFFFFF
-
-    #startETM 1
-end
-
 define px4_enable_swo_stm32h7
     _setAddressesSTM32
 
@@ -223,8 +192,6 @@ end
 
 define px4_etm_trace_tpiu_swo_stm32f7
     px4_reset
-    tbreak nx_start
-    continue
 
     enableSTM32TRACE 4 3 1
     startETM 1
