@@ -253,11 +253,12 @@ class Nsh:
 
 # -----------------------------------------------------------------------------
 @contextmanager
-def nsh(serial: str, baudrate: int = 57600):
+def nsh(serial_or_port: str, baudrate: int = 57600):
     """
-    Opens a serial port with the `serial` number and closes it again.
+    Opens a serial port with the `serial` number or filepath and closes it again.
 
-    :param serial: the serial number of the port to connect to.
+    :param serial_or_port: the serial number or the filepath of the port to
+                           connect to.
     :param baudrate: the baudrate to use.
 
     :raises `SerialException`: if serial port is not found.
@@ -265,10 +266,14 @@ def nsh(serial: str, baudrate: int = 57600):
     :return: yields an initialized `Nsh` object.
     """
     nsh = None
-    port = find_serial_port(serial)
+    if "/" in serial_or_port:
+        ttyDevice = serial_or_port
+    else:
+        ttyDevice = find_serial_port(serial_or_port).device
     try:
-        LOGGER.info(f"Starting on port '{serial}'..." if serial else "Starting...")
-        device = Serial(port.device, baudrate=baudrate)
+        LOGGER.info(f"Starting on port '{serial_or_port}'..."
+                    if serial_or_port else "Starting...")
+        device = Serial(ttyDevice, baudrate=baudrate)
         reader_thread = ReaderThread(device, lambda: _NshReader(device))
         with reader_thread as reader:
             nsh = Nsh(reader_thread, reader)

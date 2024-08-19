@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4
+
+- Allow NSH port to be opened by filepath.
+
 ## 1.5.3
 
 - Fix enabling vector catch with OpenOCD.
