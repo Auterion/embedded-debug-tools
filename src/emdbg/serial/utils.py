@@ -4,7 +4,7 @@
 from __future__ import annotations
 from serial.tools import list_ports
 import logging
-LOGGER = logging.getLogger("serial")
+_LOGGER = logging.getLogger("serial")
 
 
 class SerialException(Exception):
@@ -26,7 +26,7 @@ def find_serial_port(identifier=None):
     serials = []
     for port in list_ports.comports():
         if not identifier:
-            LOGGER.debug(f"Using first found serial port '{port.serial_number}'.")
+            _LOGGER.debug(f"Using first found serial port '{port.serial_number}'.")
             return port
         if port.serial_number == identifier:
             return port

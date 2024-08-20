@@ -12,7 +12,7 @@ from serial.threaded import ReaderThread, Protocol
 from .utils import find_serial_port
 from ..utils import add_datetime as add_dt
 
-LOGGER = logging.getLogger("serial:nsh")
+_LOGGER = logging.getLogger("serial:nsh")
 
 
 class _NshReader(Protocol):
@@ -74,6 +74,7 @@ class Nsh:
         self._serial._data_received = self._print
         self._print_data = ""
         self.filter_ansi_escapes = True
+        """Filter ANSI escape codes from the output."""
         self._logfile = None
         self.clear()
 
@@ -85,7 +86,7 @@ class Nsh:
         if Nsh._NEWLINE in self._print_data:
             *lines, self._print_data = self._print_data.split(Nsh._NEWLINE)
             for line in self._filter(lines):
-                LOGGER.debug(line)
+                _LOGGER.debug(line)
                 if self._logfile is not None:
                     self._logfile.write(line + "\n")
 
@@ -175,7 +176,7 @@ class Nsh:
                 if re.search(pattern, line):
                     return self._join(lines)
             time.sleep(0.1)
-        LOGGER.warning(f"Waiting for '{pattern}' timed out after {timeout:.1f}s!")
+        _LOGGER.warning(f"Waiting for '{pattern}' timed out after {timeout:.1f}s!")
         return None
 
     def wait_for_prompt(self, timeout: float = _TIMEOUT) -> list[str]:
@@ -191,7 +192,7 @@ class Nsh:
         if prompts := self._read_packets(Nsh._NEWLINE + Nsh._PROMPT, timeout):
             prompt = Nsh._PROMPT + Nsh._PROMPT.join(prompts)
             return self._join(self._filter(prompt.split(Nsh._NEWLINE)))
-        LOGGER.warning(f"Waiting for 'nsh> ' prompt timed out after {timeout:.1f}s!")
+        _LOGGER.warning(f"Waiting for 'nsh> ' prompt timed out after {timeout:.1f}s!")
         return None
 
 
@@ -271,7 +272,7 @@ def nsh(serial_or_port: str, baudrate: int = 57600):
     else:
         ttyDevice = find_serial_port(serial_or_port).device
     try:
-        LOGGER.info(f"Starting on port '{serial_or_port}'..."
+        _LOGGER.info(f"Starting on port '{serial_or_port}'..."
                     if serial_or_port else "Starting...")
         device = Serial(ttyDevice, baudrate=baudrate)
         reader_thread = ReaderThread(device, lambda: _NshReader(device))
@@ -280,13 +281,13 @@ def nsh(serial_or_port: str, baudrate: int = 57600):
             yield nsh
     finally:
         if nsh is not None: nsh.log_to_file(None)
-        LOGGER.debug("Stopping.")
+        _LOGGER.debug("Stopping.")
 
 
 # -----------------------------------------------------------------------------
 # We need to monkey patch the ReaderThread.run() function to prevent a
 # "device not ready" error to abort the reader thread.
-def patched_run(self):
+def _patched_run(self):
     from serial import SerialException
     self.serial.timeout = 0.1
     self.protocol = self.protocol_factory()
@@ -304,7 +305,7 @@ def patched_run(self):
             data = self.serial.read(self.serial.in_waiting or 1)
         except SerialException as e:
             if self.alive and "readiness" in str(e):
-                # LOGGER.debug(e)
+                # _LOGGER.debug(e)
                 continue
             error = e
             break
@@ -319,4 +320,4 @@ def patched_run(self):
     self.protocol.connection_lost(error)
     self.protocol = None
 
-ReaderThread.run = patched_run
+ReaderThread.run = _patched_run
