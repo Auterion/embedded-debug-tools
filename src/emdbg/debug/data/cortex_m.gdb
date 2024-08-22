@@ -83,11 +83,11 @@ define px4_configure_orbuculum
     # enable the CYCCNT
     dwtCycEna 1
     # enable exception tracing
-    dwtTraceException 0
+    dwtTraceException 1
     # Set POSTCNT source to CYCCNT[10] /1024
-    dwtPostTap 10
+    dwtPostTap 1
     # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 10
+    dwtPostReset 2
     # enable PC sampling
     dwtSamplePC 0
 
@@ -192,6 +192,8 @@ end
 
 define px4_etm_trace_tpiu_swo_stm32f7
     px4_reset
+    tbreak nx_start
+    continue
 
     enableSTM32TRACE 4 3 1
     startETM 1

@@ -48,8 +48,10 @@ struct
     uint64_t cps{0};
     std::string file;
     std::string elfFile;
+    std::string elfBootloaderFile;
     bool outputDebugFile;
     enum verbLevel verbose;
+    bool etm{false};
 } options;
 
 struct
@@ -62,7 +64,9 @@ struct
     struct TPIUPacket p;
     uint64_t timeStamp;                  /* Latest received time */
     uint64_t ns;                         /* Latest received time in ns */
-    struct symbol *symbols;              /* symbols from the elf file */
+    struct symbol *symbols;              /* active symbols */
+    struct symbol *symbols_main;         /* symbols from the main elf file */
+    struct symbol *symbols_bootloader;   /* symbols from the bootloader elf file */
 } _r;
 
 static Device device;
@@ -661,15 +665,23 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             print->set_buf(buffer);
             break;
         }
+        default:
+        {
+            // debug print the unknown source address
+            genericsReport( V_DEBUG, "Unknown SW message from %u\n", m->srcAddr );
+            break;
+        }
     }
 }
 // ====================================================================================================
 static void _handleTS( struct TSMsg *m, struct ITMDecoder *i )
 {
-    // depreciated since we have better timestamp in etm
-    // _r.timeStamp += m->timeInc;
-    // _r.ns = (_r.timeStamp * 1e9) / options.cps;
-    // mortrall.update_itm_timestamp(_r.timeStamp,_r.ns);
+    // only use if instruction trace data is not available
+    if( !options.etm )
+    {
+        _r.timeStamp += m->timeInc;
+        _r.ns = (_r.timeStamp * 1e9) / options.cps;
+    }
 }
 
 static void _handleTSFromETM(uint64_t cc)
@@ -876,7 +888,8 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
 {
     if ( options.useTPIU )
     {
-        switch ( TPIUPump( &_r.t, c ) )
+        _r.t.debug = _pumpETMProcessGeneric != NULL;
+        switch ( TPIUPump( &_r.t, c) )
         {
             case TPIU_EV_NEWSYNC:
             case TPIU_EV_SYNCED:
@@ -906,6 +919,8 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
                         {
                             //printf("ETM\n");
                             _pumpETMProcessGeneric( _r.p.packet[g].d );
+                        }else{
+                            options.etm = true;
                         }
                         continue;
                     }
@@ -940,6 +955,14 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
         //printf("C: %u\n", c);
     }
 }
+
+// ====================================================================================================
+
+static void _switchSymbols()
+{
+    _r.symbols = _r.symbols_main;
+}
+
 // ====================================================================================================
 static struct option _longOptions[] =
 {
@@ -948,6 +971,7 @@ static struct option _longOptions[] =
     {"help", no_argument, NULL, 'h'},
     {"tpiu", required_argument, NULL, 't'},
     {"elf", required_argument, NULL, 'e'},
+    {"elf_bootloader", required_argument, NULL, 'b'},
     {"debug", no_argument, NULL, 'd'},
     {"verbose", required_argument, NULL, 'v'},
     {"version", no_argument, NULL, 'V'},
@@ -956,7 +980,7 @@ static struct option _longOptions[] =
 bool _processOptions( int argc, char *argv[] )
 {
     int c, optionIndex = 0;
-    while ( ( c = getopt_long ( argc, argv, "C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
+    while ( ( c = getopt_long ( argc, argv, "b:C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
         switch ( c )
         {
             // ------------------------------------
@@ -967,14 +991,15 @@ bool _processOptions( int argc, char *argv[] )
             // ------------------------------------
             case 'h':
                 fprintf( stdout, "Usage: %s [options]" EOL, argv[0] );
-                fprintf( stdout, "    -C, --cpufreq:      <Frequency in KHz> (Scaled) speed of the CPU" EOL );
-                fprintf( stdout, "    -f, --input-file:   <filename> Take input from specified file" EOL );
-                fprintf( stdout, "    -h, --help:         This help" EOL );
-                fprintf( stdout, "    -e, --elf:          <file>: Use this ELF file for information" EOL );
-                fprintf( stdout, "    -d, --debug:        Output a human-readable protobuf file" EOL );
-                fprintf( stdout, "    -t, --tpiu:         <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
-                fprintf( stdout, "    -v, --verbose:      <level> Verbose mode 0(errors)..3(debug)" EOL );
-                fprintf( stdout, "    -V, --version:      Print version and exit" EOL );
+                fprintf( stdout, "    -C, --cpufreq:            <Frequency in KHz> (Scaled) speed of the CPU" EOL );
+                fprintf( stdout, "    -f, --input-file:         <filename> Take input from specified file" EOL );
+                fprintf( stdout, "    -h, --help:               This help" EOL );
+                fprintf( stdout, "    -e, --elf:                <file>: Use this ELF file for information" EOL );
+                fprintf( stdout, "    -eb, --elf_bootloader:    <file>: Use this ELF file for bootloader information" EOL );
+                fprintf( stdout, "    -d, --debug:              Output a human-readable protobuf file" EOL );
+                fprintf( stdout, "    -t, --tpiu:               <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
+                fprintf( stdout, "    -v, --verbose:            <level> Verbose mode 0(errors)..3(debug)" EOL );
+                fprintf( stdout, "    -V, --version:            Print version and exit" EOL );
                 return false;
 
             // ------------------------------------
@@ -995,6 +1020,10 @@ bool _processOptions( int argc, char *argv[] )
             // ------------------------------------
             case 'e':
                 options.elfFile = optarg;
+                break;
+
+            case 'b':
+                options.elfBootloaderFile = optarg;
                 break;
 
             // ------------------------------------
@@ -1104,18 +1133,33 @@ int main(int argc, char *argv[])
     stream->close(stream);
     free(stream);
 
-
     printf("Loading ELF file %s with%s source lines\n", options.elfFile.c_str(), has_pc_samples ? "" : "out");
-    _r.symbols = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
-    assert( _r.symbols );
-    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols,_handleTSFromETM);
-    
-    printf("Loaded ELF with %u sections:\n", _r.symbols->nsect_mem);
-    for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)
+    _r.symbols_main = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
+    assert( _r.symbols_main );
+    printf("Loaded ELF with %u sections:\n", _r.symbols_main->nsect_mem);
+    for (int ii = 0; ii < _r.symbols_main->nsect_mem; ii++)
     {
-        auto mem = _r.symbols->mem[ii];
+        auto mem = _r.symbols_main->mem[ii];
         printf("  Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
     }
+    if(options.elfBootloaderFile.size())
+    {
+        printf("Loading ELF file %s for bootloader with%s source lines\n", options.elfBootloaderFile.c_str(), has_pc_samples ? "" : "out");
+        _r.symbols_bootloader = symbolAcquire((char*)options.elfBootloaderFile.c_str(), true, has_pc_samples);
+        assert( _r.symbols_bootloader );
+        printf("Loaded ELF with %u sections:\n", _r.symbols_bootloader->nsect_mem);
+        for (int ii = 0; ii < _r.symbols_bootloader->nsect_mem; ii++)
+        {
+            auto mem = _r.symbols_bootloader->mem[ii];
+            printf("  Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
+        }
+        _r.symbols = _r.symbols_bootloader;
+    }else{
+        _r.symbols = _r.symbols_main;
+    }
+
+    printf("Initialize Mortrall (Instruction tracing)\n");
+    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols_main,_r.symbols_bootloader,_handleTSFromETM,_switchSymbols);
 
     stream = streamCreateFile( options.file.c_str() );
     genericsReport( V_INFO, "Process Stream" EOL );

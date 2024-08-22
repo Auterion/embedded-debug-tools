@@ -69,7 +69,11 @@ struct RunTime
     enum TRACEprotocol protocol;        /* Encoding protocol to use */
     struct TRACEDecoder i;
 
-    struct symbol *s;                   /* Symbols read from elf */
+    struct symbol *s;                   /* Currently used elf */
+    struct symbol *_s;                  /* Symbols read from elf */
+    struct symbol *sb;                  /* Symbols read from bootloader elf*/
+
+    bool bootloader;              /* Set if we are still using bootloader elf */
 
     struct opConstruct op;              /* Materials required to be maintained across callbacks for output construction */
 
@@ -89,6 +93,7 @@ struct RunTime
 
     CallStack *callStack;               /* Pointer to current active call stack */
     CallStack exceptionCallStack;       /* Separate call stack for exceptions (all exceptions need to convert to depth 0; nested exceptions not implemented)*/
+    CallStack bootloaderCallStack;      /* Call stack for bootloader */
 };
 
 struct CallStackBuffer
@@ -114,8 +119,9 @@ class Mortrall
         static inline RunTime *r;
         // Parameter to store the PID at which the callstack is added to the perfetto trace
         static constexpr uint32_t PID_CALLSTACK = 400000;
+        static constexpr uint32_t PID_BOOTLOADER = 401000;
         static constexpr uint32_t PID_EXCEPTION = 500000;
-        static inline uint32_t activeCallStackThread = PID_CALLSTACK;
+        static inline uint32_t activeCallStackThread;
         // Store interrupt names to give each a unique perfetto thread
         static inline std::unordered_map<int, const char *> exception_names;
         // initialized
@@ -138,6 +144,7 @@ class Mortrall
         static inline struct symbolFunctionStore *top_thread_func;
         // Callback function to update timestamp in ITM trace
         static inline std::function<void(uint64_t)> update_itm_timestamp;
+        static inline std::function<void()> switch_itm_symbols;
         // Verbosity level
         static inline enum verbLevel verbose;
 
@@ -149,27 +156,41 @@ class Mortrall
             ;
         }
         // initialization
-        void inline init(perfetto::protos::Trace *perfetto_trace,perfetto::protos::FtraceEventBundle *ftrace,uint64_t cps,enum verbLevel v, struct symbol *s, std::function<void(uint64_t)> update_itm_timestamp_input)
+        void inline init(perfetto::protos::Trace *perfetto_trace,perfetto::protos::FtraceEventBundle *ftrace,uint64_t cps,enum verbLevel v, struct symbol *s,struct symbol *sb, std::function<void(uint64_t)> update_itm_timestamp_input,std::function<void()> switch_itm_symbols)
         {
             Mortrall::_startSong();
             Mortrall::perfetto_trace = perfetto_trace;
             Mortrall::ftrace = ftrace;
             Mortrall::cps = cps;
             Mortrall::r = new RunTime();
-            Mortrall::r->s = s;
+            Mortrall::r->_s = s;
+            Mortrall::r->sb = sb;
             Mortrall::_init();
             Mortrall::initialized = true;
             Mortrall::itm_timestamp_ns = 0;
             Mortrall::itm_cycle_count = 0;
             Mortrall::// Initialize the callstacks
             Mortrall::callstacks[0] = CallStack();
-            Mortrall::r->callStack = &Mortrall::callstacks[0];
             Mortrall::r->exceptionCallStack = CallStack();
-            Mortrall::activeCallStackThread = PID_CALLSTACK;
+            Mortrall::r->bootloaderCallStack = CallStack();
+            if(sb)
+            {
+                r->bootloader = true;
+                r->s = sb;
+                Mortrall::r->callStack = &r->bootloaderCallStack;
+                Mortrall::activeCallStackThread = PID_BOOTLOADER;
+            }else
+            {
+                r->bootloader = false;
+                r->s = s;
+                Mortrall::r->callStack = &Mortrall::callstacks[0];
+                Mortrall::activeCallStackThread = PID_CALLSTACK;
+            }
             Mortrall::pending_thread_switch = false;
             Mortrall::top_thread_func = NULL;
             Mortrall::debug = false;
             Mortrall::update_itm_timestamp = update_itm_timestamp_input;
+            Mortrall::switch_itm_symbols = switch_itm_symbols;
             if (v)
             {
                 Mortrall::verbose = v;
@@ -197,24 +218,6 @@ class Mortrall
                 Mortrall::r->committed = true;
                 // flush remaining buffer entries
                 Mortrall::_flush_proto_buffer();
-                // close all callstacks
-                // for (auto&& [key, val] : Mortrall::callstacks)
-                // {
-                //     Mortrall::r->callStack = &val;
-                //     Mortrall::tid = key;
-                //     Mortrall::activeCallStackThread = Mortrall::PID_CALLSTACK+Mortrall::tid;
-                //     csb.proto_buffer_index = 0;
-                //     while(Mortrall::r->callStack->stackDepth > 0)
-                //     {
-                //         Mortrall::r->callStack->stackDepth--;
-                //         Mortrall::_generate_protobuf_entries_single(0);
-                //     }
-                //     if(Mortrall::tid == 0){
-                //         Mortrall::r->callStack->stackDepth--;
-                //         Mortrall::_generate_protobuf_entries_single(0);
-                //     }
-                //     Mortrall::_flush_proto_buffer();
-                // }
             }
             Mortrall::_init_protobuf(process_tree);
             delete Mortrall::r;
@@ -240,6 +243,7 @@ class Mortrall
         {
             Mortrall::thread_switches.push_back(tid);
         }
+
     private:
 
 //--------------------------------------------------------------------------------------//
@@ -565,10 +569,24 @@ class Mortrall
                 else
                 {
                     clock_gettime(CLOCK_MONOTONIC, &start);
-                    _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_ASSEMBLY, "%8x:\tASSEMBLY NOT FOUND" EOL, Mortrall::r->op.workingAddr );
-                    Mortrall::r->op.workingAddr += 2;
-                    disposition >>= 1;
-                    incAddr--;
+                    /* If it is the first time assembly is not found switch elf file because we exceeded the address range of bootloader elf*/
+                    if (r->bootloader)
+                    {
+                        r->s = r->_s;
+                        Mortrall::tid = 0;
+                        r->callStack = &callstacks[Mortrall::tid];
+                        Mortrall::activeCallStackThread = PID_CALLSTACK + Mortrall::tid;
+                        _addTopToStack(Mortrall::r,cpu->addr);
+                        r->bootloader = false;
+                        Mortrall::switch_itm_symbols();
+                        _traceReport( V_DEBUG, "*** BOOTLOADER FINISHED *** \n");
+                    }else
+                    {
+                        _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_ASSEMBLY, "%8x:\tASSEMBLY NOT FOUND" EOL, Mortrall::r->op.workingAddr );
+                        Mortrall::r->op.workingAddr += 2;
+                        disposition >>= 1;
+                        incAddr--;
+                    }
                     clock_gettime(CLOCK_MONOTONIC, &end);
                     time64 += (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
                 }
@@ -604,6 +622,11 @@ class Mortrall
                     thread->set_tgid(PID_CALLSTACK);
                     thread->set_name("Thread");
                 }
+                // Add additional thread for bootloader
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_BOOTLOADER);
+                thread->set_tgid(PID_CALLSTACK);
+                thread->set_name("Bootloader");
             }
             {
                 auto *process = process_tree->add_processes();
@@ -687,8 +710,10 @@ class Mortrall
                 {
                     if(strcmp(next_func->funcname, top_thread_func->funcname))
                     {
-                        printf("Inconsistent function switch detected between functions: %s and %s\n", next_func->funcname, top_thread_func->funcname);
+                        _traceReport( V_DEBUG, "Inconsistent function switch detected between functions: %s and %s\n", next_func->funcname, top_thread_func->funcname);
                         _handleInconsistentFunctionSwitch(next_func,addr);
+                        // Update top thread function after handling the inconsistency
+                        Mortrall::top_thread_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth] );
                         return true;
                     }
                 }
@@ -813,7 +838,8 @@ class Mortrall
 
         static bool inline _handleExceptionExit(struct symbolFunctionStore *func)
         {
-            if(r->exceptionActive && func && strstr(func->funcname,"arm_exception") && (Mortrall::r->op.workingAddr == (func->highaddr - 1)))
+            // if highaddr is reached its the end of exception (highaddr might be offset by a 1/2 byte)
+            if(r->exceptionActive && func && strstr(func->funcname,"arm_exception") && (Mortrall::r->op.workingAddr >= (func->highaddr - 0xf))&& (Mortrall::r->op.workingAddr <= (func->highaddr)))
             {
                 // Clear the exception call stack
                 _removeRetFromStack(Mortrall::r);
