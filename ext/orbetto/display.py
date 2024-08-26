@@ -12,6 +12,8 @@ app = Dash(__name__)
 widgets = []
 active_thread = None
 df_functions = None
+df_heap = {}
+heap_title = None
 hist_data = {}
 df_detailed_thread_state = None
 
@@ -127,14 +129,14 @@ def bar_chart(df1,df2,x,y,z):
     _add_dropdown_menu_bar_chart(fig)
     widgets.append(dcc.Graph(figure=fig))
 
-def _add_dropdown_menu_threads(thread_list):
-    widgets.append(html.H1("Detailed Function Overview", style={'textAlign': 'center'}))
+def _add_dropdown_menu_threads(thread_list, type,title, multi,initial_value=[]):
     widgets.append(html.H4("Select Threads:",style={'margin-bottom': '10px'}))
-    dropdown = dcc.Dropdown(id='thread-select',
+    dropdown = dcc.Dropdown(id='thread-select'+ '-' + type + '-' + title,
                           options=thread_list,
-                          multi= False,
+                          multi= multi,
                           clearable=True,
-                          value=[])
+                          value=initial_value,
+                          style={'width': '400px'})
     widgets.append(dropdown)
 
 def _add_dropdown_menu_functions():
@@ -151,10 +153,10 @@ def _add_dropdown_menu_functions():
 def custom_data_bar_chart(df):
     global df_functions
     df_functions = df
-    _add_dropdown_menu_threads(df['thread_name'].unique())
+    widgets.append(html.H1("Detailed Function Overview", style={'textAlign': 'center'}))
+    _add_dropdown_menu_threads(df['thread_name'].unique(),'function',False)
     _add_dropdown_menu_functions()
     widgets.append(dcc.Graph(id='thread-graph',figure={}))
-    return
 
 def _add_dropdown_menu_reg_function(function_list):
     widgets.append(html.H4("Select Function:",style={'margin-bottom': '10px'}))
@@ -186,7 +188,7 @@ def _add_dropdown_menu_threads_runtime(thread_list):
                           value=[])
     widgets.append(dropdown)
 
-def pie_chart(df):
+def cpu_waiting_time_pie_chart(df):
     global df_detailed_thread_state
     df_detailed_thread_state = df
     widgets.append(html.H1("Thread CPU Time Detailed",style={'textAlign': 'center'}))
@@ -197,14 +199,39 @@ def pie_chart(df):
     widgets.append(dcc.Graph(id='thread-overview-graph-running',figure={}))
     widgets.append(dcc.Graph(id='thread-overview-graph-sleeping',figure={}))
 
+def compute_heap_sum(df):
+    return df.groupby('thread_name').agg({'allocation_size': 'sum'}).reset_index()
+
+def heap_pie_chart(df,title):
+    widgets.append(html.H1("Heap Profile"+ " - (" + title + ')',style ={'textAlign': 'center'}))
+    df_aggr = compute_heap_sum(df)
+    df_aggr['allocation_size'] = df_aggr['allocation_size'].abs()
+    if df_aggr['allocation_size'].sum() == 0:
+        widgets.append(html.H3("Traces do not show memory differences when matched.",style={'textAlign': 'center'}))
+        return
+    else:
+        widgets.append(dcc.Graph(figure=pie_chart(df_aggr,'thread_name','allocation_size','Total Heap Usage per Thread')))
+
+
+def heap_counter(df,title):
+    global df_heap
+    df_heap[title] = df
+    _add_dropdown_menu_threads(df['thread_name'].unique(),type='heap',title=title,multi=True)
+    widgets.append(dcc.Graph(id='heap-graph' + '-' + title,figure={}))
+
 def show(debug):
-    app.layout = html.Div(widgets)
+    app.layout = html.Div(widgets,style={
+        'display': 'flex',
+        'flexDirection': 'column',
+        'alignItems': 'center',
+        'justifyContent': 'center',
+    })
     app.run_server(debug=debug)
 
 #---------------------- Dash CallBacks ----------------------#
 @callback(
     Output('function-select', 'options'),
-    Input('thread-select', 'value'),
+    Input('thread-select-function', 'value'),
 )
 def update_function_callback(thread):
     if thread is None:
@@ -217,7 +244,7 @@ def update_function_callback(thread):
     Output('thread-graph', 'figure'),
     Input('function-select', 'value'),
 )
-def update_graph(selected_functions):
+def update_counter_function(selected_functions):
     fig = go.Figure()
     if active_thread is None:
         return fig
@@ -344,3 +371,61 @@ def update_thread_overview(selected_thread,n_clicks):
         xaxis_title='Duration [ms]'
     )
     return fig,fig2,fig3,fig4
+
+@callback(
+    Output('heap-graph-counter', 'figure'),
+    Input('thread-select-heap-counter', 'value'),
+)
+def update_counter_heap(selected_threads):
+    return counter_bar_chart(df_heap['counter'],selected_threads,'thread_name','allocation_size','ts','Heap Counter [Bytes]')
+
+@callback(
+    Output('heap-graph-counter_matched', 'figure'),
+    Input('thread-select-heap-counter_matched', 'value'),
+)
+def update_counter_heap(selected_threads):
+    return counter_bar_chart(df_heap['counter_matched'],selected_threads,'thread_name','allocation_size','ts','Heap Counter [Bytes]')
+
+#---------------------- General Plots ----------------------#
+
+def counter_bar_chart(df,selection,category,value,ts,title):
+    fig = go.Figure()
+    if selection is None:
+        return fig
+    max_ts = df[ts].max()
+    for s in selection:
+        df_s = df[df[category] == s]
+        df_s = df_s.sort_values(by=[ts])
+        x_axis = np.array(df_s[ts]) / 1e6
+        y_axis = df_s[value].cumsum().to_numpy()
+        if(x_axis != [] and x_axis[-1] < max_ts):
+            x_axis = np.append(x_axis,max_ts / 1e6)
+            y_axis = np.append(y_axis,y_axis[-1])
+        fig.add_trace(go.Scatter(x=x_axis,
+                                 y=y_axis,
+                                 mode='lines+markers',
+                                 name=s))
+    fig.update_layout(
+        xaxis_title='Time [ms]',
+        yaxis_title=title,
+        height=700,
+        width=1400
+    )
+    return fig
+
+def pie_chart(df,category,value,title):
+    fig = go.Figure()
+    fig.add_trace(go.Pie(labels = df[category],
+                        values = df[value],
+                        title=title
+                        )
+                )
+    fig.update_layout(
+        height=800,
+        width=800,
+    )
+    fig.update_traces(
+        textposition='inside',
+        automargin=True
+    )
+    return fig

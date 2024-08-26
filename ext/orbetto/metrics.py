@@ -9,6 +9,10 @@ def init_argparse():
                         help='Path to protobuf trace file',
                         type = str,
                         required = True)
+    parser.add_argument('-f2','--file2',
+                        help='Path to second protobuf trace file for diffs',
+                        type = str,
+                        required = False)
     parser.add_argument('-wq','--work_queue_overview',
                         help='Display work queue overview. (Runnable/Running)',
                         action='store_true',
@@ -37,6 +41,14 @@ def init_argparse():
                         help='Display debug information',
                         action='store_true',
                         default = False)
+    parser.add_argument('-hp', "--heap_profile",
+                        help='Display heap profile',
+                        action='store_true',
+                        default = False)
+    parser.add_argument('-diff', "--difference",
+                        help='Switch all other options to display differences between two trace files',
+                        action='store_true',
+                        default = False)
     
     return parser.parse_args()
 
@@ -53,7 +65,7 @@ def cpu_time():
 
 def cpu_waiting_time():
     df = get_detailed_thread_state_perfetto()
-    pie_chart(df)
+    cpu_waiting_time_pie_chart(df)
 
 def function_distribution():
     functions = get_function_distribution()
@@ -71,21 +83,121 @@ def dma_throughputs():
 def semaphore_deadlocks():
     pass
 
+def extract_malloc(df):
+    df_malloc = df[df['allocation_type']=='malloc']
+    df_malloc['allocation_info'] = df_malloc['slice_name'].apply(lambda x: x.split('[')[1][:-1])
+    df_malloc['allocation_pointer'] = df_malloc['allocation_info'].apply(lambda x: x.split(',')[0])
+    df_malloc['allocation_size'] = df_malloc['allocation_info'].apply(lambda x: int(x.split(',')[1]))
+    return df_malloc
+
+def extract_free(df):
+    df_free = df[df['allocation_type']=='free']
+    df_free['allocation_pointer'] = df_free['slice_name'].str.extract(r'\((.*?)\)')
+    df_free['allocation_size'] = df_free['slice_name'].apply(lambda x: -int(x.split('(')[2][:-1]))
+    return df_free
+
+
+def match_heap_pointers(df1,df2):
+    # copy
+    df_malloc = df1.copy()
+    df_free = df2.copy()
+    # convert to int
+    df_malloc['ts'] = df_malloc['ts'].astype(int)
+    df_free['ts'] = df_free['ts'].astype(int)
+    # reset index
+    df_malloc.reset_index(drop=True, inplace=True)
+    df_free.reset_index(drop=True, inplace=True)
+    for index, row in df_malloc.iterrows():
+        # Filter rows that match the conditions
+        future_frees = df_free[(df_free['allocation_pointer'] == row['allocation_pointer']) &
+                               (df_free['ts'] >= row['ts'])]
+        if not future_frees.empty:
+            df_malloc.drop(index, inplace=True)
+            df_free.drop(future_frees['ts'].idxmin(), inplace=True)
+    assert(df_free.empty)
+    return df_malloc
+
+
+def extract_heap_profile(df):
+    if df.empty:
+        print("No heap profile data found")
+        return None
+    df['allocation_type'] = df['slice_name'].apply(lambda x: x.split('(')[0])
+    df_malloc = extract_malloc(df)
+    df_free = extract_free(df)
+    return pd.concat([df_malloc,df_free]), match_heap_pointers(df_malloc,df_free)
+
+def heap_profile():
+    df = get_heap_profile()
+    df, df_matched = extract_heap_profile(df)
+    if(df is not None):
+        heap_pie_chart(df, title="absolute count")
+        heap_counter(df, title="counter")
+        heap_pie_chart(df_matched , title="absolute count matched")
+        heap_counter(df_matched, title="counter_matched")
+
+
+def diff_heap_profile(df1,df2):
+    max_ts = min(df1['ts'].max(),df2['ts'].max())
+    df1 = df1[df1['ts'] <= max_ts]
+    df2 = df2[df2['ts'] <= max_ts]
+    df2['allocation_size'] = df2['allocation_size'] * -1
+    return pd.concat([df1,df2])
+
+def heap_profile_diff():
+    df1 = get_heap_profile()
+    df1, df1_matched = extract_heap_profile(df1)
+    df2 = get_heap_profile2()
+    df2, df2_matched = extract_heap_profile(df2)
+    if(df1 is not None and df2 is not None):
+        df = diff_heap_profile(df1,df2)
+        df_matched = diff_heap_profile(df1_matched,df2_matched)
+        heap_pie_chart(df, title="absolute count")
+        heap_counter(df, title="counter")
+        heap_pie_chart(df_matched, title="absolute count matched")
+        heap_counter(df_matched, title="counter_matched")
+    
 if __name__ == "__main__":
     args = init_argparse()
     init_trace_processor(args.file)
+    if args.difference:
+        assert(args.file2)
+        init_trace_processor2(args.file2)  
     if args.work_queue_overview:
-        cpu_time()
+        if args.difference:
+            pass
+        else:
+            cpu_time()
     if args.detailed_work_queue:
-        cpu_waiting_time()
+        if args.difference:
+            pass
+        else:
+            cpu_waiting_time()
     if args.function_pairs:
-        function_distribution()
+        if args.difference:
+            pass
+        else:
+            function_distribution()
     if args.function_regularity:
-        regularity()
+        if args.difference:
+            pass
+        else:
+            regularity()
     if args.dma_throughputs:
-        dma_throughputs()
+        if args.difference:
+            pass
+        else:
+            dma_throughputs()
     if args.semaphore_deadlocks:
-        semaphore_deadlocks()
+        if args.difference:
+            pass
+        else:
+            semaphore_deadlocks()
+    if args.heap_profile:
+        if args.difference:
+            heap_profile_diff()
+        else:
+            heap_profile()
     show(args.debug)
 
 
