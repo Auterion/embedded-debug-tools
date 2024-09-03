@@ -40,6 +40,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.urls]
+"Docs" = "https://auterion.github.io/embedded-debug-tools/emdbg.html"
 "GitHub" = "https://github.com/auterion/embedded-debug-tools"
 "Changelog" = "https://github.com/auterion/embedded-debug-tools/blob/main/CHANGELOG.md"
 

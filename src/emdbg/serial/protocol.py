@@ -165,16 +165,15 @@ class Nsh:
 
         :return: received lines until matched pattern or None on timeout
         """
-        lines = []
+        lines = ""
         start = time.time()
         while True:
             if time.time() - start > timeout:
                 break
-            new_lines = self.read_lines(0)
-            lines.append(new_lines)
-            for line in new_lines:
-                if re.search(pattern, line):
-                    return self._join(lines)
+            if (new_lines := self.read_lines(0)) is not None:
+                lines += new_lines
+                if re.search(pattern, new_lines):
+                    return lines
             time.sleep(0.1)
         _LOGGER.warning(f"Waiting for '{pattern}' timed out after {timeout:.1f}s!")
         return None

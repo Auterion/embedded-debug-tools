@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.5
+
+- Fix NSH protocol `wait_for()` function implementation.
+
 ## 1.5.4
 
 - Allow NSH port to be opened by filepath.
