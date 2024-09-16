@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.6
+
+- Fix `px4_switch_task` for NuttX v11.
+
 ## 1.5.5
 
 - Fix NSH protocol `wait_for()` function implementation.

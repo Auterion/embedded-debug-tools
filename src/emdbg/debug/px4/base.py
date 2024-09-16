@@ -62,7 +62,8 @@ class Base:
             if name in ["sp", "r13"]:
                 name = "msp"
             if name == "msp":
-                self.write_register("r13", value)
+                # NuttX stores the SP incorrectly (is off by 4 bytes)
+                self.write_register("r13", value + 4)
             # Remove double FP registers
             if name.startswith("d"): continue
             self.write_register(name, value)
