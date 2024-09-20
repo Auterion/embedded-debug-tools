@@ -87,7 +87,7 @@ define px4_configure_orbuculum
     # Set POSTCNT source to CYCCNT[10] /1024
     dwtPostTap 1
     # Set POSTCNT init/reload value to /1 -> every 1024*2=2048 cycles = 9.5µs @ 216MHz
-    dwtPostReset 2
+    dwtPostReset 4
     # enable PC sampling
     dwtSamplePC 0
 
@@ -115,7 +115,7 @@ define px4_configure_orbuculum
     # Enable semaphore profiling
     # set $TER |= 0x000000E0
     # Enable heap profiling
-    # set $TER |= 0x00000F00
+    set $TER |= 0x00000F00
     # Enable DMA profiling
     # set $TER |= 0x00007000
 
@@ -150,6 +150,7 @@ define px4_enable_swo_stm32h7
 
     enableSTM32Pin 1 3 3
 end
+
 
 define px4_enable_trace_stm32h7
     _setAddressesSTM32
@@ -192,20 +193,20 @@ end
 
 define px4_etm_trace_tpiu_swo_stm32f7
     px4_reset
-    tbreak nx_start
-    continue
 
     enableSTM32TRACE 4 3 1
-    startETM 1
 
     px4_configure_orbuculum
 
+    startETM 1
+    
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
     shell killall orbuculum
     shell orbuculum -O "-T4" &
     shell sleep 1
     shell nc localhost 3443 > trace.swo &
 end
+
 
 define px4_trace_tpiu_swo_stm32f7
     px4_reset
@@ -223,6 +224,21 @@ define px4_trace_tpiu_swo_stm32f7
     shell nc localhost 3443 > trace.swo &
 end
 
+define px4_etm_trace_tpiu_swo_stm32h7
+    px4_reset
+
+    px4_enable_trace_stm32h7 4
+
+    px4_configure_orbuculum
+
+    startETM 1
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    shell orbuculum -O "-T4" &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
+end
 
 define px4_trace_tpiu_swo_stm32h7
     px4_reset

@@ -145,7 +145,7 @@ class Fmu:
 
 def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
                 ui: str = None, speed: int = 16000, backend: str = None) -> tuple:
-    if "fmu-v5x" in target:
+    if "fmu" in target and "v5x" in target:
         device = "STM32F765II"
         config = "fmu_v5x"
     elif "fmu-v6x" in target:

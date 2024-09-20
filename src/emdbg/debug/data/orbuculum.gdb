@@ -88,6 +88,7 @@ set $ITMBASE=0xE0000000
 set $TPIUBASE=0xE0040000
 set $ETMBASE=0xE0041000
 
+
 define _setAddressesSTM32
   # Locations in the memory map for interesting things on STM32
   set $CPU = $CPU_STM32
@@ -165,6 +166,7 @@ set $TRCVDARCCTLR=$ETM4BASE+0x0a8
 set $TRCDEVARCH=$ETM4BASE+0xFBC
 # Trace IDR base address
 set $TRCIDR0=$ETM4BASE+0x1E0
+set $TRCIDR3=$ETM4BASE+0x1EC
 end
 # Trace Address comparator Value registers
 set $TRCACVR0=$ETMBASE+0x400
@@ -267,10 +269,12 @@ define _startETMv4_modified
   set *($TRCEVENTCTL0R) = 0
   set *($TRCEVENTCTL1R) = 0
 
+  # Stalling is not possible on h7 and f7
   # Disable or enable stalling for instructions, if implemented
   set *($TRCSTALLCTLR) = (1<<13)|(1<<8)|(0x0f<<0)
 
-  # Trace sync every 256 bytes of trace
+  # Fixed on STM32f7
+  # Trace sync every 1024 bytes of trace
   set *($TRCSYNCPR) = 0x0c
 
   # Do we want branch broadcasting?
@@ -283,7 +287,7 @@ define _startETMv4_modified
 
   # enable cycle count
   set *($TRCCONFIGR) |= 0x10
-  set *($TRCCCCTLR) |= 0x0a
+  set *($TRCCCCTLR) |= 0x10
 
   # Trace on ID 2
   set *($TRCTRACEIDR) = 2
@@ -981,15 +985,15 @@ define enableSTM32TRACE
   enableSTM32Pin 4 2 $drive
   enableSTM32Pin 4 3 $drive
 
-  if ($bits>0)
+  if ($bits>=1)
      # Setup PE4
      enableSTM32Pin 4 4 $drive
   end
 
-  if ($bits>1)
+  if ($bits>=2)
     # Setup PE5 & PC12 
     enableSTM32Pin 4 5 $drive
-    enableSTM32Pin 4 6 $drive
+    #enableSTM32Pin 4 6 $drive
     if ($remap)
       enableSTM32Pin 2 12 $drive 
     else

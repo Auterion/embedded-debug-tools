@@ -46,6 +46,7 @@ struct
     bool useTPIU{false};
     uint32_t tpiuChannel{1};
     uint64_t cps{0};
+    uint64_t dbg_cc{0};
     std::string file;
     std::string elfFile;
     std::string elfBootloaderFile;
@@ -966,13 +967,14 @@ static void _switchSymbols()
 // ====================================================================================================
 static struct option _longOptions[] =
 {
+    {"cc", required_argument, NULL, 'a'},
     {"cpufreq", required_argument, NULL, 'C'},
     {"input-file", required_argument, NULL, 'f'},
     {"help", no_argument, NULL, 'h'},
     {"tpiu", required_argument, NULL, 't'},
     {"elf", required_argument, NULL, 'e'},
     {"elf_bootloader", required_argument, NULL, 'b'},
-    {"debug", no_argument, NULL, 'd'},
+    {"debug", required_argument, NULL, 'd'},
     {"verbose", required_argument, NULL, 'v'},
     {"version", no_argument, NULL, 'V'},
     {NULL, no_argument, NULL, 0}
@@ -980,7 +982,7 @@ static struct option _longOptions[] =
 bool _processOptions( int argc, char *argv[] )
 {
     int c, optionIndex = 0;
-    while ( ( c = getopt_long ( argc, argv, "b:C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
+    while ( ( c = getopt_long ( argc, argv, "a:b:C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
         switch ( c )
         {
             // ------------------------------------
@@ -1010,6 +1012,10 @@ bool _processOptions( int argc, char *argv[] )
             // ------------------------------------
             case 'd':
                 options.outputDebugFile = true;
+                break;
+
+            case 'a':
+                options.dbg_cc = atoi( optarg );
                 break;
 
             // ------------------------------------
@@ -1159,7 +1165,7 @@ int main(int argc, char *argv[])
     }
 
     printf("Initialize Mortrall (Instruction tracing)\n");
-    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols_main,_r.symbols_bootloader,_handleTSFromETM,_switchSymbols);
+    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols_main,_r.symbols_bootloader,_handleTSFromETM,_switchSymbols,options.dbg_cc);
 
     stream = streamCreateFile( options.file.c_str() );
     genericsReport( V_INFO, "Process Stream" EOL );

@@ -23,15 +23,14 @@ define px4_trace_swo_stm32f7
     enableSTM32SWO 7
 end
 
-
 define px4_trace_swo_stm32h7
     px4_reset
     tbreak nx_start
     continue
 
-    px4_enable_swo_stm32h7 60000000
-
     px4_configure_orbuculum
+
+    enableSTM32SWO 7
 
     shell orbuculum -O "-Tu -a 60000000" -o trace.swo &
 end
