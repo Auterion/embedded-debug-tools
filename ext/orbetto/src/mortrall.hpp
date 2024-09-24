@@ -31,7 +31,7 @@
 #include "sio.h"
 #include "stream.h"
 
-
+#include "LRUCache.hpp"
 
 //--------------------------------------------------------------------------------------//
 //--------------------------------- BEGIN REGION Defines -------------------------------//
@@ -46,6 +46,16 @@
 #define MAX_CALL_STACK (30)
 #define DEFAULT_PM_BUFLEN_K (32)
 #define MAX_BUFFER_SIZE (100)
+
+#define CACHE_SIZE (10000)
+
+// struct for caching of capstone dissasembly
+struct capstoneCache
+{
+    char *assembly;
+    enum instructionClass ic;
+    uint32_t newaddr;
+};
 
 /* Materials required to be maintained across callbacks for output construction */
 struct opConstruct
@@ -103,6 +113,8 @@ struct CallStackBuffer
     uint64_t global_interpolations[MAX_BUFFER_SIZE];          /* Global timestamps */
     int proto_buffer_index{0};                    /* Index for the buffer */
 }csb;
+
+cache::lru_cache<uint32_t, capstoneCache> cache_lru(CACHE_SIZE);
 
 //--------------------------------------------------------------------------------------//
 //---------------------------------- END REGION Defines --------------------------------//
@@ -229,19 +241,31 @@ class Mortrall
             printf("Overflows: %lu - %lu\n",cpu->overflows,cpu->ASyncs);
 
             delete Mortrall::r;
-            // printf times
-            printf("Time1: %lu\n",time1);
-            printf("Time2: %lu\n",time2);
-            printf("Time3: %lu\n",time3);
-            printf("Time4: %lu\n",time4);
-            printf("Time5: %lu\n",time5);
-            printf("Time61: %lu\n",time61);
-            printf("Time611: %lu\n",time611);
-            printf("Time612: %lu\n",time612);
-            printf("Time613: %lu\n",time613);
-            printf("Time62: %lu\n",time62);
-            printf("Time63: %lu\n",time63);
-            printf("Time64: %lu\n",time64);
+            
+            printf("Time1: %02llu:%02llu\n", time1 / (1000000000ULL * 60),
+                                            (time1 / 1000000000ULL) % 60);
+            printf("Time2: %02llu:%02llu\n", time2 / (1000000000ULL * 60),
+                                            (time2 / 1000000000ULL) % 60);
+            printf("Time3: %02llu:%02llu\n", time3 / (1000000000ULL * 60),
+                                            (time3 / 1000000000ULL) % 60);
+            printf("Time4: %02llu:%02llu\n", time4 / (1000000000ULL * 60),
+                                            (time4 / 1000000000ULL) % 60);
+            printf("Time5: %02llu:%02llu\n", time5 / (1000000000ULL * 60),
+                                            (time5 / 1000000000ULL) % 60);
+            printf("Time61: %02llu:%02llu\n", time61 / (1000000000ULL * 60),
+                                            (time61 / 1000000000ULL) % 60);
+            printf("Time611: %02llu:%02llu\n", time611 / (1000000000ULL * 60),
+                                            (time611 / 1000000000ULL) % 60);
+            printf("Time612: %02llu:%02llu\n", time612 / (1000000000ULL * 60),
+                                            (time612 / 1000000000ULL) % 60);
+            printf("Time613: %02llu:%02llu\n", time613 / (1000000000ULL * 60),
+                                            (time613 / 1000000000ULL) % 60);
+            printf("Time62: %02llu:%02llu\n", time62 / (1000000000ULL * 60),
+                                            (time62 / 1000000000ULL) % 60);
+            printf("Time63: %02llu:%02llu\n", time63 / (1000000000ULL * 60),
+                                            (time63 / 1000000000ULL) % 60);
+            printf("Time64: %02llu:%02llu\n", time64 / (1000000000ULL * 60),
+                                            (time64 / 1000000000ULL) % 60);
 
             //Mortrall::_endSong();
         }
@@ -388,7 +412,7 @@ class Mortrall
                 _detect_thread_switch_pattern(cpu);
                 /* Whatever the state was, this is an explicit setting of an address, so we need to respect it */
                 Mortrall::r->op.workingAddr = cpu->addr;        // Update working address from addr packet
-                Mortrall::r->exceptionEntry = false;        // Reset exception entry flag
+                Mortrall::r->exceptionEntry = false;            // Reset exception entry flag
             }
             
             clock_gettime(CLOCK_MONOTONIC, &end);
@@ -464,7 +488,19 @@ class Mortrall
                 clock_gettime(CLOCK_MONOTONIC, &start);
 
                 /* Now output the matching assembly, and location updates */
-                char *a = symbolDisassembleLine( Mortrall::r->s, &ic, Mortrall::r->op.workingAddr, &newaddr , &time611, &time612, &time613);
+                char *a = NULL;
+                if(cache_lru.exists(Mortrall::r->op.workingAddr))
+                {
+                    auto val = cache_lru.get(Mortrall::r->op.workingAddr);
+                    a = val.assembly;
+                    ic = val.ic;
+                    newaddr = val.newaddr;
+                }
+                else
+                {
+                    a = symbolDisassembleLine( Mortrall::r->s, &ic, Mortrall::r->op.workingAddr, &newaddr , &time611, &time612, &time613);
+                    cache_lru.put(Mortrall::r->op.workingAddr, {a,ic,(uint32_t)newaddr});
+                }
                 
                 clock_gettime(CLOCK_MONOTONIC, &end);
                 time61 += (end.tv_sec - start.tv_sec) * 1e9 + (end.tv_nsec - start.tv_nsec);
@@ -904,37 +940,37 @@ class Mortrall
             if ( Mortrall::r->resentStackDel && (revertStack || (inconsistent && !Mortrall::r->exceptionEntry)))
             {
                 _traceReport( V_DEBUG, "Stack delete reverted" );
-                Mortrall::r->callStack->stackDepth++;
+                if ( Mortrall::r->callStack->stackDepth < MAX_CALL_STACK - 1 )
+                {
+                    Mortrall::r->callStack->stackDepth++;
+                }
             }
         }
 
         static void inline _catchInconsistencies(bool inconsistent, uint32_t addr)
         {
-            //if (inconsistent){
-                    // check if function in stack
-                    if(Mortrall::r->callStack->stackDepth > 0)
+            if(Mortrall::r->callStack->stackDepth > 0)
+            {
+                // loop over r->callstack
+                struct symbolFunctionStore *new_func = symbolFunctionAt( Mortrall::r->s, addr);
+                for (int i = (Mortrall::r->callStack->stackDepth - 1); i >= 0; i--)
+                {
+                    // check if function name address is the same as the new address
+                    struct symbolFunctionStore *current_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[i]);
+                    if(current_func != NULL && new_func != NULL && strcmp(current_func->funcname,new_func->funcname) == 0)
                     {
-                        // loop over r->callstack
-                        struct symbolFunctionStore *new_func = symbolFunctionAt( Mortrall::r->s, addr);
-                        for (int i = (Mortrall::r->callStack->stackDepth - 1); i >= 0; i--)
+                        _traceReport( V_DEBUG, "Inconsistency has been caught and reverted" );
+                        for (int j = (Mortrall::r->callStack->stackDepth - 1); j >= i; j--)
                         {
-                            // check if function name address is the same as the new address
-                            struct symbolFunctionStore *current_func = symbolFunctionAt( Mortrall::r->s, Mortrall::r->callStack->stack[i]);
-                            if(current_func != NULL && new_func != NULL && strcmp(current_func->funcname,new_func->funcname) == 0)
-                            {
-                                _traceReport( V_DEBUG, "Inconsistency has been caught and reverted" );
-                                for (int j = (Mortrall::r->callStack->stackDepth - 1); j >= i; j--)
-                                {
-                                    _removeRetFromStack(Mortrall::r);
-                                    // commit
-                                    Mortrall::r->committed = true;
-                                    _generate_protobuf_entries_single(addr);
-                                }
-                                _stackReport(Mortrall::r);
-                            }
+                            _removeRetFromStack(Mortrall::r);
+                            // commit
+                            Mortrall::r->committed = true;
+                            _generate_protobuf_entries_single(addr);
                         }
+                        _stackReport(Mortrall::r);
                     }
-                //}
+                }
+            }
         }
 
         static void inline _detect_thread_switch_pattern(struct TRACECPUState *cpu)
@@ -957,7 +993,6 @@ class Mortrall
 
         static void inline _addRetToStack( RunTime *r, symbolMemaddr p , int num = 0)
         {
-            // for debugging
             if ( Mortrall::r->callStack->stackDepth == MAX_CALL_STACK - 1 )
             {
                 /* Stack is full, so make room for a new entry */
@@ -980,7 +1015,6 @@ class Mortrall
                 _traceReport( V_DEBUG, "Popped %08x from return stack", Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth]);
             }
         }
-        static inline int count = 0;
         static void inline _addTopToStack(RunTime *r,symbolMemaddr p)
         {
             // If the stack is uninitialized set the stack depth to 0
@@ -991,14 +1025,6 @@ class Mortrall
             if ( Mortrall::r->callStack->stackDepth < MAX_CALL_STACK - 1 )
             {
                 Mortrall::r->callStack->stack[Mortrall::r->callStack->stackDepth] = p;
-            }
-            if(p==0x080166ca){
-                count++;
-                //printf("Debug %d\n", count);
-                if (count == 45)
-                {
-                    printf("Debug found.\n");
-                }
             }
         }
 
@@ -1014,6 +1040,10 @@ class Mortrall
         static void inline _appendToOPBuffer( struct RunTime *r, void *dat, int32_t lineno, enum LineType lt, const char *fmt, ... )
         /* Add line to output buffer, in a printf stylee */
         {
+            if ( Mortrall::verbose != V_DEBUG )
+            {
+                return;
+            }
             char construct[SCRATCH_STRING_LEN];
             va_list va;
             char *p;
@@ -1040,6 +1070,10 @@ class Mortrall
         static void inline _traceReport( enum verbLevel l, const char *fmt, ... )
         /* Debug reporting stream */
         {
+            if ( Mortrall::verbose != V_DEBUG )
+            {
+                return;
+            }
             static char op[SCRATCH_STRING_LEN];
             va_list va;
             va_start( va, fmt );
@@ -1109,7 +1143,7 @@ class Mortrall
 //--------------------------------------------------------------------------------------//
 
         /*  This part is just for fun because I was stuck on with instruction tracing and Niklas was on vacation */
-        /*  and sadly no one else at Auterion can help me with that (GPT: why should they no one has ever done that )*/
+        /*  and sadly no one else at Auterion can help me with that (GPT: why should they, no one has ever done that )*/
 
         static void inline _startSong()
         {
@@ -1118,7 +1152,6 @@ class Mortrall
 
             // Command to play the song using afplay
             char command[512];
-            //snprintf(command, sizeof(command), "afplay \"%s\"", songPath);
             snprintf(command, sizeof(command), "osascript -e 'tell application \"Terminal\" to do script \"afplay \\\"%s\\\"\"'", songPath);
 
             // Play the song
