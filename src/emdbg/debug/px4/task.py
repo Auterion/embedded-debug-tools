@@ -215,6 +215,7 @@ class Task(Base):
             return False
         regs = {name: self._tcb["xcp"]["regs"][offset]
                 for name, offset in _XCP_REGS_MAP.items()}
+        regs = self.fix_nuttx_sp(regs)
         self.write_registers(regs)
         self._is_running_switched = True
         return True

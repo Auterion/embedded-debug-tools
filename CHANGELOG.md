@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.7
+
+- Fix `px4_switch_task` for J-Link (previously only fixed for ST-LINK).
+
 ## 1.5.6
 
 - Fix `px4_switch_task` for NuttX v11.

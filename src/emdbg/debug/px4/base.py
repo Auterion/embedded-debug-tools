@@ -56,17 +56,22 @@ class Base:
     def write_registers(self, values: dict[str, int]):
         """Writes all named registers into the CPU"""
         for name, value in values.items():
-            #
             if name in ["control", "faultmask", "primask"]: continue
             # GDB does not know SP, only MSP and PSP
             if name in ["sp", "r13"]:
                 name = "msp"
             if name == "msp":
-                # NuttX stores the SP incorrectly (is off by 4 bytes)
-                self.write_register("r13", value + 4)
+                self.write_register("r13", value)
             # Remove double FP registers
             if name.startswith("d"): continue
             self.write_register(name, value)
+
+    def fix_nuttx_sp(self, regs: dict[str, int]):
+        """Fixes stored SP, as NuttX incorrectly stores the SP (is off by 4 bytes)"""
+        regs["msp"] = regs["msp"] + 4
+        regs["sp"] = regs["msp"]
+        regs["r13"] = regs["msp"]
+        return regs
 
     def lookup_static_symbol_in_function(self, symbol_name: str, function_name: str) -> "gdb.Symbol | None":
         """
