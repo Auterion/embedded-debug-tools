@@ -662,7 +662,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             event->set_pid(100);
             auto *print = event->mutable_print();
             char buffer[100];
-            snprintf(buffer, sizeof(buffer), "I|0|Timestamp|%llu,%llu", m->value, (m->value * 1e9) / options.cps);
+            snprintf(buffer, sizeof(buffer), "I|0|Timestamp|%u,%f", m->value, (m->value * 1e9) / options.cps);
             print->set_buf(buffer);
             break;
         }

@@ -208,7 +208,7 @@ class Mortrall
 
         static void inline dumpElement(char element)
         {
-            /* This is input function for decoding instruction trace packets must be called from outside */
+            /* Input function for decoding instruction trace packets, must be called from outside */
             if(Mortrall::initialized)
             {
                 uint8_t byte = (uint8_t)element;
@@ -220,9 +220,9 @@ class Mortrall
         {
             if(Mortrall::initialized)
             {
-                /* Commit all changes*/
+                /* Commit all changes */
                 Mortrall::r->committed = true;
-                /* flush remaining buffer entries*/
+                /* flush remaining buffer entries */
                 Mortrall::_flush_proto_buffer();
             }
             /* Initialize the protobuf categories */
@@ -231,7 +231,7 @@ class Mortrall
             struct TRACECPUState *cpu = TRACECPUState( &Mortrall::r->i );
             /* The number of overflows is one metrics that represents the quality of the trace */
             /* If there are many overflows try implicit tracing */
-            printf("Overflows: %lu - %lu\n",cpu->overflows,cpu->ASyncs);
+            printf("Overflows: %llu - %llu\n",cpu->overflows,cpu->ASyncs);
             delete Mortrall::r;
         }
 
@@ -421,10 +421,7 @@ class Mortrall
                 /* If we have changed line then output the new one */
                 if ( l && ( ( l->startline != Mortrall::r->op.currentLine ) ) )
                 {
-                    const char *v = symbolSource( Mortrall::r->s, l->filename, l->startline - 1 );
                     Mortrall::r->op.currentLine = l->startline;
-                    //if ( v )
-                    //    _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_SOURCE, v );
                 }
 
                 /* This part caches the function symbolDisassembleLine with a lru-cache, which improves runtime heavily */
@@ -432,15 +429,24 @@ class Mortrall
                 if(cache_lru.exists(Mortrall::r->op.workingAddr))
                 {
                     auto val = cache_lru.get(Mortrall::r->op.workingAddr);
-                    a = val.assembly;
+                    a = (char *)malloc(strlen(val.assembly) + 1);
+                    strcpy(a,val.assembly);
                     ic = val.ic;
                     newaddr = val.newaddr;
                 }
                 else
                 {
                     /* Use capstone to disassemble current instruction and assign instructions types to ic */
-                    a = symbolDisassembleLine( Mortrall::r->s, &ic, Mortrall::r->op.workingAddr, &newaddr , &time611, &time612, &time613);
-                    cache_lru.put(Mortrall::r->op.workingAddr, {a,ic,(uint32_t)newaddr});
+                    a = symbolDisassembleLine( Mortrall::r->s, &ic, Mortrall::r->op.workingAddr, &newaddr);
+                    if (a)
+                    {
+                        struct capstoneCache *cs_element = new capstoneCache();
+                        cs_element->assembly = (char *)malloc(strlen(a) + 1);
+                        strcpy(cs_element->assembly,a);
+                        cs_element->ic = ic;
+                        cs_element->newaddr = newaddr;
+                        cache_lru.put(Mortrall::r->op.workingAddr, *cs_element);
+                    }
                 }
                 
                 if ( a )
@@ -668,7 +674,7 @@ class Mortrall
             }
         }
 
-        static bool inline _handleInconsistentFunctionSwitch(struct symbolFunctionStore *next_func, uint32_t addr)
+        static void inline _handleInconsistentFunctionSwitch(struct symbolFunctionStore *next_func, uint32_t addr)
         {
             /*
                 This function inserts a stop and start element into the protobuf trace to compensate for function switches
@@ -937,7 +943,7 @@ class Mortrall
             /* Hint: This would need to be changed for work for other RTOS */
             if(!Mortrall::pending_thread_switch && func && (strcmp(func->funcname,"sched_note_resume") == 0))
             {
-                int remaining_switches = thread_switches.size()
+                int remaining_switches = thread_switches.size();
                 if (remaining_switches == 0)
                 {
                     /* If there are no more thread switches left return. */
@@ -1110,7 +1116,7 @@ class Mortrall
             char buffer[STACK_BUFFER_SIZE];
             va_list args;
             va_start(args, format);
-            vsprintf(buffer, format, args);
+            vsnprintf(buffer,STACK_BUFFER_SIZE, format, args);
             va_end(args);
             strcat(str, buffer);
         }
@@ -1125,7 +1131,6 @@ class Mortrall
 
         /*  This part is just for fun because I was stuck on with instruction tracing and Niklas was on vacation */
         /*  and sadly no one else at Auterion can help me with that (GPT: why should they, no one has ever done that )*/
-
         static void inline _startSong()
         {
             /* Path to your audio file */
