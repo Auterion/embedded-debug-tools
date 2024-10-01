@@ -329,7 +329,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 {
                     if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
                     {
-                        printf("Found Name %s for 0x%08x\n", name, m->value);
+                        //printf("Found Name %s for 0x%08x\n", name, m->value);
                         workqueue_names[m->value] = name;
                     }
                     else {
@@ -889,7 +889,6 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
 {
     if ( options.useTPIU )
     {
-        _r.t.debug = _pumpETMProcessGeneric != NULL;
         switch ( TPIUPump( &_r.t, c) )
         {
             case TPIU_EV_NEWSYNC:
