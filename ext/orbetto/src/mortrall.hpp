@@ -33,6 +33,10 @@
 
 #include "LRUCache.hpp"
 
+#include "roaring.hh"
+
+using namespace roaring;
+
 //--------------------------------------------------------------------------------------//
 //--------------------------------- BEGIN REGION Defines -------------------------------//
 //--------------------------------------------------------------------------------------//
@@ -130,8 +134,10 @@ class Mortrall
         static constexpr uint32_t PID_CALLSTACK = 400000;
         static constexpr uint32_t PID_BOOTLOADER = 401000;
         static constexpr uint32_t PID_EXCEPTION = 500000;
+        static constexpr uint32_t PID_PC = 600000;
         static inline uint32_t activeCallStackThread;
         static inline std::unordered_map<int, const char *> exception_names;        // Store interrupt names to give each a unique perfetto thread
+        static inline Roaring r1;
 
         /* Data Struct to store information about the current decoding process (used in orbmortem) */
         static inline RunTime *r;
@@ -232,6 +238,22 @@ class Mortrall
             /* The number of overflows is one metrics that represents the quality of the trace */
             /* If there are many overflows try implicit tracing */
             printf("Overflows: %llu - %llu\n",cpu->overflows,cpu->ASyncs);
+            printf("PC bitmap cardinality = %llu\n", r1.cardinality());
+            // Serialize the bitmap to a file
+            // Step 1: Get the size of the serialized bitmap
+            size_t size_in_bytes = r1.getSizeInBytes();
+
+            // Step 2: Create a buffer (vector of char) to hold the serialized bitmap
+            std::vector<char> buffer(size_in_bytes);
+
+            // Step 3: Serialize the bitmap into the buffer
+            r1.write(buffer.data());
+
+            // Step 4: Write the buffer to a binary file
+            std::ofstream out("bitmap.roar", std::ios::binary);
+            out.write(buffer.data(), buffer.size());
+            out.close();
+            printf("PC bitmap serialized to 'bitmap.roar'\n");
             delete Mortrall::r;
         }
 
@@ -346,7 +368,7 @@ class Mortrall
                 _addTopToStack(Mortrall::r,cpu->addr);
                 /* Update the ProtoBuf entries */
                 _generate_protobuf_entries_single(cpu->addr);
-                /* Report the Stack for debugging b*/
+                /* Report the Stack for debugging */
                 _stackReport(Mortrall::r);
                 /* Whatever the state was, this is an explicit setting of an address, so we need to respect it */
                 Mortrall::r->op.workingAddr = cpu->addr;        // Update working address from addr packet
@@ -451,6 +473,7 @@ class Mortrall
                 
                 if ( a )
                 {
+                    _add_pc(Mortrall::r->op.workingAddr);
                     /* Calculate if this instruction was executed. This is slightly hairy depending on which protocol we're using;         */
                     /*   * ETM3.5: Instructions are executed based on disposition bit (LSB in disposition word)                            */
                     /*   * ETM4  : ETM4 everything up to a branch is executed...decision about that branch is based on disposition bit     */
@@ -637,6 +660,15 @@ class Mortrall
                     thread->set_name(name);
                 }
             }
+            {
+                auto *process = process_tree->add_processes();
+                process->set_pid(PID_PC);
+                process->add_cmdline("PC");
+                auto *thread = process_tree->add_threads();
+                thread->set_tid(PID_PC);
+                thread->set_tgid(PID_PC);
+                thread->set_name("PC");
+            }
         }
 
 //--------------------------------------------------------------------------------------//
@@ -646,6 +678,11 @@ class Mortrall
 //--------------------------------------------------------------------------------------//
 //-------------------------------- BEGIN REGION Perfetto -------------------------------//
 //--------------------------------------------------------------------------------------//
+
+        static void inline _add_pc(uint32_t addr)
+        {
+            r1.add(addr);
+        }
 
         static void inline _appendTOProtoBuffer(auto *event, int offset = 0)
         {

@@ -6,6 +6,8 @@ tp2 = None
 def init_trace_processor(trace):
     global tp
     tp = TraceProcessor(trace=trace)
+    print(tp)
+
 def init_trace_processor2(trace):
     global tp2
     tp2 = TraceProcessor(trace=trace)
@@ -135,3 +137,39 @@ def get_heap_profile():
 
 def get_heap_profile2():
     return tp2.query(heap_query).as_pandas_dataframe()
+
+def get_detailed_thread_state_perfetto():
+
+    query = f"""
+    DROP VIEW IF EXISTS workqueue_slices;
+    CREATE VIEW workqueue_slices AS
+    SELECT
+        slice.ts as ts,
+        slice.dur as dur,
+        slice.id as slice_id,
+        slice.name as slice_name,
+        thread.name as thread_name,
+        thread.utid as utid
+    FROM slice
+    JOIN thread_track ON thread_track.id = slice.track_id
+    JOIN thread USING (utid)
+    WHERE thread.tid < 10000;
+
+    DROP TABLE IF EXISTS slice_thread_state_breakdown;
+    CREATE VIRTUAL TABLE slice_thread_state_breakdown
+    USING SPAN_LEFT_JOIN(
+        workqueue_slices PARTITIONED utid,
+        thread_state PARTITIONED utid
+    );
+
+    SELECT
+        thread_name,
+        slice_name,
+        slice_id,
+        SUM(CASE WHEN state = 'Running' THEN dur ELSE 0 END) as running_interval,
+        SUM(CASE WHEN state = 'R' THEN dur ELSE 0 END) as runnable_interval,
+        SUM(CASE WHEN state = 'S' THEN dur ELSE 0 END) as sleeping_interval
+    FROM slice_thread_state_breakdown
+    GROUP BY slice_id;
+    """
+    return tp.query(query).as_pandas_dataframe()

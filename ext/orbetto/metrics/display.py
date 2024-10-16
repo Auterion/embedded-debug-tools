@@ -6,6 +6,7 @@ from dash import Dash, dcc, html, callback, Output, Input
 import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
 from queries import *
+from elfFileDecode import *
 
 app = Dash(__name__)
 
@@ -16,6 +17,8 @@ df_heap = {}
 heap_title = None
 hist_data = {}
 df_detailed_thread_state = None
+df_code_coverage = None
+code_coverage_file = None
 
 def _find_outliers(thread_intervals,thread_ids):
     outlier_id = []
@@ -136,17 +139,17 @@ def _add_dropdown_menu_threads(thread_list, type,title, multi,initial_value=[]):
                           multi= multi,
                           clearable=True,
                           value=initial_value,
-                          style={'width': '400px'})
+                          style={'width': '900px'})
     widgets.append(dropdown)
 
-def _add_dropdown_menu_functions():
-    widgets.append(html.H4("Select Functions:",style={'margin-bottom': '10px','margin-left': '20px'}))
-    dropdown = dcc.Dropdown(id='function-select',
+def _add_dropdown_menu_functions(id,multi):
+    widgets.append(html.H4("Select Function:",style={'margin-bottom': '10px','margin-left': '20px'}))
+    dropdown = dcc.Dropdown(id=id,
                           options=[],
-                          multi= True,
+                          multi= multi,
                           clearable=True,
                           value=[],
-                          style={'margin-left': '10px'})
+                          style={'margin-left': '10px','width': '500px'})
     widgets.append(dropdown)
 
 
@@ -155,7 +158,7 @@ def custom_data_bar_chart(df):
     df_functions = df
     widgets.append(html.H1("Detailed Function Overview", style={'textAlign': 'center'}))
     _add_dropdown_menu_threads(df['thread_name'].unique(),'function',False)
-    _add_dropdown_menu_functions()
+    _add_dropdown_menu_functions('function-select',multi=True)
     widgets.append(dcc.Graph(id='thread-graph',figure={}))
 
 def _add_dropdown_menu_reg_function(function_list):
@@ -185,7 +188,8 @@ def _add_dropdown_menu_threads_runtime(thread_list):
                           options=thread_list,
                           multi= False,
                           clearable=True,
-                          value=[])
+                          value=[],
+                          style={'margin-left': '10px','width': '500px'})
     widgets.append(dropdown)
 
 def cpu_waiting_time_pie_chart(df):
@@ -218,6 +222,22 @@ def heap_counter(df,title):
     df_heap[title] = df
     _add_dropdown_menu_threads(df['thread_name'].unique(),type='heap',title=title,multi=True)
     widgets.append(dcc.Graph(id='heap-graph' + '-' + title,figure={}))
+
+def display_code_coverage(df):
+    global df_code_coverage
+    df_code_coverage = df
+    widgets.append(html.H1('Code Coverage',style ={'textAlign': 'center'}))
+    _add_dropdown_menu_threads(df['File'].unique(),type='code-coverage',title='file-select',multi=False)
+    _add_dropdown_menu_functions('function-select-code-coverage',multi=False)
+    #widgets.append(html.Pre(id='highlighted-code', style={'overflow': 'auto', 'height': '500px'}))
+    widgets.append(html.Div(id='highlighted-code', style={
+        'overflow': 'auto', 
+        'height': '500px', 
+        'border': '1px solid black', 
+        'font-family': 'monospace',
+        'white-space': 'pre-wrap',  # Preserve whitespace
+        'background-color': '#f0f0f0',  # Optional: light gray background for better visibility
+    }))
 
 def show(debug):
     app.layout = html.Div(widgets,style={
@@ -385,6 +405,30 @@ def update_counter_heap(selected_threads):
 )
 def update_counter_heap(selected_threads):
     return counter_bar_chart(df_heap['counter_matched'],selected_threads,'thread_name','allocation_size','ts','Heap Counter [Bytes]')
+
+@callback(
+    Output('function-select-code-coverage', 'options'),
+    Input('thread-select-code-coverage-file-select', 'value'),
+)
+def update_code_coverage_function_select(selected_file):
+    global code_coverage_file
+    if selected_file is None or len(selected_file) == 0:
+        print(selected_file)
+        return ['empty']
+    code_coverage_file = selected_file
+    return df_code_coverage[df_code_coverage['File'] == selected_file]['Function Name'].unique().tolist()
+
+@callback(
+    Output('highlighted-code', 'children'),
+    Input('function-select-code-coverage', 'value'),
+)
+def update_code_coverage_highlighted_code(selected_function):
+    if selected_function is None or len(selected_function) == 0:
+        return ""
+    source_code = get_function_info(bytes(code_coverage_file, 'utf-8'), bytes(selected_function, 'utf-8'))
+    if len(source_code) == 0:
+        return f"Function {selected_function} not found in {code_coverage_file}."
+    return html.Div(children=[html.Div(children=source_code, style={'white-space': 'pre-wrap'})])
 
 #---------------------- General Plots ----------------------#
 

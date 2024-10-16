@@ -1,6 +1,7 @@
 import pandas as pd
 from queries import *
 from display import *
+from elfFileDecode import *
 import argparse
 
 def init_argparse():
@@ -8,7 +9,7 @@ def init_argparse():
     parser.add_argument('-f','--file',
                         help='Path to protobuf trace file',
                         type = str,
-                        required = True)
+                        required = False)
     parser.add_argument('-f2','--file2',
                         help='Path to second protobuf trace file for diffs',
                         type = str,
@@ -45,6 +46,15 @@ def init_argparse():
                         help='Display heap profile',
                         action='store_true',
                         default = False)
+    parser.add_argument('-cc',"--code_coverage",
+                        help='Display code coverage',
+                        action='store_true',
+                        default = False)
+    parser.add_argument('-bm',"--bitmap",
+                        help='Path to bitmap file which is needed for code coverage',
+                        type = str,
+                        required = False)
+
     parser.add_argument('-diff', "--difference",
                         help='Switch all other options to display differences between two trace files',
                         action='store_true',
@@ -156,6 +166,18 @@ def heap_profile_diff():
         heap_counter(df, title="counter")
         heap_pie_chart(df_matched, title="absolute count matched")
         heap_counter(df_matched, title="counter_matched")
+
+
+def code_coverage(path):
+    elf_file = "/Users/lukasvonbriel/Auterion/PX4_firmware_private/build/px4_fmu-v5x_default/px4_fmu-v5x_default.elf"
+    set_elffile_and_bitmap(elf_file, path)
+    init_bitmap()
+    df = get_all_function_names()
+    display_code_coverage(df)
+
+
+def code_coverage_diff():
+    pass
     
 if __name__ == "__main__":
     args = init_argparse()
@@ -198,6 +220,14 @@ if __name__ == "__main__":
             heap_profile_diff()
         else:
             heap_profile()
+    if args.code_coverage:
+        if args.bitmap:
+            if args.difference:
+                pass
+            else:
+                code_coverage(args.bitmap)
+        else:
+            print("Please provide a bitmap file")
     show(args.debug)
 
 
