@@ -582,23 +582,27 @@ class Mortrall
                     /* Check if trace is still executing bootloader */
                     if (r->bootloader)
                     {
-                        /* switch symbols (elf File) */
-                        r->s = r->_s;
-                        /* Start with main_thread by default */
-                        Mortrall::tid = 0;
-                        /* Set the callStack to the main_thread */
-                        r->callStack = &callstacks[Mortrall::tid];
-                        Mortrall::activeCallStackThread = PID_CALLSTACK + Mortrall::tid;
-                        /* Add the first function to the top of the stack */
-                        _addTopToStack(Mortrall::r,cpu->addr);
-                        /* Update the ProtoBuf entries */
-                        _generate_protobuf_entries_single(cpu->addr);
-                        /* reset bootloader flag */
-                        r->bootloader = false;
-                        /* switch symbols for itm trace as well */
-                        Mortrall::switch_itm_symbols();
-                        /* Print Debug Information */
-                        _traceReport( V_DEBUG, "*** BOOTLOADER FINISHED *** \n");
+                        /* Switch to default elf file if the new address is available */
+                        if (symbolDisassembleLine( r->_s, &ic, Mortrall::r->op.workingAddr, &newaddr))
+                        {
+                            /* switch symbols (elf File) */
+                            r->s = r->_s;
+                            /* Start with main_thread by default */
+                            Mortrall::tid = 0;
+                            /* Set the callStack to the main_thread */
+                            r->callStack = &callstacks[Mortrall::tid];
+                            Mortrall::activeCallStackThread = PID_CALLSTACK + Mortrall::tid;
+                            /* Add the first function to the top of the stack */
+                            _addTopToStack(Mortrall::r,cpu->addr);
+                            /* Update the ProtoBuf entries */
+                            _generate_protobuf_entries_single(cpu->addr);
+                            /* reset bootloader flag */
+                            r->bootloader = false;
+                            /* switch symbols for itm trace as well */
+                            Mortrall::switch_itm_symbols();
+                            /* Print Debug Information */
+                            _traceReport( V_DEBUG, "*** BOOTLOADER FINISHED *** \n");
+                        }
                     }else
                     {
                         _appendToOPBuffer( Mortrall::r, l, Mortrall::r->op.currentLine, LT_ASSEMBLY, "%8x:\tASSEMBLY NOT FOUND" EOL, Mortrall::r->op.workingAddr );
@@ -882,6 +886,24 @@ class Mortrall
                 _generate_protobuf_entries_single(Mortrall::r->op.workingAddr);
                 _flush_proto_buffer();
                 _stackReport(Mortrall::r);
+                /* Check if the current elf file is still the bootloader */
+                if(r->bootloader){
+                    /* Switch to bootloader */
+                    Mortrall::tid = Mortrall::PID_BOOTLOADER;
+                    _traceReport( V_DEBUG, "*** THREAD SWITCH *** (to tid: %u)" , Mortrall::tid);
+                    /* set the current call stack in runtime */
+                    Mortrall::r->callStack = &Mortrall::callstacks[Mortrall::tid];
+                    Mortrall::activeCallStackThread = Mortrall::PID_BOOTLOADER;
+                    /* Reset pending thread switch flag */
+                    Mortrall::pending_thread_switch = false;
+                    /* Set stack switch flag */
+                    r->resentStackSwitch = true;
+                    /* Reset exception flag */
+                    r->exceptionActive = false;
+                    /* Debug print Callstack */
+                    _stackReport(Mortrall::r);
+                    return true;
+                }
                 /* Switch to new call stack */
                 /* Check if we switched threads or are just returning from the exception to the old callStack */
                 if (Mortrall::pending_thread_switch){

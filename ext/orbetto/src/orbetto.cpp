@@ -884,7 +884,6 @@ static void _itmPumpProcess( char c )
 // ====================================================================================================
 // ====================================================================================================
 // ====================================================================================================
-int counter = 0;
 static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),void ( *_pumpETMProcessGeneric )( char ))
 {
     if ( options.useTPIU )
@@ -914,10 +913,8 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
                 {
                     if  ( _r.p.packet[g].s == 2 )
                     {
-                        // genericsReport( V_DEBUG, "Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
                         if ( _pumpETMProcessGeneric )
                         {
-                            //printf("ETM\n");
                             _pumpETMProcessGeneric( _r.p.packet[g].d );
                         }else{
                             options.etm = true;
@@ -926,12 +923,7 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
                     }
                     else if ( _r.p.packet[g].s == 1 )
                     {
-                        // print counter
-                        // printf("Packet count: %u\n", counter++);
-                        counter ++;
-                        //_itmPumpProcess( _r.p.packet[g].d );
                         _pumpITMProcessGeneric( (char)_r.p.packet[g].d );
-                        //if ( _pumpETMProcessGeneric ) printf("ITM\n");
                     }
                     else
                     {
@@ -950,9 +942,7 @@ static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),v
     }
     else
     {
-        //_itmPumpProcess( c );
         _pumpITMProcessGeneric( c );
-        //printf("C: %u\n", c);
     }
 }
 

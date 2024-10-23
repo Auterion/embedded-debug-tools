@@ -54,6 +54,10 @@ def init_argparse():
                         help='Path to bitmap file which is needed for code coverage',
                         type = str,
                         required = False)
+    parser.add_argument('-elf',"--elf_file",
+                        help='Path to elf file which is needed for code coverage',
+                        type = str,
+                        required = False)
 
     parser.add_argument('-diff', "--difference",
                         help='Switch all other options to display differences between two trace files',
@@ -168,9 +172,8 @@ def heap_profile_diff():
         heap_counter(df_matched, title="counter_matched")
 
 
-def code_coverage(path):
-    elf_file = "/Users/lukasvonbriel/Auterion/PX4_firmware_private/build/px4_fmu-v5x_default/px4_fmu-v5x_default.elf"
-    set_elffile_and_bitmap(elf_file, path)
+def code_coverage(elf, path):
+    set_elffile_and_bitmap(elf, path)
     init_bitmap()
     df = get_all_function_names()
     display_code_coverage(df)
@@ -221,11 +224,11 @@ if __name__ == "__main__":
         else:
             heap_profile()
     if args.code_coverage:
-        if args.bitmap:
+        if args.bitmap and args.elf_file:
             if args.difference:
                 pass
             else:
-                code_coverage(args.bitmap)
+                code_coverage(args.elf_file, args.bitmap)
         else:
             print("Please provide a bitmap file")
     show(args.debug)

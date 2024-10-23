@@ -198,7 +198,7 @@ define px4_etm_trace_tpiu_swo_stm32f7
 
     px4_configure_orbuculum
 
-    startETM 1
+    startETM
     
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
     shell killall orbuculum
@@ -231,7 +231,7 @@ define px4_etm_trace_tpiu_swo_stm32h7
 
     px4_configure_orbuculum
 
-    startETM 1
+    startETM
 
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
     shell killall orbuculum
