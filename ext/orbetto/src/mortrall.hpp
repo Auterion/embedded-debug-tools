@@ -33,7 +33,7 @@
 
 #include "LRUCache.hpp"
 
-#include "build/subprojects/CRoaring/roaring.hh"
+#include "roaring.hh"
 
 using namespace roaring;
 
