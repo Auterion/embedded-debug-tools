@@ -24,12 +24,14 @@ git_version_info_h = orbuculum.get_variable('git_version_info_h')
 # Specify the include directory for Roaring Bitmap
 cmake = import('cmake')
 sub_proj = cmake.subproject('croaring')
+# Fetch the dependency object
 cm_lib = sub_proj.dependency('croaring-singleheader-source-lib')
+inc = sub_proj.get_variable('roaring_inc')
 
 # Compile and link everything together
 executable('orbetto',
     sources: ['src/orbetto.cpp', 'src/device.cpp', git_version_info_h],
-    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc,
+    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc + inc,
     dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies') + [cm_lib],
     link_with: [liborb, perfbuf_lib],
     install: true,
