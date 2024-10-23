@@ -21,17 +21,16 @@ liborb = orbuculum.get_variable('liborb')
 orbinc = orbuculum.get_variable('incdirs')
 git_version_info_h = orbuculum.get_variable('git_version_info_h')
 
-
 # Specify the include directory for Roaring Bitmap
-cpp = meson.get_compiler('cpp')
-roaring_inc = include_directories(['subprojects/CRoaring/build'])
-roaring_lib = cpp.find_library('libcroaring-singleheader-source-lib', dirs: ['/Users/lukasvonbriel/Auterion/embedded-debug-tools/ext/orbetto/subprojects/CRoaring/build'])
+cmake = import('cmake')
+sub_proj = cmake.subproject('croaring')
+cm_lib = sub_proj.dependency('croaring-singleheader-source-lib')
 
 # Compile and link everything together
 executable('orbetto',
     sources: ['src/orbetto.cpp', 'src/device.cpp', git_version_info_h],
-    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc + roaring_inc,
-    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies') + [roaring_lib],
+    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc,
+    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies') + [cm_lib],
     link_with: [liborb, perfbuf_lib],
     install: true,
 )

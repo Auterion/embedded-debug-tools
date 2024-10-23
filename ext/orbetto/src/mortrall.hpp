@@ -889,10 +889,9 @@ class Mortrall
                 /* Check if the current elf file is still the bootloader */
                 if(r->bootloader){
                     /* Switch to bootloader */
-                    Mortrall::tid = Mortrall::PID_BOOTLOADER;
-                    _traceReport( V_DEBUG, "*** THREAD SWITCH *** (to tid: %u)" , Mortrall::tid);
+                    _traceReport( V_DEBUG, "*** THREAD SWITCH *** (to tid: %u)" , Mortrall::PID_BOOTLOADER);
                     /* set the current call stack in runtime */
-                    Mortrall::r->callStack = &Mortrall::callstacks[Mortrall::tid];
+                    Mortrall::r->callStack = &r->bootloaderCallStack;
                     Mortrall::activeCallStackThread = Mortrall::PID_BOOTLOADER;
                     /* Reset pending thread switch flag */
                     Mortrall::pending_thread_switch = false;
