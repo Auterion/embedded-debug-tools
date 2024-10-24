@@ -21,6 +21,7 @@
 #include <deque>
 #include <functional>
 #include <time.h>
+#include <iomanip>
 
 #include "git_version_info.h"
 #include "generics.h"
@@ -32,7 +33,6 @@
 #include "stream.h"
 
 #include "LRUCache.hpp"
-
 #include "roaring.hh"
 
 using namespace roaring;
