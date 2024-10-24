@@ -8,6 +8,10 @@ dist/
 /ext/orbetto/subprojects/orbuculum
 /ext/orbetto/subprojects/libdwarf*
 /ext/orbetto/subprojects/packagecache
+/ext/orbetto/subprojects/CRoaring
 /ext/orbetto/*.perf
 /ext/orbetto/*.gz
 /ext/orbetto/*.debug
+/ext/orbetto/*.zip
+/ext/orbetto/*.roar
+/ext/orbetto/trace.swo
