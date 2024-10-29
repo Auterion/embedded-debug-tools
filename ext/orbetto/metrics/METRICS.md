@@ -37,8 +37,8 @@ is to do regression testing and fuzzing with statistics derived from the instruc
 - Thread progress vs semaphores
 - Callstack changes (code coverage) [Done].
 
-All these metrics need to be combined into a large latent space that can be diffed (a kind of distance measure) between different versions of PX4.
-of PX4 to detect bugs in the code before it flies.
+All these metrics need to be combined into a large latent space that can be diffed (a kind of distance measure) between different versions of PX4
+to detect bugs in the code before it flies.
 
 ## GCOV
 
@@ -48,7 +48,7 @@ Two files are required for gcov to display code coverage:
 - .gcno, which is an advanced source file you get when compiling with the GCC -ftest-coverage option
 - .gcda, which is created when the GCC -fprofile-arcs option is run.
 
-It should be a simple .gcno file as the flag is already a compile option in PX4.
+It should be simple to get the .gcno file as the flag is already a compile option in PX4.
 Theoretically it should be possible to reverse engineer the .gcda file just from the PC values,
 (documentation can be found here: https://github.com/gcc-mirror/gcc/blob/master/gcc/gcov-io.h)
 However, it is unclear how long this will take and how robust it will be.

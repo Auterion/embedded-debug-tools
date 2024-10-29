@@ -238,6 +238,10 @@ class Mortrall
             /* The number of overflows is one metrics that represents the quality of the trace */
             /* If there are many overflows try implicit tracing */
             printf("Overflows: %llu - %llu\n",cpu->overflows,cpu->ASyncs);
+            if (cpu->overflows > 0)
+            {
+                printf("Warning: When tracing implicit, it is very likely overflows corrupt the Call Stack.\n");
+            }
             printf("PC bitmap cardinality = %llu\n", r1.cardinality());
             // Serialize the bitmap to a file
             // Step 1: Get the size of the serialized bitmap
@@ -289,7 +293,7 @@ class Mortrall
             /* Check for Cycle Count update to reset instruction count*/
             if (TRACEStateChanged( &Mortrall::r->i, EV_CH_CYCLECOUNT) )
             {
-                Mortrall::_generate_protobuf_cycle_counts();
+                // Mortrall::_generate_protobuf_cycle_counts();
                 Mortrall::_flush_proto_buffer();
                 Mortrall::r->instruction_count = 0;
                 Mortrall::update_itm_timestamp(cpu->cycleCount);
@@ -858,6 +862,7 @@ class Mortrall
             /* Handle the context switch after a exception */
             if (Mortrall::r->exceptionEntry)
             {
+                Mortrall::_generate_protobuf_cycle_counts();
                 /* Check if exception Id is in the map */
                 if(!Mortrall::exception_names.contains(Mortrall::r->exceptionId))
                 {
@@ -879,8 +884,9 @@ class Mortrall
         {
             /* As there is no exception exit packet the exit has to be detected by ending of the "arm_exception" function */
             /* If highaddr is reached its the end of exception (highaddr might be offset by a 1/2 byte) */
-            if(r->exceptionActive && func && strstr(func->funcname,"arm_exception") && (Mortrall::r->op.workingAddr >= (func->highaddr - 0xf))&& (Mortrall::r->op.workingAddr <= (func->highaddr)))
+            if(r->exceptionActive && func && strstr(func->funcname,"arm_exception") && (Mortrall::r->op.workingAddr >= (func->highaddr - 0x1f))&& (Mortrall::r->op.workingAddr <= (func->highaddr + 0xf)))
             {
+                Mortrall::_generate_protobuf_cycle_counts();
                 /* Clear the exception call stack */
                 _removeRetFromStack(Mortrall::r);
                 _generate_protobuf_entries_single(Mortrall::r->op.workingAddr);
