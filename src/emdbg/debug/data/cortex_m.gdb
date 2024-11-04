@@ -196,12 +196,29 @@ define px4_enable_trace_stm32h7
     set *($TPIUBASE+0x304) = 0x00000102
 end
 
+define px4_etm_trace_tpiu_swo_stm32f7
+    px4_reset
+
+    enableSTM32TRACE 4 3 1
+
+    px4_configure_orbuculum
+
+    startETM
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    shell orbuculum -O "-T4" &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
+end
+
+
 define px4_trace_tpiu_swo_stm32f7
     px4_reset
     tbreak nx_start
     continue
 
-    enableSTM32TRACE 4 3
+    enableSTM32TRACE 4 3 1
 
     px4_configure_orbuculum
 
@@ -212,6 +229,21 @@ define px4_trace_tpiu_swo_stm32f7
     shell nc localhost 3443 > trace.swo &
 end
 
+define px4_etm_trace_tpiu_swo_stm32h7
+    px4_reset
+
+    px4_enable_trace_stm32h7 4
+
+    px4_configure_orbuculum
+
+    startETM
+
+    # -o trace.swo dumps the RAW data, not the demuxed data!!!
+    shell killall orbuculum
+    shell orbuculum -O "-T4" &
+    shell sleep 1
+    shell nc localhost 3443 > trace.swo &
+end
 
 define px4_trace_tpiu_swo_stm32h7
     px4_reset

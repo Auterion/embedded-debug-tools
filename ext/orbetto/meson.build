@@ -15,6 +15,17 @@ perfbuf_sources = cpp_gen.process(proto_sources, preserve_path_from: meson.curre
 # Compile and link the protobuf source files
 perfbuf_lib = static_library('perfbuf', sources: perfbuf_sources, dependencies: [dependency('protobuf')])
 
+# Specify the include directory for Roaring Bitmap
+cmake = import('cmake')
+rm = cmake.subproject('croaring')
+# Fetch the dependency object
+message('CMake targets:\n - ' + '\n - '.join(rm.target_list()))
+rm_dep1 = rm.dependency('roaring-headers-cpp')
+rm_dep2 = rm.dependency('roaring-headers')
+rm_dep = rm.dependency('roaring')
+rm_inc = rm.get_variable('roaring_headers_cpp_inc') + rm.get_variable('roaring_headers_inc')
+
+
 # Clone the orbuculum git repository
 orbuculum = subproject('orbuculum')
 liborb = orbuculum.get_variable('liborb')
@@ -24,8 +35,8 @@ git_version_info_h = orbuculum.get_variable('git_version_info_h')
 # Compile and link everything together
 executable('orbetto',
     sources: ['src/orbetto.cpp', 'src/device.cpp', git_version_info_h],
-    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc,
-    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies'),
+    include_directories: ['src'] + perfbuf_lib.private_dir_include() + orbinc + rm_inc,
+    dependencies: [dependency('protobuf')] + orbuculum.get_variable('dependencies') + [rm_dep] + [rm_dep1] + [rm_dep2],
     link_with: [liborb, perfbuf_lib],
     install: true,
 )

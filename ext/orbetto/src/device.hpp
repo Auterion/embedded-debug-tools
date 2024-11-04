@@ -7,6 +7,14 @@
 #include <string_view>
 #include <cstdint>
 
+// enum for skynode device id
+enum DeviceId
+{
+    SYKNODE_V5X = 0,
+    SYKNODE_V6X = 1,
+    SKYNODE_S = 2,
+};
+
 class Device
 {
 public:
@@ -49,9 +57,16 @@ public:
     clock() const
     { return _clock; }
 
+    /// Provides the device id.
+    int
+    id() const
+    { return (int)_id; }
+
+
 private:
     const IrqTable *_irq_table{nullptr};
     const RegisterTable *_register_table{nullptr};
     uint32_t _clock{0};
     int16_t _max_irq{0};
+    DeviceId _id; // device id: 0
 };

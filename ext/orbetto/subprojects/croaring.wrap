@@ -1,0 +1,4 @@
+[wrap-git]
+directory = CRoaring
+url = https://github.com/RoaringBitmap/CRoaring.git
+revision = ad487efbb48637445e6a5eee10c81cc9fdd7bf76

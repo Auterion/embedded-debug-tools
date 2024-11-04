@@ -88,6 +88,7 @@ set $ITMBASE=0xE0000000
 set $TPIUBASE=0xE0040000
 set $ETMBASE=0xE0041000
 
+
 define _setAddressesSTM32
   # Locations in the memory map for interesting things on STM32
   set $CPU = $CPU_STM32
@@ -165,6 +166,7 @@ set $TRCVDARCCTLR=$ETM4BASE+0x0a8
 set $TRCDEVARCH=$ETM4BASE+0xFBC
 # Trace IDR base address
 set $TRCIDR0=$ETM4BASE+0x1E0
+set $TRCIDR3=$ETM4BASE+0x1EC
 end
 # Trace Address comparator Value registers
 set $TRCACVR0=$ETMBASE+0x400
@@ -257,6 +259,59 @@ define _startETMv4
   end
 end
 # ====================================================================
+define _startETMv4_modified
+  echo ETMv4 Tracing is enabled\n
+  # Enable the return stack, global timestamping, Context ID, and Virtual context identifier tracing.
+  # Disabled global timestamp to not interfere with cycle count
+  set *($TRCCONFIGR) = 0x000010C1
+
+  # Disable all event tracing.
+  set *($TRCEVENTCTL0R) = 0
+  set *($TRCEVENTCTL1R) = 0
+
+  # Stalling is not possible on h7 and f7
+  # Disable or enable stalling for instructions, if implemented
+  set *($TRCSTALLCTLR) = (1<<13)|(1<<8)|(0x0f<<0)
+
+  # Fixed on STM32f7
+  # Trace sync every 1024 bytes of trace
+  set *($TRCSYNCPR) = 0x0c
+
+  # Do we want branch broadcasting?
+  set *$TRCACVR0=0
+  set *$TRCACVR1=0xFFFFFFFF
+  set *$TRCACATR0=0
+  set *$TRCACATR1=0
+  set *($TRCCONFIGR) |= ($br_out<<3)
+  set *($TRCBBCTLR) = ($br_out<<8)|0x03
+
+  # enable cycle count
+  set *($TRCCONFIGR) |= 0x10
+  set *($TRCCCCTLR) |= 0x10
+
+  # Trace on ID 2
+  set *($TRCTRACEIDR) = 2
+
+  # Disable timestamp event (This does not do anything)
+  set *($TRCTSCTLR) = 0
+
+  # Enable ViewInst to trace everything
+  set *($TRCVICTLR) = 0x201
+
+  # No address range filtering for ViewInst
+  set *($TRCVIIECTLR) = 0
+
+  # No start or stop points for ViewInst
+  set *($TRCVISSCTLR) = 0
+
+  # ...and start
+  set *($TRCPRGCTLR) |= (1<<0)
+
+  while (((*$TRCSTATR)&(1<<0))==1)
+  echo Wait for trace not idle\n
+  end
+end
+# ====================================================================
 define _startETMv35
 
   # Allow access to device
@@ -329,8 +384,10 @@ define startETM
 
 
   if (((*$TRCDEVARCH)&0xfff0ffff)  ==0x47704a13)
-    _startETMv4
+    echo ETMv4 version active \n
+    _startETMv4_modified
   else
+    echo ETMv3 version active \n
     _startETMv35
   end
 
@@ -891,6 +948,7 @@ define enableSTM32TRACE
 
   set $bits=4
   set $drive=1
+  set $remap=0
 
   if $argc >= 1
     set $bits = $arg0
@@ -905,6 +963,10 @@ define enableSTM32TRACE
 
   if ($drive > 3)
     help enableSTM32TRACE
+  end
+
+  if $argc >= 3
+    set $remap = $arg2
   end
 
   set $bits = $bits-1
@@ -923,15 +985,20 @@ define enableSTM32TRACE
   enableSTM32Pin 4 2 $drive
   enableSTM32Pin 4 3 $drive
 
-  if ($bits>0)
+  if ($bits>=1)
      # Setup PE4
      enableSTM32Pin 4 4 $drive
   end
 
-  if ($bits>1)
-     # Setup PE5 & PC12
-     enableSTM32Pin 4 5 $drive
-     enableSTM32Pin 2 12 $drive
+  if ($bits>=2)
+    # Setup PE5 & PC12 
+    enableSTM32Pin 4 5 $drive
+    #enableSTM32Pin 4 6 $drive
+    if ($remap)
+      enableSTM32Pin 2 12 $drive 
+    else
+      enableSTM32Pin 4 6 $drive
+    end
   end
 
   # Set number of bits in DBGMCU_CR

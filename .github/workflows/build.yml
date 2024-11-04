@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: sudo apt-get update
-      - run: sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev python3-pip ninja-build protobuf-compiler
+      - run: sudo apt-get install -y libusb-1.0-0-dev libzmq3-dev meson libsdl2-dev libdwarf-dev libdw-dev libelf-dev libcapstone-dev python3-pip ninja-build protobuf-compiler cmake
       - run: sudo pip3 install meson==1.2.0
       - uses: actions/checkout@v3
       - run: meson setup ./build
@@ -27,7 +27,7 @@ jobs:
     name: Build and Test Orbetto on macOS
     runs-on: macos-13
     steps:
-      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils
+      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils cmake
       - uses: actions/checkout@v3
       - run: meson setup ./build
         working-directory: ext/orbetto

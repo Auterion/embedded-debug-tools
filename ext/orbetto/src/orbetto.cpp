@@ -30,6 +30,7 @@ using namespace std::string_literals;
 #include "stream.h"
 #include "loadelf.h"
 #include "device.hpp"
+#include "mortrall.hpp"
 
 // To get the ITM channel list
 #include "../../src/emdbg/patch/data/itm.h"
@@ -45,9 +46,13 @@ struct
     bool useTPIU{false};
     uint32_t tpiuChannel{1};
     uint64_t cps{0};
+    uint64_t dbg_cc{0};
     std::string file;
     std::string elfFile;
+    std::string elfBootloaderFile;
     bool outputDebugFile;
+    enum verbLevel verbose;
+    bool etm{false};
 } options;
 
 struct
@@ -60,13 +65,17 @@ struct
     struct TPIUPacket p;
     uint64_t timeStamp;                  /* Latest received time */
     uint64_t ns;                         /* Latest received time in ns */
-    struct symbol *symbols;              /* symbols from the elf file */
+    struct symbol *symbols;              /* active symbols */
+    struct symbol *symbols_main;         /* symbols from the main elf file */
+    struct symbol *symbols_bootloader;   /* symbols from the bootloader elf file */
 } _r;
 
 static Device device;
 
 static perfetto::protos::Trace *perfetto_trace;
 static perfetto::protos::FtraceEventBundle *ftrace;
+Mortrall mortrall;
+
 // ====================================================================================================
 
 static constexpr uint32_t PID_TSK{0};
@@ -275,6 +284,16 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             const uint8_t priority = m->value >> 16;
             const uint8_t prev_state = m->value >> 24;
             _switchTo(tid, true, priority, prev_state);
+            if(prev_tid < PID_STOP && prev_tid != 0)
+            {
+                auto *event = ftrace->add_event();
+                event->set_timestamp(ns);
+                event->set_pid(PID_TSK + prev_tid);
+                auto *print = event->mutable_print();
+                char buffer[100];
+                snprintf(buffer, sizeof(buffer), "C|%u|Priorities %s|%u",PID_TSK,thread_names[prev_tid].c_str() ,priority);
+                print->set_buf(buffer);
+            }
             break;
         }
         case EMDBG_TASK_RUNNABLE: // ready
@@ -310,7 +329,7 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
                 {
                     if (const char *name = (const char *) symbolCodeAt(_r.symbols, m->value, NULL); name)
                     {
-                        printf("Found Name %s for 0x%08x\n", name, m->value);
+                        //printf("Found Name %s for 0x%08x\n", name, m->value);
                         workqueue_names[m->value] = name;
                     }
                     else {
@@ -624,12 +643,28 @@ static void _handleSW( struct swMsg *m, struct ITMDecoder *i )
             }
             break;
         }
+        default:
+        {
+            // debug print the unknown source address
+            genericsReport( V_DEBUG, "Unknown SW message from %u\n", m->srcAddr );
+            break;
+        }
     }
 }
 // ====================================================================================================
 static void _handleTS( struct TSMsg *m, struct ITMDecoder *i )
 {
-    _r.timeStamp += m->timeInc;
+    // only use if instruction trace data is not available
+    if( !options.etm )
+    {
+        _r.timeStamp += m->timeInc;
+        _r.ns = (_r.timeStamp * 1e9) / options.cps;
+    }
+}
+
+static void _handleTSFromETM(uint64_t cc)
+{
+    _r.timeStamp = cc;
     _r.ns = (_r.timeStamp * 1e9) / options.cps;
 }
 
@@ -759,6 +794,11 @@ static void _itmPumpProcessPre( char c )
                     stopped_threads.insert(m->value);
                     // printf("Thread %u stopped\n", m->value);
                 }
+                // List all thread switches to construct call graph from instruction (etm) data later
+                if(m->srcAddr== EMDBG_TASK_RESUME)
+                {
+                    mortrall.add_thread_switch(m->value & 0xfffful);
+                }
             }
             else if (p.genericMsg.msgtype == MSG_PC_SAMPLE)
             {
@@ -806,6 +846,7 @@ static void _itmPumpProcess( char c )
 
         if ( h[pp->genericMsg.msgtype] )
         {
+
             ( h[pp->genericMsg.msgtype] )( pp, &_r.i );
         }
     }
@@ -817,11 +858,11 @@ static void _itmPumpProcess( char c )
 // ====================================================================================================
 // ====================================================================================================
 // ====================================================================================================
-static void _protocolPump( uint8_t c )
+static void _protocolPump( uint8_t c ,void ( *_pumpITMProcessGeneric )( char ),void ( *_pumpETMProcessGeneric )( char ))
 {
     if ( options.useTPIU )
     {
-        switch ( TPIUPump( &_r.t, c ) )
+        switch ( TPIUPump( &_r.t, c) )
         {
             case TPIU_EV_NEWSYNC:
             case TPIU_EV_SYNCED:
@@ -844,15 +885,23 @@ static void _protocolPump( uint8_t c )
 
                 for ( uint32_t g = 0; g < _r.p.len; g++ )
                 {
-                    if ( _r.p.packet[g].s == options.tpiuChannel )
+                    if  ( _r.p.packet[g].s == 2 )
                     {
-                        _itmPumpProcess( _r.p.packet[g].d );
+                        if ( _pumpETMProcessGeneric )
+                        {
+                            _pumpETMProcessGeneric( _r.p.packet[g].d );
+                        }else{
+                            options.etm = true;
+                        }
                         continue;
                     }
-
-                    if  ( _r.p.packet[g].s != 0 )
+                    else if ( _r.p.packet[g].s == 1 )
                     {
-                        genericsReport( V_DEBUG, "Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
+                        _pumpITMProcessGeneric( (char)_r.p.packet[g].d );
+                    }
+                    else
+                    {
+                        printf("Unknown TPIU channel %02x" EOL, _r.p.packet[g].s );
                     }
                 }
 
@@ -861,22 +910,34 @@ static void _protocolPump( uint8_t c )
             case TPIU_EV_ERROR:
                 genericsReport( V_WARN, "****ERROR****" EOL );
                 break;
+            default:
+                break;
         }
     }
     else
     {
-        _itmPumpProcess( c );
+        _pumpITMProcessGeneric( c );
     }
 }
+
+// ====================================================================================================
+
+static void _switchSymbols()
+{
+    _r.symbols = _r.symbols_main;
+}
+
 // ====================================================================================================
 static struct option _longOptions[] =
 {
+    {"cc", required_argument, NULL, 'a'},
     {"cpufreq", required_argument, NULL, 'C'},
     {"input-file", required_argument, NULL, 'f'},
     {"help", no_argument, NULL, 'h'},
     {"tpiu", required_argument, NULL, 't'},
     {"elf", required_argument, NULL, 'e'},
-    {"debug", no_argument, NULL, 'd'},
+    {"elf_bootloader", required_argument, NULL, 'b'},
+    {"debug", required_argument, NULL, 'd'},
     {"verbose", required_argument, NULL, 'v'},
     {"version", no_argument, NULL, 'V'},
     {NULL, no_argument, NULL, 0}
@@ -884,7 +945,7 @@ static struct option _longOptions[] =
 bool _processOptions( int argc, char *argv[] )
 {
     int c, optionIndex = 0;
-    while ( ( c = getopt_long ( argc, argv, "C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
+    while ( ( c = getopt_long ( argc, argv, "a:b:C:Ef:de:hVt:v:", _longOptions, &optionIndex ) ) != -1 )
         switch ( c )
         {
             // ------------------------------------
@@ -895,14 +956,15 @@ bool _processOptions( int argc, char *argv[] )
             // ------------------------------------
             case 'h':
                 fprintf( stdout, "Usage: %s [options]" EOL, argv[0] );
-                fprintf( stdout, "    -C, --cpufreq:      <Frequency in KHz> (Scaled) speed of the CPU" EOL );
-                fprintf( stdout, "    -f, --input-file:   <filename> Take input from specified file" EOL );
-                fprintf( stdout, "    -h, --help:         This help" EOL );
-                fprintf( stdout, "    -e, --elf:          <file>: Use this ELF file for information" EOL );
-                fprintf( stdout, "    -d, --debug:        Output a human-readable protobuf file" EOL );
-                fprintf( stdout, "    -t, --tpiu:         <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
-                fprintf( stdout, "    -v, --verbose:      <level> Verbose mode 0(errors)..3(debug)" EOL );
-                fprintf( stdout, "    -V, --version:      Print version and exit" EOL );
+                fprintf( stdout, "    -C, --cpufreq:            <Frequency in KHz> (Scaled) speed of the CPU" EOL );
+                fprintf( stdout, "    -f, --input-file:         <filename> Take input from specified file" EOL );
+                fprintf( stdout, "    -h, --help:               This help" EOL );
+                fprintf( stdout, "    -e, --elf:                <file>: Use this ELF file for information" EOL );
+                fprintf( stdout, "    -eb, --elf_bootloader:    <file>: Use this ELF file for bootloader information" EOL );
+                fprintf( stdout, "    -d, --debug:              Output a human-readable protobuf file" EOL );
+                fprintf( stdout, "    -t, --tpiu:               <channel>: Use TPIU decoder on specified channel (normally 1)" EOL );
+                fprintf( stdout, "    -v, --verbose:            <level> Verbose mode 0(errors)..3(debug)" EOL );
+                fprintf( stdout, "    -V, --version:            Print version and exit" EOL );
                 return false;
 
             // ------------------------------------
@@ -915,6 +977,10 @@ bool _processOptions( int argc, char *argv[] )
                 options.outputDebugFile = true;
                 break;
 
+            case 'a':
+                options.dbg_cc = atoi( optarg );
+                break;
+
             // ------------------------------------
             case 'f':
                 options.file = optarg;
@@ -923,6 +989,10 @@ bool _processOptions( int argc, char *argv[] )
             // ------------------------------------
             case 'e':
                 options.elfFile = optarg;
+                break;
+
+            case 'b':
+                options.elfBootloaderFile = optarg;
                 break;
 
             // ------------------------------------
@@ -940,6 +1010,7 @@ bool _processOptions( int argc, char *argv[] )
                 }
 
                 genericsSetReportLevel( (enum verbLevel)atoi( optarg ) );
+                options.verbose = (enum verbLevel) atoi( optarg );
                 break;
 
             // ------------------------------------
@@ -1012,6 +1083,7 @@ int main(int argc, char *argv[])
     ftrace->set_cpu(0);
 
     struct Stream *stream = streamCreateFile( options.file.c_str() );
+    genericsReport( V_INFO, "PreProcess Stream" EOL );
     while ( true )
     {
         size_t receivedSize;
@@ -1024,23 +1096,42 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _itmPumpProcessPre(*c++);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcessPre,NULL); //_itmPumpProcessPre(*c++);
         fflush(stdout);
     }
     stream->close(stream);
     free(stream);
 
     printf("Loading ELF file %s with%s source lines\n", options.elfFile.c_str(), has_pc_samples ? "" : "out");
-    _r.symbols = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
-    assert( _r.symbols );
-    printf("Loaded ELF with %u sections:\n", _r.symbols->nsect_mem);
-    for (int ii = 0; ii < _r.symbols->nsect_mem; ii++)
+    _r.symbols_main = symbolAcquire((char*)options.elfFile.c_str(), true, has_pc_samples);
+    assert( _r.symbols_main );
+    printf("Loaded ELF with %u sections:\n", _r.symbols_main->nsect_mem);
+    for (int ii = 0; ii < _r.symbols_main->nsect_mem; ii++)
     {
-        auto mem = _r.symbols->mem[ii];
+        auto mem = _r.symbols_main->mem[ii];
         printf("  Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
     }
+    if(options.elfBootloaderFile.size())
+    {
+        printf("Loading ELF file %s for bootloader with%s source lines\n", options.elfBootloaderFile.c_str(), has_pc_samples ? "" : "out");
+        _r.symbols_bootloader = symbolAcquire((char*)options.elfBootloaderFile.c_str(), true, has_pc_samples);
+        assert( _r.symbols_bootloader );
+        printf("Loaded ELF with %u sections:\n", _r.symbols_bootloader->nsect_mem);
+        for (int ii = 0; ii < _r.symbols_bootloader->nsect_mem; ii++)
+        {
+            auto mem = _r.symbols_bootloader->mem[ii];
+            printf("  Section '%s': [0x%08lx, 0x%08lx] (%lu)\n", mem.name, mem.start, mem.start + mem.len, mem.len);
+        }
+        _r.symbols = _r.symbols_bootloader;
+    }else{
+        _r.symbols = _r.symbols_main;
+    }
+
+    printf("Initialize Mortrall (Instruction tracing)\n");
+    mortrall.init(perfetto_trace,ftrace,options.cps, options.verbose,_r.symbols_main,_r.symbols_bootloader,_handleTSFromETM,_switchSymbols,options.dbg_cc);
 
     stream = streamCreateFile( options.file.c_str() );
+    genericsReport( V_INFO, "Process Stream" EOL );
     while ( true )
     {
         size_t receivedSize;
@@ -1053,7 +1144,7 @@ int main(int argc, char *argv[])
         if (result == RECEIVE_RESULT_EOF or result == RECEIVE_RESULT_ERROR) break;
 
         unsigned char *c = cbw;
-        while (receivedSize--) _protocolPump(*c++);
+        while (receivedSize--) _protocolPump(*c++,_itmPumpProcess,mortrall.dumpElement);
         fflush(stdout);
     }
     stream->close(stream);
@@ -1095,6 +1186,9 @@ int main(int argc, char *argv[])
                 thread->set_tid(tid);
                 thread->set_tgid(PID_TSK);
             }
+            auto *thread = process_tree->add_threads();
+            thread->set_tid(100);
+            thread->set_tgid(PID_TSK);
         }
         {
             auto *process = process_tree->add_processes();
@@ -1181,6 +1275,7 @@ int main(int argc, char *argv[])
             //     thread->set_name(buffer);
             // }
         }
+        mortrall.finalize(process_tree);
     }
 
 
