@@ -111,7 +111,6 @@ out-of-box or with small adaptations.</p>
 <li>Trace Probes: ITM/DWT/ETM over TRACE.
 <ul>
 <li><a href="https://orbcode.org/orbtrace-mini">Orbcode ORBTrace mini</a>: (50MB/s).</li>
-<li><a href="https://www.segger.com/products/debug-probes/j-trace/models/j-trace/">SEGGER J-Trace</a>: (&gt;100MB/s) (planned).</li>
 </ul></li>
 <li><a href="https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain">GDB Debugger</a>.
 <ul>
@@ -126,6 +125,11 @@ out-of-box or with small adaptations.</p>
 <li>Visualization of entire RTOS state via <a href="https://perfetto.dev">perfetto</a>.</li>
 <li>Nanosecond resolution with very little runtime overhead.</li>
 </ul></li>
+<li><a href="https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/src/TRACE.md">Real-time instruction trace using ETM</a>.
+<ul>
+<li>Visualization of callstacks via <a href="https://perfetto.dev">perfetto</a>.</li>
+<li>Generation of <a href="https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/metrics/METRICS.md">metrics from trace via PerfettoSQL</a>.</li>
+</ul></li>
 <li>Patch Manager for out-of-tree modifications.</li>
 <li>Power Switch.
 <ul>
@@ -134,8 +138,7 @@ out-of-box or with small adaptations.</p>
 <li>Logic Analyzer and Waveform Generator.
 <ul>
 <li><a href="https://digilent.com/reference/test-and-measurement/analog-discovery-2/start">Digilent Analog Discovery 2</a> via Python API.</li>
-<li><a href="https://sigrok.org/wiki/Main_Page">Sigrok</a> (prototyped).</li>
-<li>Visualization via <a href="https://perfetto.dev">perfetto</a> (prototyped).</li>
+<li><a href="https://glasgow-embedded.org/">Glasgow Digital Interface Explorer</a> (planned).</li>
 </ul></li>
 <li>Serial Protocols.
 <ul>
@@ -153,6 +156,14 @@ the <code>scripts</code> folder.</p>
 <h2 id="presentations">Presentations</h2>
 
 <p>Sorted in reverse chronological order.</p>
+
+<h3 id="utilizing-instruction-tracing-to-analyze-px4-at-runtime">Utilizing Instruction Tracing to Analyze PX4 at Runtime</h3>
+
+<p>Presented at <a href="https://auterion.com">Auterion</a> by Lukas von Briel on 2024-10-31.</p>
+
+<p><a href="https://www.youtube.com/watch?v=sJ5pnPrWA30"><img src="https://i.ytimg.com/vi/sJ5pnPrWA30/maxresdefault.jpg" width="100%"/></a></p>
+
+<p><a href="https://salkinium.com/talks/auterion24_instruction_tracing.pdf">Slides with Notes</a>.</p>
 
 <h3 id="analyzing-cortex-m-firmware-with-the-perfetto-trace-processor">Analyzing Cortex-M Firmware with the Perfetto Trace Processor</h3>
 
