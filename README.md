@@ -27,7 +27,6 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
     - Coredump via [CrashDebug](https://github.com/adamgreen/CrashDebug) with support for PX4 Hardfault logs.
 - Trace Probes: ITM/DWT/ETM over TRACE.
     - [Orbcode ORBTrace mini](https://orbcode.org/orbtrace-mini): (50MB/s).
-    - [SEGGER J-Trace](https://www.segger.com/products/debug-probes/j-trace/models/j-trace/): (>100MB/s) (planned).
 - [GDB Debugger](https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain).
     - Automatic management of debug probe drivers.
     - Remote interfacing via [GDB/MI](https://github.com/cs01/pygdbmi) and RPyC.
@@ -37,13 +36,15 @@ emdbg is maintained by [@niklaut](https://github.com/niklaut) from
 - [Real-time instrumentation using ITM/DWT](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto).
     - Visualization of entire RTOS state via [perfetto](https://perfetto.dev).
     - Nanosecond resolution with very little runtime overhead.
+- [Real-time instruction trace using ETM](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/src/TRACE.md).
+    - Visualization of callstacks via [perfetto](https://perfetto.dev).
+    - Generation of [metrics from trace via PerfettoSQL](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/metrics/METRICS.md).
 - Patch Manager for out-of-tree modifications.
 - Power Switch.
     - Yocto USB Relay.
 - Logic Analyzer and Waveform Generator.
     - [Digilent Analog Discovery 2](https://digilent.com/reference/test-and-measurement/analog-discovery-2/start) via Python API.
-    - [Sigrok](https://sigrok.org/wiki/Main_Page) (prototyped).
-    - Visualization via [perfetto](https://perfetto.dev) (prototyped).
+    - [Glasgow Digital Interface Explorer](https://glasgow-embedded.org/) (planned).
 - Serial Protocols.
     - NuttX NSH command prompt.
 - Hardware configuration.
@@ -56,6 +57,14 @@ the `scripts` folder.
 ## Presentations
 
 Sorted in reverse chronological order.
+
+### Utilizing Instruction Tracing to Analyze PX4 at Runtime
+
+Presented at [Auterion](https://auterion.com) by [Lukas von Briel](https://www.linkedin.com/in/lvb2000) on 2024-10-31.
+
+<a href="https://www.youtube.com/watch?v=sJ5pnPrWA30"><img src="https://i.ytimg.com/vi/sJ5pnPrWA30/maxresdefault.jpg" width="100%"/></a>
+
+[Slides with Notes](https://salkinium.com/talks/auterion24_instruction_tracing.pdf).
 
 ### Analyzing Cortex-M Firmware with the Perfetto Trace Processor
 
