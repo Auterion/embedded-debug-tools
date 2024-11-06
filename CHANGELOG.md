@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0
+
+- Add inline function analyzer.
+
 ## 1.5.7
 
 - Fix `px4_switch_task` for J-Link (previously only fixed for ST-LINK).
