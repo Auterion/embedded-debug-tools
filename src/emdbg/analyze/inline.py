@@ -2,7 +2,28 @@
 # Copyright (c) 2024, Auterion AG
 # SPDX-License-Identifier: BSD-3-Clause
 
+"""
+# Analyze inline function usage
+
+Function inlining generally is a space-time tradeoff where more inlining helps
+with execution speed but increases FLASH usage. This tool helps to see which
+functions are inlined where and how much FLASH usage this inlining causes.
+
+## Command Line Interface
+
+You can analyze the inline usage like this:
+
+```sh
+python3 -m emdbg.analyze.inline -f test.elf
+```
+
+The analysis can take some time as it has to traverse all DIEs of the DWARF data.
+"""
+
+from __future__ import annotations
 from collections import defaultdict
+from dataclasses import dataclass
+from pathlib import Path
 import argparse
 import logging
 import posixpath
@@ -16,42 +37,43 @@ import rich
 from rich.console import Console
 from rich.table import Table
 
-LOGGER = logging.getLogger("flash:inline")
+_LOGGER = logging.getLogger(__name__)
 
+
+def _rel_file_name(file_name: Path) -> str:
+    """Return the filename relative to the CWD"""
+    try: return str(Path(file_name).relative_to(Path().cwd()))
+    except ValueError: return str(Path(file_name))
 
 # -----------------------------------------------------------------------------
+@dataclass
 class InlinedInstance:
     """
-    See :class:`InlinedFunction`.
+    See `InlinedFunction`.
     """
-    def __init__(self, file_name: str, file_line: int, size: int) -> None:
-        """
-        :param file_name: file where the function is inlined to.
-        :param file_line: line within the file where the function is inlined.
-        :param size: amount of flash used by the inlined function in this instance.
-        """
-        self.file_name = file_name
-        self.file_line = file_line
-        self.size = size
+    file_name: Path
+    """file where the function is inlined to."""
+    file_line: int
+    """line within the file where the function is inlined."""
+    size: int
+    """amount of flash used by the inlined function in this instance."""
 
 
 # -----------------------------------------------------------------------------
+@dataclass
 class InlinedFunction:
     """
-    The :class:`InlinedFunction` represents a function that is inlined into different callers.
-    It contains a list of :class:`InlinedInstance` which represent the instance that this function is inlined into.
+    The `InlinedFunction` represents a function that is inlined into different callers.
+    It contains a list of `InlinedInstance` which represent the instance that this function is inlined into.
     """
-    def __init__(self, file_name: str, file_line: int, total_size: int, inlined_instances: list[InlinedInstance]) -> None:
-        """
-        :param file_name: file where the inline function is declared.
-        :param file_line: line within the file where the inline function is declared.
-        :param total_size: total amount of flash used due to this method being inline.
-        :param inlined_instances: list of instances where this function is inlined to.
-        """
-        self.inlined_instances = inlined_instances
-        self.file_name = file_name
-        self.file_line = file_line
-        self.total_size = total_size
+    file_name: Path
+    """file where the inline function is declared."""
+    file_line: int
+    """line within the file where the inline function is declared."""
+    total_size: int
+    """total amount of flash used due to this method being inline."""
+    inlined_instances: list[InlinedInstance]
+    """list of instances where this function is inlined to."""
 
     def print(self, console: Console, num_of_instances: int, total_size: int) -> str:
         """
@@ -61,7 +83,7 @@ class InlinedFunction:
         :param num_of_instances: the number of inlined instances to print. A value of `0` causes all to be displayed.
         ;param total_size: total amount of FLASH used by inlined functions. Used to calculate the percentage caused by this inlined function.
         """
-        console.print(f"{self.file_name}:{self.file_line} -- Total Size: {self.total_size} ({(self.total_size / total_size * 100):.2f}%)")
+        console.print(f"{_rel_file_name(self.file_name)}:{self.file_line} -- Total Size: {self.total_size} ({(self.total_size / total_size * 100):.2f}%)")
 
         table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
         table.add_column("File name")
@@ -71,7 +93,7 @@ class InlinedFunction:
 
         for i, inlined_instance in enumerate(self.inlined_instances):
             if i < num_of_instances or num_of_instances == 0:
-                table.add_row(inlined_instance.file_name, str(inlined_instance.file_line),
+                table.add_row(_rel_file_name(inlined_instance.file_name), str(inlined_instance.file_line),
                               str(inlined_instance.size), "{:.2f}".format(inlined_instance.size / self.total_size * 100))
             else:
                 table.add_row("...", "...", "...")
@@ -81,21 +103,19 @@ class InlinedFunction:
 
 
 # -----------------------------------------------------------------------------
+@dataclass
 class AnalysisResult:
     """
-    The class :class:`AnalysisResult` represents the result of an inline analysis performed using :class:`InlineAnalyzer`
-
-    :param inlined_savings_list: inlined functions with more than one instance. These allow for potential FLASH savings.
-    :param inlined_no_savings_list: inlined functions with one instance.
-    :param savings_total_size: overall FLASH size used by inlined functions with more than one instance.
-    :param no_savings_total_size: overall FLASH size used by inlined functions with one instance.
+    The class `AnalysisResult` represents the result of an inline analysis performed using `InlineAnalyzer`
     """
-    def __init__(self, inlined_savings_list: list[InlinedFunction], inlined_no_savings_list: list[InlinedFunction],
-                savings_total_size: int, no_savings_total_size: int) -> None:
-        self.inlined_savings_list = inlined_savings_list
-        self.inlined_no_savings_list = inlined_no_savings_list
-        self.savings_total_size = savings_total_size
-        self.no_savings_total_size = no_savings_total_size
+    inlined_savings_list: list[InlinedFunction]
+    """inlined functions with more than one instance. These allow for potential FLASH savings."""
+    inlined_no_savings_list: list[InlinedFunction]
+    """inlined functions with one instance."""
+    savings_total_size: int
+    """overall FLASH size used by inlined functions with more than one instance."""
+    no_savings_total_size: int
+    """overall FLASH size used by inlined functions with one instance."""
 
 
 # -----------------------------------------------------------------------------
@@ -104,21 +124,22 @@ class InlineAnalyzer:
     Analyzes an ELF file and DWARF debugging data to identify inline functions and the instances where they are inlined to.
     This allows to identify options for a space-time tradeoff.
     """
-    def __init__(self) -> None:
+    def __init__(self):
         self._raw_inlined_functions = defaultdict(list)
+
 
     def get_inlined_functions(self, file_name: str) -> AnalysisResult:
         """
-        Returns the identified :class:`InlinedFunction` in the given ELF file.
+        Returns the identified `InlinedFunction` in the given ELF file.
         This is only possible if DWARF debugging data is available which contains debug ranges and line program.
 
         :param file_name: path to the ELF file to analyze.
 
-        :return: on success, a :class:`AnalysisResult` is returned. In case of errors an exception is raised.
+        :return: on success, a `AnalysisResult` is returned. In case of errors an exception is raised.
 
         :raises ValueError: if the debugging data is not sufficient of the analysis.
         """
-        logging.info(f"Processing file: {file_name}")
+        _LOGGER.info(f"Processing file: {file_name}")
         self._raw_inlined_functions.clear()
 
         with open(file_name, "rb") as f:
@@ -137,30 +158,31 @@ class InlineAnalyzer:
                 line_program = dwarf_info.line_program_for_CU(CU)
 
                 if line_program is None:
-                    logging.warning("CU @ {CU.cu_offset} DWARF info is missing line program. Skipping CU.")
+                    _LOGGER.warning("CU @ {CU.cu_offset} DWARF info is missing line program. Skipping CU.")
                     continue
 
                 top_die = CU.get_top_DIE()
-                self.__die_get_inlined_rec(top_die, line_program, range_lists)
-        return self.__raw_inlined_to_output()
+                self.die_get_inlined_rec(top_die, line_program, range_lists)
+        return self.raw_inlined_to_output()
 
-    def __die_get_inlined_rec(self, die: DIE, line_program: LineProgram, range_lists: RangeLists) -> None:
+
+    def die_get_inlined_rec(self, die: DIE, line_program: LineProgram, range_lists: RangeLists):
         """
         Recursively traverse all DIEs of a given top DIE and extract information about inlined functions.
 
         :param die: DIE to be processed. Is gathered recursively after passing a top DIE.
-        :param line_program: :class:`LineProgram` extracted from the DWARF debugging data.
-        :param range_lists: :class:`RangeLists` extracted from the DWARF debugging data.
+        :param line_program: `LineProgram` extracted from the DWARF debugging data.
+        :param range_lists: `RangeLists` extracted from the DWARF debugging data.
         """
         if die.tag == "DW_TAG_inlined_subroutine" and {"DW_AT_call_file"} <= die.attributes.keys():
-            call_file = self.__get_file_name(die.attributes["DW_AT_call_file"].value, line_program)
+            call_file = self.get_file_name(die.attributes["DW_AT_call_file"].value, line_program)
             call_line = die.attributes["DW_AT_call_line"].value
-            size = self.__get_size(die, range_lists)
+            size = self.get_size(die, range_lists)
 
-            decl_die = self.__resolve_die_ref(die, die.cu.cu_offset + die.attributes["DW_AT_abstract_origin"].value)
+            decl_die = self.resolve_die_ref(die, die.cu.cu_offset + die.attributes["DW_AT_abstract_origin"].value)
 
             if {"DW_AT_decl_file", "DW_AT_decl_line"} <= decl_die.attributes.keys():
-                decl_file = self.__get_file_name(decl_die.attributes["DW_AT_decl_file"].value, line_program)
+                decl_file = self.get_file_name(decl_die.attributes["DW_AT_decl_file"].value, line_program)
                 decl_line = decl_die.attributes["DW_AT_decl_line"].value
 
                 called_function = InlinedInstance(call_file, call_line, size)
@@ -168,14 +190,15 @@ class InlineAnalyzer:
 
         # Recurse into the DIE children
         for child in die.iter_children():
-                self.__die_get_inlined_rec(child, line_program, range_lists)
+                self.die_get_inlined_rec(child, line_program, range_lists)
 
-    def __get_file_name(self, file_idx: int, line_program: LineProgram) -> str:
+
+    def get_file_name(self, file_idx: int, line_program: LineProgram) -> Path:
         """
         Returns a file name given a DIE file index. To perform this mapping the line program is required.
 
         :param file_idx: DIE file index for which the file name shall be returned.
-        :param line_program: :class:`LineProgram` extracted from the DWARF debugging data.
+        :param line_program: `LineProgram` extracted from the DWARF debugging data.
 
         :return: the file name for the given DIE file index. This will include the full path if the line program
                  contains the relevant data. Otherwise, only the file name without path will be returned.
@@ -186,18 +209,19 @@ class InlineAnalyzer:
         dir_index = file_entry["dir_index"]
 
         if dir_index == 0:
-            return file_entry.name.decode()
+            return Path(file_entry.name.decode())
 
         directory = lp_header["include_directory"][dir_index - 1]
-        return posixpath.join(directory, file_entry.name).decode()
+        return Path(directory.decode()) / file_entry.name.decode()
 
-    def __get_size(self, die: DIE, range_lists: RangeLists) -> int:
+
+    def get_size(self, die: DIE, range_lists: RangeLists) -> int:
         """
         Returns the size required by the given DIE. The function will try different methods to get the size depending on the
         attributes being present in the DIE. If none of the methods are successful, `0` will be returned.
 
         :param die: DIE for which the size shall be returned.
-        :param range_lists: :class:`RangeLists` extracted from the DWARF debugging data.
+        :param range_lists: `RangeLists` extracted from the DWARF debugging data.
 
         :return: on success, the size of the DIE. Otherwise, `0` will be returned.
         """
@@ -212,7 +236,8 @@ class InlineAnalyzer:
             return size
         return 0
 
-    def __resolve_die_ref(self, die: DIE, ref_addr: int) -> DIE:
+
+    def resolve_die_ref(self, die: DIE, ref_addr: int) -> DIE:
         """
         Given a DIE containing a reference address, the DIE referenced by that address will be returned.
 
@@ -223,13 +248,14 @@ class InlineAnalyzer:
         """
         return die.cu.get_DIE_from_refaddr(ref_addr)
 
-    def __raw_inlined_to_output(self) -> AnalysisResult:
+
+    def raw_inlined_to_output(self) -> AnalysisResult:
         """
         Performs post-processing on the gathered data about inlined functions to bring it into an easy-to-use format.
         This includes wrapping the data into classes, grouping into inlined functions with and without FLASH saving potential
         and sorting by the amount of FLASH used.
 
-        :return: a :class:`AnalysisResult`.
+        :return: a `AnalysisResult`.
         """
         inlined_savings_list = []
         inlined_no_savings_list = []
