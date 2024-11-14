@@ -33,6 +33,7 @@ dependencies = [
     "cmsis-svd==0.4",
     "arm-gdb>=0.9.9,<1",
     "pydwf>=1.1.19,<2",
+    "pyelftools>=0.31",
     "yoctopuce>=1.10.57762,<2.0",
     "rpyc>=5.3.1,<6",
     "rich>=13.7.0,<14",
