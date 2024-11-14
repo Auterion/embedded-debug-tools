@@ -51,6 +51,8 @@ class InlinedInstance:
     """
     See `InlinedFunction`.
     """
+    translation_unit: str
+    """name of the translation unit this instance is used in."""
     file_name: Path
     """file where the function is inlined to."""
     file_line: int
@@ -72,29 +74,42 @@ class InlinedFunction:
     """line within the file where the inline function is declared."""
     total_size: int
     """total amount of flash used due to this method being inline."""
+    total_size_wo_overhead: int
+    """total amount of flash used due to this method being inline, reduced by the function call instruction overheads."""
     inlined_instances: list[InlinedInstance]
     """list of instances where this function is inlined to."""
 
-    def print(self, console: Console, num_of_instances: int, total_size: int) -> str:
+    def print(self, console: Console, num_of_instances: int, total_size: int, total_size_wo_overhead: int, call_overhead: int) -> str:
         """
         Prints the inlined function and its instances to the console in an easy-to-read format.
 
         :param console: console to print the output to.
         :param num_of_instances: the number of inlined instances to print. A value of `0` causes all to be displayed.
-        ;param total_size: total amount of FLASH used by inlined functions. Used to calculate the percentage caused by this inlined function.
+        :param total_size: total amount of FLASH used by inlined functions. Used to calculate the percentage caused by this inlined function.
+        :param total_size_wo_overhead: total amount of FLASH used by inlined functions, reduced by the function call instruction overheads.
+        :param call_overhead: expected instruction overhead caused by a function call.
         """
-        console.print(f"{_rel_file_name(self.file_name)}:{self.file_line} -- Total Size: {self.total_size} ({(self.total_size / total_size * 100):.2f}%)")
+        console.print((
+            f"{_rel_file_name(self.file_name)}:{self.file_line}"
+            f" -- Total Size: {self.total_size}"
+            f" ({(100 if total_size == 0 else (self.total_size / total_size * 100)):.2f}%)"
+            f" -- Total Size without instruction overhead: {self.total_size_wo_overhead}"
+            f" ({(100 if total_size_wo_overhead == 0 else (self.total_size_wo_overhead / total_size_wo_overhead * 100)):.2f}%)"
+        ))
 
         table = Table(box=rich.box.MINIMAL_DOUBLE_HEAD)
+        table.add_column("Translation unit")
         table.add_column("File name")
         table.add_column("File line")
         table.add_column("Size")
+        table.add_column("Call instruction overhead")
         table.add_column("%")
 
         for i, inlined_instance in enumerate(self.inlined_instances):
             if i < num_of_instances or num_of_instances == 0:
-                table.add_row(_rel_file_name(inlined_instance.file_name), str(inlined_instance.file_line),
-                              str(inlined_instance.size), "{:.2f}".format(inlined_instance.size / self.total_size * 100))
+                table.add_row(_rel_file_name(inlined_instance.translation_unit), _rel_file_name(inlined_instance.file_name), str(inlined_instance.file_line),
+                              str(inlined_instance.size), str(call_overhead),
+                              "{:.2f}".format(100 if self.total_size == 0 else inlined_instance.size / self.total_size * 100))
             else:
                 table.add_row("...", "...", "...")
                 break
@@ -116,6 +131,10 @@ class AnalysisResult:
     """overall FLASH size used by inlined functions with more than one instance."""
     no_savings_total_size: int
     """overall FLASH size used by inlined functions with one instance."""
+    savings_total_size_wo_overhead: int
+    """overall FLASH size used by inlined functions with more than one instance, reduced by function call instruction overheads."""
+    no_savings_total_size_wo_overhead: int
+    """overall FLASH size used by inlined functions with one instance, reduced by function call instruction overheads."""
 
 
 # -----------------------------------------------------------------------------
@@ -123,8 +142,11 @@ class InlineAnalyzer:
     """
     Analyzes an ELF file and DWARF debugging data to identify inline functions and the instances where they are inlined to.
     This allows to identify options for a space-time tradeoff.
+
+    :param call_overhead: expected instruction overhead caused by a function call.
     """
-    def __init__(self):
+    def __init__(self, call_overhead: int):
+        self._call_overhead = call_overhead
         self._raw_inlined_functions = defaultdict(list)
 
 
@@ -150,9 +172,6 @@ class InlineAnalyzer:
 
             dwarf_info = elf_file.get_dwarf_info()
             range_lists = dwarf_info.range_lists()
-
-            if range_lists is None:
-                raise ValueError(f"{file_name}: DWARF info is missing debug ranges.")
 
             for CU in dwarf_info.iter_CUs():
                 line_program = dwarf_info.line_program_for_CU(CU)
@@ -184,8 +203,9 @@ class InlineAnalyzer:
             if {"DW_AT_decl_file", "DW_AT_decl_line"} <= decl_die.attributes.keys():
                 decl_file = self.get_file_name(decl_die.attributes["DW_AT_decl_file"].value, line_program)
                 decl_line = decl_die.attributes["DW_AT_decl_line"].value
+                translation_unit_name = self.get_translation_unit_name(die)
 
-                called_function = InlinedInstance(call_file, call_line, size)
+                called_function = InlinedInstance(translation_unit_name, call_file, call_line, size)
                 self._raw_inlined_functions[(decl_file, decl_line)].append(called_function)
 
         # Recurse into the DIE children
@@ -214,6 +234,21 @@ class InlineAnalyzer:
         directory = lp_header["include_directory"][dir_index - 1]
         return Path(directory.decode()) / file_entry.name.decode()
 
+    def get_translation_unit_name(self, die: DIE) -> str:
+        """
+        Returns the name of the translation unit the given DIE is contained in. If the name can't be retrieved,
+        an empty string will be returned.
+
+        :param die: DIE for which the translation unit name shall be returned.
+
+        :return: on success, name of the translation unit. Otherwise, an empty string will be returned.
+        """
+        cu = self.resolve_die_ref(die, die.cu.cu_die_offset)
+
+        if {"DW_AT_name"} <= cu.attributes.keys():
+            return cu.attributes["DW_AT_name"].value.decode()
+        else:
+            return ""
 
     def get_size(self, die: DIE, range_lists: RangeLists) -> int:
         """
@@ -226,13 +261,16 @@ class InlineAnalyzer:
         :return: on success, the size of the DIE. Otherwise, `0` will be returned.
         """
         if {"DW_AT_high_pc"} <= die.attributes.keys():
-            return die.attributes["DW_AT_high_pc"].value + 1
+            return die.attributes["DW_AT_high_pc"].value
         if {"DW_AT_ranges"} <= die.attributes.keys():
+            if range_lists is None:
+                raise ValueError(f"DWARF info is missing debug ranges, which is required for DIE: {die}.")
+
             range_list = range_lists.get_range_list_at_offset(die.attributes["DW_AT_ranges"].value)
             size = 0
             for entry in range_list:
                 if isinstance(entry, RangeEntry):
-                    size = size + (entry.end_offset - entry.begin_offset) + 1
+                    size = size + (entry.end_offset - entry.begin_offset)
             return size
         return 0
 
@@ -259,8 +297,11 @@ class InlineAnalyzer:
         """
         inlined_savings_list = []
         inlined_no_savings_list = []
+
         savings_total_size = 0
         no_savings_total_size = 0
+        savings_total_size_wo_overhead = 0
+        no_savings_total_size_wo_overhead = 0
 
         for (decl_file, decl_line) in self._raw_inlined_functions:
             inlined_instances = []
@@ -269,18 +310,22 @@ class InlineAnalyzer:
             for inlined_instance in self._raw_inlined_functions[(decl_file, decl_line)]:
                 inlined_instances.append(inlined_instance)
                 total_size = total_size + inlined_instance.size
-            inlined_function = InlinedFunction(decl_file, decl_line, total_size, inlined_instances)
+            total_size_wo_overhead = max(total_size - (len(inlined_instances) * self._call_overhead), 0)
+            inlined_function = InlinedFunction(decl_file, decl_line, total_size, total_size_wo_overhead, inlined_instances)
 
             if len(inlined_instances) > 1:
                 inlined_savings_list.append(inlined_function)
                 savings_total_size = savings_total_size + total_size
+                savings_total_size_wo_overhead = savings_total_size_wo_overhead + total_size_wo_overhead
             else:
                 inlined_no_savings_list.append(inlined_function)
                 no_savings_total_size = no_savings_total_size + total_size
+                no_savings_total_size_wo_overhead = no_savings_total_size_wo_overhead + total_size_wo_overhead
 
-        inlined_savings_list.sort(key=lambda x: x.total_size, reverse=True)
-        inlined_no_savings_list.sort(key=lambda x: x.total_size, reverse=True)
-        return AnalysisResult(inlined_savings_list, inlined_no_savings_list, savings_total_size, no_savings_total_size)
+        inlined_savings_list.sort(key=lambda x: x.total_size_wo_overhead, reverse=True)
+        inlined_no_savings_list.sort(key=lambda x: x.total_size_wo_overhead, reverse=True)
+        return AnalysisResult(inlined_savings_list, inlined_no_savings_list, savings_total_size, no_savings_total_size,
+                              savings_total_size_wo_overhead, no_savings_total_size_wo_overhead)
 
 
 # -----------------------------------------------------------------------------
@@ -305,6 +350,12 @@ if __name__ == "__main__":
         default=0
     )
     parser.add_argument(
+        "--overhead",
+        help="Expected instruction overhead caused by a function call, and therefore needs to be removed from the saveable space. This should include at least one branch instruction.",
+        type=int,
+        default=8
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         default=False,
@@ -314,12 +365,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     console = Console()
-    inline_analyzer = InlineAnalyzer()
+    inline_analyzer = InlineAnalyzer(args.overhead)
     analysis_result = inline_analyzer.get_inlined_functions(args.file)
 
     for i, inlined_function in enumerate(analysis_result.inlined_savings_list):
         if i < args.n or args.n == 0:
-            inlined_function.print(console, args.m, analysis_result.savings_total_size)
+            inlined_function.print(console, args.m, analysis_result.savings_total_size, analysis_result.savings_total_size_wo_overhead, args.overhead)
             console.print("")
         else:
             console.print("[...]")
@@ -328,13 +379,15 @@ if __name__ == "__main__":
     if args.all:
         for i, inlined_function in enumerate(analysis_result.inlined_no_savings_list):
             if i < args.n or args.n == 0:
-                inlined_function.print(console, args.m, analysis_result.no_savings_total_size)
+                inlined_function.print(console, args.m, analysis_result.no_savings_total_size, analysis_result.no_savings_total_size_wo_overhead, args.overhead)
                 console.print("")
             else:
                 console.print("[...]")
                 break
 
-    console.print(f"Total saveable space: {analysis_result.savings_total_size}")
+    console.print(f"Total potentially saveable space: {analysis_result.savings_total_size}")
+    console.print(f"Total potentially saveable space without instruction overhead: {analysis_result.savings_total_size_wo_overhead}")
 
     if args.all:
         console.print(f"Total non-saveable space: {analysis_result.no_savings_total_size}")
+        console.print(f"Total non-saveable space without instruction overhead: {analysis_result.no_savings_total_size_wo_overhead}")
