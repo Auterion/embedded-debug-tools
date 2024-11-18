@@ -50,7 +50,7 @@ class Fmu:
 
     def _init(self):
         self.gdb.interrupt_and_wait()
-        for cmd in self._DBGMCU_CONFIG(self._target):
+        for cmd in Fmu._DBGMCU_CONFIG(self._target):
             self.gdb.execute(cmd)
         self.restart_system_load_monitor()
 
