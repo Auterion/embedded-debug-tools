@@ -72,7 +72,7 @@
 
 <p>The PX4 NSH can be accessed via a context manager.
 The received stream is polled in a background thread, so that no data is lost.
-See the <code><a href="serial/protocol.html#Nsh">emdbg.serial.protocol.Nsh</a></code> class for all functionality.</p>
+See the <code>emdbg.serial.protocol.Nsh</code> class for all functionality.</p>
 
 <div class="pdoc-code codehilite">
 <pre><span></span><code><span class="k">with</span> <span class="n">emdbg</span><span class="o">.</span><span class="n">serial</span><span class="o">.</span><span class="n">nsh</span><span class="p">(</span><span class="n">serial</span><span class="p">)</span> <span class="k">as</span> <span class="n">nsh</span><span class="p">:</span>
@@ -99,7 +99,7 @@ See the <code><a href="serial/protocol.html#Nsh">emdbg.serial.protocol.Nsh</a></
 </span><span id="L-5"><a href="#L-5"><span class="linenos">5</span></a><span class="sd">.. include:: README.md</span>
 </span><span id="L-6"><a href="#L-6"><span class="linenos">6</span></a><span class="sd">&quot;&quot;&quot;</span>
 </span><span id="L-7"><a href="#L-7"><span class="linenos">7</span></a>
-</span><span id="L-8"><a href="#L-8"><span class="linenos">8</span></a><span class="kn">from</span> <span class="nn">.protocol</span> <span class="kn">import</span> <span class="n">nsh</span>
+</span><span id="L-8"><a href="#L-8"><span class="linenos">8</span></a><span class="kn">from</span> <span class="nn">.protocol</span> <span class="kn">import</span> <span class="n">cmd</span><span class="p">,</span> <span class="n">nsh</span>
 </span></pre></div>
 
 
