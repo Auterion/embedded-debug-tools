@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from serial.tools import list_ports
+import re
 import logging
 _LOGGER = logging.getLogger("serial")
 
@@ -42,3 +43,10 @@ def find_serial_port(identifier=None):
         raise SerialException(msg)
 
     return serials
+
+
+_ANSI_ESCAPE = re.compile(r"\x1b(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+def ansi_escape(line: str) -> str:
+    """Removes ANSI escape sequences from a string"""
+    return _ANSI_ESCAPE.sub("", line)

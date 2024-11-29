@@ -5,4 +5,4 @@
 .. include:: README.md
 """
 
-from .protocol import nsh
+from .protocol import cmd, nsh

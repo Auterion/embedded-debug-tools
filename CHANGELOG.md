@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0
+
+- Generalize the `Nsh` command prompt into `Cmd`.
+
 ## 1.6.0
 
 - Add inline function analyzer.
