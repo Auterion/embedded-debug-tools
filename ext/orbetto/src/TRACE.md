@@ -36,9 +36,11 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v5x --orbtrace
 Reset the target and start the capture:
 
 ```
-(gdb) px4_etm_trace_tpiu_swo_stm32f7
+(gdb) px4_etm_trace_tpiu_swo_stm32f7 <TER_REG>
 (gdb) Continue
 ```
+
+Values for `<TER_REG>` are as described in: [TER_REG](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/README.md#ter_reg).
 
 
 ### FMUv6x
@@ -53,9 +55,11 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v6x --orbtrace
 Reset the target and start the capture. You might need to power cycle the target:
 
 ```
-(gdb) px4_etm_trace_tpiu_swo_stm32h7
+(gdb) px4_etm_trace_tpiu_swo_stm32h7 <TER_REG>
 (gdb) Continue
 ```
+
+Values for `<TER_REG>` are as described in: [TER_REG](https://github.com/Auterion/embedded-debug-tools/blob/main/ext/orbetto/README.md#ter_reg).
 
 
 ### Visualization

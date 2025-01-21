@@ -97,9 +97,11 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v5x --stlink
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_stm32f7
+(gdb) px4_trace_swo_stm32f7 <TER_REG>
 (gdb) continue
 ```
+
+Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
 
 
 ### FMUv6x
@@ -114,9 +116,31 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v6x --jlink
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_stm32h7
+(gdb) px4_trace_swo_stm32h7 <TER_REG>
 (gdb) continue
 ```
+
+Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
+
+
+### TER_REG
+
+The `<TER_REG>` parameter defines which stimulus ports are enabled for
+ITM and therefore which information will be included in the trace.
+The stimulus port numbers are defined in the enum contained in
+[itm.h](https://github.com/Auterion/embedded-debug-tools/blob/main/src/emdbg/patch/data/itm.h).
+Enabling stimulus port `i` requires setting bit `i` of the `TER_REG` parameter.
+
+Useful values are:
+- Task information: `0x0000000F`.
+- Workqueue scheduling: `0x00000010`.
+- Semaphore profiling: `0x000000E0`.
+- Heap profiling: `0x00000F00`.
+- DMA profiling: `0x00007000`.
+- All optional user channels: `0xFFFF0000`.
+
+As described above, they can be combined with a `bitwise or` to get combinations. For example:
+- Task information + Workqueue scheduling: `0x0000001F`.
 
 
 ### Finish
