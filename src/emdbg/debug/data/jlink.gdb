@@ -15,7 +15,7 @@ define px4_trace_swo_stm32f7
     tbreak nx_start
     continue
     monitor SWO EnableTarget 216000000 27000000 1 0
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
     shell nc localhost 2332 > trace.swo &
 end
 
@@ -24,6 +24,6 @@ define px4_trace_swo_stm32h7
     tbreak nx_start
     continue
     monitor SWO EnableTarget 120000000 30000000 1 0
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
     shell nc localhost 2332 > trace.swo &
 end

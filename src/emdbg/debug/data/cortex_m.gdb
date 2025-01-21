@@ -114,21 +114,7 @@ define px4_configure_orbuculum
     ITMSYNCEna 1
 
     # Enable ITM ports
-    # We always need the task information
-    set $TER = 0x0000000F
-    # Enable workqueue scheduling
-    set $TER |= 0x00000010
-
-    # Enable semaphore profiling
-    # set $TER |= 0x000000E0
-    # Enable heap profiling
-    # set $TER |= 0x00000F00
-    # Enable DMA profiling
-    # set $TER |= 0x00007000
-
-    # Enable all optional user channels
-    set $TER |= 0xFFFF0000
-
+    set $TER = $arg0
     # Write the TER to the device
     ITMTER 0 $TER
     # Enable the ITM
@@ -201,7 +187,7 @@ define px4_etm_trace_tpiu_swo_stm32f7
 
     enableSTM32TRACE 4 3 1
 
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
 
     startETM
 
@@ -220,7 +206,7 @@ define px4_trace_tpiu_swo_stm32f7
 
     enableSTM32TRACE 4 3 1
 
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
 
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
     shell killall orbuculum
@@ -234,7 +220,7 @@ define px4_etm_trace_tpiu_swo_stm32h7
 
     px4_enable_trace_stm32h7 4
 
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
 
     startETM
 
@@ -252,7 +238,7 @@ define px4_trace_tpiu_swo_stm32h7
 
     px4_enable_trace_stm32h7 4
 
-    px4_configure_orbuculum
+    px4_configure_orbuculum $arg0
 
     # -o trace.swo dumps the RAW data, not the demuxed data!!!
     shell killall orbuculum
