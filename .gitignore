@@ -4,6 +4,12 @@ build/
 eggs/
 *.egg*
 dist/
+.sconsign.dblite
+
+/ext/hwtools/*/build
+/ext/hwtools/*/modm
+/ext/hwtools/*/SConstruct
+
 /ext/orbetto/subprojects/perfetto
 /ext/orbetto/subprojects/orbuculum
 /ext/orbetto/subprojects/libdwarf*

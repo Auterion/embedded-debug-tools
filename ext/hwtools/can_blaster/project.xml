@@ -1,0 +1,12 @@
+<library>
+  <repositories>
+    <repository><path>../modm/repo.lb</path></repository>
+  </repositories>
+  <extends>modm:nucleo-l432kc</extends>
+  <modules>
+    <module>modm:platform:can:1</module>
+    <module>modm:platform:random</module>
+    <module>modm:processing:fiber</module>
+    <module>modm:build:scons</module>
+  </modules>
+</library>
