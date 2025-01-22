@@ -1,0 +1,60 @@
+name: Build Hardware Tools
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware-build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/modm-ext/modm-build-cortex-m:2024-12-01
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Fix Git permission/ownership problem
+        run: |
+          git config --global --add safe.directory /__w/embedded-debug-tools/embedded-debug-tools
+      - name: Update lbuild
+        run: |
+          pip3 install --upgrade --upgrade-strategy=eager --break-system-packages modm
+      - name: Check environment
+        run: |
+          env
+          locale -a
+          python --version  || true
+          python3 --version || true
+          python3 -c "import os; print(os.cpu_count())"
+          which scons
+          scons --version
+          which g++
+          g++ --version
+          which arm-none-eabi-g++
+          arm-none-eabi-g++ --version
+          which lbuild
+          lbuild --version
+
+      - name: Build Can Blaster
+        if: always()
+        working-directory: ext/hwtools/can_blaster
+        run: |
+          lbuild build
+          scons
+
+      - name: Upload artifact(s) to actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: ext/hwtools/**/*.elf
+          retention-days: 10
+          if-no-files-found: error
