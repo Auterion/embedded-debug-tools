@@ -51,6 +51,13 @@ jobs:
           lbuild build
           scons
 
+      - name: Build Can Loopback
+        if: always()
+        working-directory: ext/hwtools/can_loopback
+        run: |
+          lbuild build
+          scons
+
       - name: Upload artifact(s) to actions
         uses: actions/upload-artifact@v4
         with:

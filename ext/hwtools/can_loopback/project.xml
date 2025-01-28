@@ -1,0 +1,11 @@
+<library>
+  <repositories>
+    <repository><path>../modm/repo.lb</path></repository>
+  </repositories>
+  <extends>modm:nucleo-l432kc</extends>
+  <modules>
+    <module>modm:platform:can:1</module>
+    <module>modm:processing:timer</module>
+    <module>modm:build:scons</module>
+  </modules>
+</library>
