@@ -97,11 +97,12 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v5x --stlink
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_stm32f7 <TER_REG>
+(gdb) px4_trace_swo_stm32f7 <TER_REG> <SWO_FREQ[Hz]>
 (gdb) continue
 ```
 
-Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
+- Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
+- The value of `<SWO_FREQ>` should be ≤20MHz to get reliable tracing.
 
 
 ### FMUv6x
@@ -116,11 +117,12 @@ python3 -m emdbg.bench.fmu --target px4_fmu-v6x --jlink
 Reset your target and start the capture:
 
 ```
-(gdb) px4_trace_swo_stm32h7 <TER_REG>
+(gdb) px4_trace_swo_stm32h7 <TER_REG> <SWO_FREQ[Hz]>
 (gdb) continue
 ```
 
-Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
+- Values for `<TER_REG>` are as described in [TER_REG](#ter_reg).
+- The value of `<SWO_FREQ>` should be ≤20MHz to get reliable tracing.
 
 
 ### TER_REG
