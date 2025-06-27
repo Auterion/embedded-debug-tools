@@ -45,6 +45,7 @@ class Device(Base):
     @cached_property
     def _IDCODE_DEVICE(self):
         return {
+            0x0410: "STM32F10x med",
             0x0415: "STM32L47/L48xx",
             0x0451: "STM32F76xx, STM32F77xx",
             0x0450: "STM32H742, STM32H743/753, STM32H750",
@@ -54,6 +55,7 @@ class Device(Base):
     @cached_property
     def _GPIOS(self):
         return {
+            0x0410: list(range(0x4001_0800, 0x4001_1C00, 0x400)),
             0x0415: list(range(0x4800_0000, 0x4800_2000, 0x400)),
             # FMUv5x/v6x don't use ports J and K
             0x0451: list(range(0x4002_0000, 0x4002_2001, 0x400)),
@@ -121,10 +123,9 @@ class Device(Base):
     @cached_property
     def _SVD_FILE(self):
         return {
-            # 0x0415: Path(__file__).parents[1] / "data/STM32L4x6.svd",
+            0x0410: Path(__file__).parents[1] / "data/STM32F103.svd",
             0x0451: Path(__file__).parents[1] / "data/STM32F765.svd",
             0x0450: Path(__file__).parents[1] / "data/STM32H753.svd",
-            # 0x0483: Path(__file__).parents[1] / "data/STM32H7x3.svd",
         }.get(self.devid)
 
     @dataclass
@@ -244,6 +245,7 @@ class Device(Base):
         for jj, gper_addr in enumerate(self._GPIOS):
             port = chr(ord("A") + jj)
             gper = self.read_memory(gper_addr, 0x28).cast("I")
+            if gper[0] == 0xffffffff: continue
             for ii in range(16):
                 _1v = lambda index: (gper[index] >> ii) & 0x1
                 _2v = lambda index: (gper[index] >> ii*2) & 0x3
@@ -315,6 +317,7 @@ class Device(Base):
     def flash_size(self) -> int:
         """The FLASH size in bytes"""
         addr = {
+            0x0410: 0x1FFF_F7E0,
             0x0415: 0x1FFF_75E0,
             0x0451: 0x1FF0_F442,
             0x0450: 0x1FF1_E880,
@@ -334,6 +337,7 @@ class Device(Base):
     def uid(self) -> int:
         """The device's unique identifier as a big integer"""
         addr = {
+            0x0410: 0x1FFF_F7E8,
             0x0415: 0x1FFF_7590,
             0x0451: 0x1FF0_F420,
             0x0450: 0x1FF1_E800,
