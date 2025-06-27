@@ -191,7 +191,7 @@ def program(source: Path, commands: list[str] = None, config: list[Path] = None,
     """
     commands = utils.listify(commands) + \
         [f"program {Path(source).absolute()} verify reset exit"]
-    return call(commands=commands, config=config, search=search)
+    return call(commands=commands, config=config, search=search, serial=serial)
 
     # Unfortunately, some older OpenOCD versions seems to erase Flash sector 0
     # even if the ELF file has an offset. This overwrites the bootloader and
