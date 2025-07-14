@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.3
+
+- Pass along load address from CLI to JLink.
+
+## 1.7.2
+
+- Pass along debug probe serial number from CLI to OpenOCD.
+
+## 1.7.1
+
+- Allow setting SWO frequency for `px4_trace_swo*` commands.
+
 ## 1.7.0
 
 - Generalize the `Nsh` command prompt into `Cmd`.

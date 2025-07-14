@@ -193,7 +193,7 @@ def program(source: Path, device: str, speed: int, serial: str = None, load_addr
     """
     binary = os.environ.get("PX4_JLINK", "JLinkExe")
     if load_addr is None and Path(source).suffix == ".bin":
-        load_addr = 0x0800_0000
+        load_addr = hex(0x0800_0000)
     with tempfile.NamedTemporaryFile() as fcmd:
         # LoadFile erases the correct amount of sectors, then writes the new
         # binary or hex file. We still need to reset afterwards.
@@ -329,7 +329,7 @@ if __name__ == "__main__":
         exit(erase(args.device, args.speed, addr_range, args.serial))
 
     if args.command == "upload":
-        exit(program(os.path.abspath(args.source), args.device, args.speed, args.serial))
+        exit(program(os.path.abspath(args.source), args.device, args.speed, args.serial, args.load_addr))
 
     if args.command == "rtt":
         backend = JLinkBackend(args.device, args.speed, args.serial)
