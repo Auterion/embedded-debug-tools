@@ -15,7 +15,7 @@ jobs:
   firmware-build:
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/modm-ext/modm-build-cortex-m:2024-12-01
+      image: ghcr.io/modm-ext/modm-build-cortex-m:2025-05-18
 
     steps:
       - name: Check out repository
