@@ -31,7 +31,7 @@ jobs:
     name: Build and Test Orbetto on macOS
     runs-on: macos-13
     steps:
-      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils cmake
+      - run: brew install zmq sdl2 libelf protobuf meson ninja capstone dwarfutils
       - uses: actions/checkout@v3
       - run: meson setup ./build
         working-directory: ext/orbetto
