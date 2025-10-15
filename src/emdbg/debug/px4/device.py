@@ -244,6 +244,7 @@ class Device(Base):
         for jj, gper_addr in enumerate(self._GPIOS):
             port = chr(ord("A") + jj)
             gper = self.read_memory(gper_addr, 0x28).cast("I")
+            if gper[0] == 0xffffffff: continue
             for ii in range(16):
                 _1v = lambda index: (gper[index] >> ii) & 0x1
                 _2v = lambda index: (gper[index] >> ii*2) & 0x3
@@ -399,7 +400,7 @@ class Device(Base):
         return self.idcode >> 16
 
 
-def discover(gdb) -> Table:
+def discover(gdb, hint=None) -> Table:
     """
     Reads the device identifier registers and outputs a human readable string if possible.
     :return: description string
@@ -411,10 +412,12 @@ def discover(gdb) -> Table:
     table.add_column("Flash")
     table.add_column("Package")
     table.add_column("UID")
+    table.add_column("Hint")
     table.add_row(f"{dev.devid:#4x}: {dev.line}",
                   f"{dev.rev:#4x}: rev {dev._IDCODE_REVISION}",
                   f"{dev.flash_size//1024}kB", dev.package,
-                  f"{dev.uid:x}")
+                  f"{dev.uid:x}",
+                  hint or "")
     return table
 
 

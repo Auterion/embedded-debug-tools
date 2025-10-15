@@ -319,6 +319,15 @@ Device::Device(std::string_view hint)
         _clock = 480'000'000;
         _id = DeviceId::SYKNODE_V6X;
     }
+    else if (hint.find("stm32h743") != std::string_view::npos or
+             hint.find("v6s") != std::string_view::npos)
+    {
+        _irq_table = &irq_names_stm32h753;
+        _register_table = &registers_stm32h753;
+        _max_irq = 16+149;
+        _clock = 480'000'000;
+        _id = DeviceId::SKYNODE_V6S;
+    }
     // this was used in a pure NuttX build as ETM test
     else if (hint.find("nuttx") != std::string_view::npos)
     {

@@ -28,7 +28,7 @@ class PX4_Discover(gdb.Command):
 
     @report_exception
     def invoke(self, argument, from_tty):
-        _CONSOLE.print(px4.discover_device(gdb))
+        _CONSOLE.print(px4.discover_device(gdb, px4._TARGET))
 
 
 class PX4_Tasks(gdb.Command):
@@ -162,7 +162,7 @@ class PX4_Gpios(gdb.Command):
     @report_exception
     def invoke(self, argument, from_tty):
         args = self.parser.parse_args(shlex.split(argument))
-        pinout = px4.pinout(gdb, "fmu")
+        pinout = px4.pinout(gdb, px4._TARGET)
         columns = args.columns
         if args.pin_filter or args.filter or args.function_filter:
             columns = 1

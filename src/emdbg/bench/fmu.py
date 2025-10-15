@@ -24,7 +24,7 @@ class Fmu:
         if "fmu-v5x" in target:
             return ["set *0xE0042008 = 0xffffffff",
                     "set *0xE004200C = 0xffffffff"] + common
-        if "fmu-v6x" in target:
+        if "fmu-v6x" in target or "fmu-v6s" in target:
             return ["set *0xE00E1034 = 0xffffffff",
                     "set *0xE00E103C = 0xffffffff",
                     "set *0xE00E104C = 0xffffffff",
@@ -150,6 +150,9 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
         config = "fmu_v5x"
     elif "fmu-v6x" in target:
         device = "STM32H753II"
+        config = "fmu_v6x"
+    elif "fmu-v6s" in target:
+        device = "STM32H743II"
         config = "fmu_v6x"
     else:
         raise ValueError(f"Unknown device for '{target}'!")

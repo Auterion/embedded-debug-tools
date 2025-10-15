@@ -12,7 +12,7 @@ enum DeviceId
 {
     SYKNODE_V5X = 0,
     SYKNODE_V6X = 1,
-    SKYNODE_S = 2,
+    SKYNODE_V6S = 2,
 };
 
 class Device

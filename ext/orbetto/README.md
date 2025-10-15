@@ -111,7 +111,8 @@ FMUv6x can currently only be traced with J-Link:
 
 ```sh
 # cd PX4-Autopilot
-python3 -m emdbg.bench.fmu --target px4_fmu-v6x --jlink
+python3 -m emdbg.bench.fmu --target px4_fmu-v6x_default --jlink
+python3 -m emdbg.bench.fmu --target auterion_fmu-v6s_default --jlink
 ```
 
 Reset your target and start the capture:

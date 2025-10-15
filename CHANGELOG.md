@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.0
+
+- Add support for FMUv6s targets.
+
 ## 1.7.3
 
 - Pass along load address from CLI to JLink.
