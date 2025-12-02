@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+
+- Fix `px4_gpios` command.
+
 ## 1.8.0
 
 - Add support for FMUv6s targets.

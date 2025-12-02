@@ -288,7 +288,7 @@ _fmu_v6x = {
 }
 
 _fmu_v6s = {
-    "A0":  ("ADC1_INP16",   "ADC (EXTRAS)"),
+    "A0":  ("TIM5_CH1/ADC1_INP16",   "PWM_CH9/ADC (EXTRAS)"),
     "A1":  ("ETH_REF_CLK",  "ETH_REF_CLK_IN"),
     "A2":  ("ETH_MDIO", "ETH_MDIO"),
     "A3":  ("ADC1_INP15",   "ADC_SCALED_5V_INTERNAL"),
@@ -327,7 +327,7 @@ _fmu_v6s = {
     "C4":  ("ETH_RXD0", "ETH_RXD0"),
     "C5":  ("ETH_RXD1", "ETH_RXD1"),
     "C6":  ("TIM3_CH1", "PWM_CH5 (EXTRAS2)"),
-    "C7":  ("TIM8_CH2", "PPM_INPUT (EXTRAS)"),
+    "C7":  ("TIM8_CH2", "PWM_CH10/PPS_INPUT (EXTRAS)"),
     "C9":  ("TIM3_CH4", "PWM_CH8 (EXTRAS2)"),
     "C10": ("SPI3_SCK", "SPI_SCK_IMU3"),
     "C11": ("SPI3_MISO",    "SPI_MISO_IMU3"),
@@ -376,7 +376,6 @@ from .device import Device
 
 def pinout(gdb, hint=None) -> dict:
     hints = {
-        "io_v2": _io_v2,
         "v5x": _fmu_v5x,
         "v6x": _fmu_v6x,
         "v6s": _fmu_v6s,
@@ -385,7 +384,6 @@ def pinout(gdb, hint=None) -> dict:
         if name in hint:
             return pins
     return {
-        0x0410: _io_v2,
         0x0451: _fmu_v5x,
         0x0450: _fmu_v6s,
     }.get(Device(gdb).devid, {})
