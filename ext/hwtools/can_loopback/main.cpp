@@ -20,17 +20,19 @@ main()
     // Pins for D10=Rx, D2=Tx
     Can::connect<GpioA11::Rx, GpioA12::Tx>(Gpio::InputType::PullUp);
     (void) Can::initialize<Clock, 125_kbps>(5);
+    // We need to turn of the retransmission since the other node may not be available all the time
+    Can::setAutomaticRetransmission(false);
+    // Accept all messages
     CanFilter::setFilter(0, CanFilter::FIFO0,
                          CanFilter::ExtendedIdentifier(0),
                          CanFilter::ExtendedFilterMask(0));
+
 
     while(1)
     {
         if (Can::isMessageAvailable())
         {
-            Can::getMessage(message);
-            // Send message back
-            Can::sendMessage(message);
+            if (Can::getMessage(message)) Can::sendMessage(message);
         }
         if (tmr.execute()) Board::LedD13::toggle();
     }
