@@ -1,0 +1,42 @@
+arm_hardfault: Hard Fault escalation:
+arm_hardfault: PANIC!!! Hard Fault!:arm_hardfault: 	IRQ: 3 regs: 0x2001b7ec
+arm_hardfault: 	BASEPRI: 000000f0 PRIMASK: 00000000 IPSR: 00000003 CONTROL: 00000000
+arm_hardfault: 	CFSR: 00010000 HFSR: 40000000 DFSR: 00000000 BFAR: e000ed38 AFSR: 00000000
+arm_hardfault: Hard Fault Reason:
+up_assert: Assertion failed at file:armv7-m/arm_hardfault.c line: 173 task: task_watchdog
+arm_registerdump: R0: 00000000 R1: 0808f577 R2: 2001b137  R3: 00000210
+arm_registerdump: R4: e000e000 R5: 2001b132 R6: 200020b0  FP: 2001b118
+arm_registerdump: R8: 00000000 SB: 00000000 SL: 00000000 R11: 00000000
+arm_registerdump: IP: 00000000 SP: 2001b8c0 LR: 0805b1fb  PC: 0805b236
+arm_registerdump: xPSR: 61000000 BASEPRI: 000000f0 CONTROL: 00000000
+arm_registerdump: EXC_RETURN: ffffffe9
+arm_dump_stack: IRQ Stack:
+arm_dump_stack: sp:     20001550
+arm_dump_stack:   base: 200012b8
+arm_dump_stack:   size: 00000300
+arm_stackdump: 20001540: 00000001 00000000 0805b236 0801111d 40000000 00000003 2001b7ec 00010000
+arm_stackdump: 20001560: 00000000 00000000 00000000 08011037 00000080 08010d9f 40000000 00000000
+arm_stackdump: 20001580: e000ed38 00000000 20000068 00000000 200015b8 00000003 2001b118 08011fff
+arm_dump_stack: User Stack:
+arm_dump_stack: sp:     2001b8c0
+arm_dump_stack:   base: 2001b138
+arm_dump_stack:   size: 000007c8
+arm_stackdump: 2001b8c0: 200020b0 2001b132 00000002 0807f635 0805b939 00000002 2001b118 00000000
+arm_stackdump: 2001b8e0: 00000000 08018b33 00000000 08012bc3 00000000 00000000 00000000 00000000
+arm_showtasks:    PID    PRI     STACK      USED   FILLED    COMMAND
+arm_showtasks:   ----   ----       768       432    56.2%    irq
+arm_dump_task:      0      0       726       404    55.6%    Idle Task
+arm_dump_task:      1    254      2944       284     9.6%    hpwork 0x200016ac
+arm_dump_task:      2    100      2576      1876    72.8%    nsh_main
+arm_dump_task:      3    255      1232       564    45.7%    wq:manager
+arm_dump_task:      4    205      3472       728    20.9%    wq:lp_default 0x80a1090
+arm_dump_task:    197     90      3192      1996    62.5%    task_watchdog start
+arm_dump_task:     87    252      2368      1268    53.5%    wq:SPI2 0x80a17a4
+arm_dump_task:    200    236      4472      2716    60.7%    wq:uavcan 0x809d460
+arm_dump_task:    169    205      1936      1052    54.3%    gps start -d /dev/ttyS1 -b p:SER_GPS1_BAUD
+arm_dump_task:    186    242      2216      1252    56.4%    wq:nav_and_controllers 0x809d62c
+arm_dump_task:    187    255      3120      1212    38.8%    wq:rate_ctrl 0x809f4cc
+arm_dump_task:    188    241      5976      1236    20.6%    wq:INS0 0x809d624
+arm_dump_task:     77    245      2312       736    31.8%    wq:I2C2 0x80a176c
+arm_dump_task:    222    100      1992       276    13.8%    task_watchdog crash
+[boot] ver 0x15 rev 0x12 (AUTCAN015012)      956    34.4%    wq:hp_default 0x809ca18

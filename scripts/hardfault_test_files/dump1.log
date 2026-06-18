@@ -1,0 +1,26 @@
+arm_hardfault: PANIC!!! Hard Fault!
+arm_hardfault: 	IRQ: 3 regs: 0x2001b7ec
+arm_hardfault: 	BASEPRI: 000000f0 PRIMASK: 00000000 IPSR: 00000003 CONTROL: 00000000
+arm_hardfault: 	CFSR: 00010000 HFSR: 40000000 DFSR: 00000000 BFAR: e000ed38 AFSR: 00000000
+arm_hardfault: Hard Fault Reason:
+up_assert: Assertion failed at file:armv7-m/arm_hardfault.c line: 173 task: task_watchdog
+arm_registerdump: R0: 00000000 R1: 0808f577 R2: 2001b137  R3: 00000210
+arm_registerdump: R4: e000e000 R5: 2001b132 R6: 200020b0  FP: 2001b118
+arm_registerdump: R8: 00000000 SB: 00000000 SL: 00000000 R11: 00000000
+arm_registerdump: IP: 00000000 SP: 2001b8c0 LR: 0805b1fb  PC: 0805b236
+arm_registerdump: xPSR: 61000000 BASEPRI: 000000f0 CONTROL: 00000000
+arm_registerdump: EXC_RETURN: ffffffe9
+arm_dump_stack: IRQ Stack:
+arm_dump_stack: sp:     20001550
+arm_dump_stack:   base: 200012b8
+arm_dump_stack:   size: 00000300
+arm_stackdump: 20001540: 000001b0 00000038 00000002 00000020 40000000 00000003 2001b7ec 00010000
+arm_stackdump: 20001560: 00000000 00000000 00000000 08011037 00000080 08010d9f 40000000 00000000
+arm_stackdump: 20001580: e000ed38 00000000 20000068 00000000 200015b8 00000003 2001b118 08011fff
+arm_stackdump: 200015a0: 00000000 08010cdf e000e000 2001b132 200020b0 08010b41 2001b7ec 00000000
+arm_dump_stack: User Stack:
+arm_dump_stack: sp:     2001b8c0
+arm_dump_stack:   base: 2001b138
+arm_dump_stack:   size: 000007c8
+arm_stackdump: 2001b8c0: 200020b0 2001b132 00000002 0807f635 0805b939 00000002 2001b118 00000000
+arm_stackdump: 2001b8e0: 00000000 08018b33 00000000 08012bc3 00000000 00000000 00000000 00000000
