@@ -21,7 +21,7 @@ class Fmu:
         # Vector catch all exceptions, but not reset
         common = ["px4_enable_vector_catch"]
         # Halt all timers and peripherals while debugging
-        if "fmu-v5x" in target:
+        if "fmu-v5x" in target or "canio" in target:
             return ["set *0xE0042008 = 0xffffffff",
                     "set *0xE004200C = 0xffffffff"] + common
         if "fmu-v6x" in target or "fmu-v6s" in target:
@@ -154,6 +154,9 @@ def _px4_config(px4_directory: Path, target: Path, commands: list[str] = None,
     elif "fmu-v6s" in target:
         device = "STM32H743II"
         config = "fmu_v6x"
+    elif "canio" in target:
+        device = "STM32F412CG"
+        config = "canio"
     else:
         raise ValueError(f"Unknown device for '{target}'!")
 

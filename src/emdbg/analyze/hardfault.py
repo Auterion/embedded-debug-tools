@@ -93,8 +93,8 @@ def convert(log: str) -> str:
     # FIXME: hardcoded for FMUv6x (STM32H753)
     known_mems[0x5C00_1000] = 0x10030450
 
-    # CPUID
-    known_mems[0xE000_ED00] = 0x411fc270
+    # CPUID - default Cortex-M7 (FMUv5x/v6x); overridden if log provides 0xe000ed00
+    known_mems.setdefault(0xE000_ED00, 0x411fc270)
     # dump all the fault registers back into memory
     known_mems[0xE000_ED28] = fault_regs.get("c", 0)
     known_mems[0xE000_ED2C] = fault_regs.get("h", 0)
